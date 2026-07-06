@@ -6,17 +6,17 @@ import { useState } from "react";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Dither — Retro WebGL Shader Backgrounds" },
+      { title: "OBSERI — Agentic web intelligence" },
       {
         name: "description",
         content:
-          "A drop-in WebGL dithered wave background component. Retro pixel aesthetic, mouse-reactive, GPU-accelerated.",
+          "Turn volatile web signals into monitored sources, verifiable data, searchable memory, and repeatable workflows.",
       },
-      { property: "og:title", content: "Dither — Retro WebGL Shader Backgrounds" },
+      { property: "og:title", content: "OBSERI — Agentic web intelligence" },
       {
         property: "og:description",
         content:
-          "A drop-in WebGL dithered wave background component. Retro pixel aesthetic, mouse-reactive, GPU-accelerated.",
+          "Turn volatile web signals into monitored sources, verifiable data, searchable memory, and repeatable workflows.",
       },
     ],
   }),
