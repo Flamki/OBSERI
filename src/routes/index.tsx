@@ -45,15 +45,9 @@ function Index() {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_35%,_rgba(0,0,0,0.75)_100%)]" />
 
         <header className="relative z-10 flex items-center justify-between px-6 md:px-10 py-6">
-          <div className="flex items-center gap-2 text-sm font-semibold text-primary">
-            <Sparkles className="h-4 w-4" />
-            <span className="text-foreground">Dither</span>
-          </div>
-          <nav className="hidden md:flex items-center gap-1 rounded-full border border-border bg-background/60 backdrop-blur px-2 py-1.5 text-sm">
-            <a href="#features" className="px-4 py-1.5 rounded-full text-foreground/80 hover:text-foreground hover:bg-secondary transition">Features</a>
-            <a href="#props" className="px-4 py-1.5 rounded-full text-foreground/80 hover:text-foreground hover:bg-secondary transition">Props</a>
-            <a href="#install" className="px-4 py-1.5 rounded-full text-foreground/80 hover:text-foreground hover:bg-secondary transition">Install</a>
-          </nav>
+          <span className="text-sm font-bold tracking-widest text-foreground uppercase">
+            OBSERI
+          </span>
           <a
             href="#install"
             className="inline-flex items-center gap-2 rounded-full border border-border bg-background/60 backdrop-blur px-4 py-2 text-sm text-foreground hover:bg-secondary transition"
