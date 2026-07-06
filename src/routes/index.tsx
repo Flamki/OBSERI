@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import Dither from "@/components/Dither";
-import { ArrowRight, Sparkles, Zap, MousePointer2 } from "lucide-react";
+import { ArrowRight, Sparkles, Zap, MousePointer2, Plus, Smartphone, Globe, Palette, Mic, ArrowUp } from "lucide-react";
+import { useState } from "react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -74,24 +75,12 @@ function Index() {
             Turn volatile pixel signals into monitored sources, verifiable waves,
             searchable memory, and repeatable shader workflows.
           </p>
-          <div className="mt-10 flex flex-wrap items-center gap-3 pointer-events-auto">
-            <a
-              href="#install"
-              className="group inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-6 py-3 text-sm font-semibold hover:bg-primary/90 transition"
-            >
-              <Zap className="h-4 w-4 fill-current" />
-              Start monitoring
-            </a>
-            <a
-              href="#features"
-              className="inline-flex items-center gap-2 rounded-md border border-border bg-background/60 backdrop-blur text-foreground px-6 py-3 text-sm font-semibold hover:bg-secondary transition"
-            >
-              <MousePointer2 className="h-4 w-4" />
-              View workflow
-            </a>
+          <div className="mt-10 w-full max-w-4xl pointer-events-auto">
+            <PromptBox />
           </div>
         </div>
       </section>
+
 
 
       {/* FEATURES */}
@@ -241,6 +230,87 @@ function Feature({
       </div>
       <h3 className="text-xl font-bold mb-2 tracking-tight">{title}</h3>
       <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
+    </div>
+  );
+}
+
+function PromptBox() {
+  const [value, setValue] = useState("");
+  const [mode, setMode] = useState<"app" | "web">("app");
+
+  return (
+    <div className="rounded-3xl border border-border/60 bg-background/70 backdrop-blur-xl shadow-2xl p-5 md:p-6 text-left">
+      <textarea
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="What native mobile app shall we design?"
+        rows={4}
+        className="w-full resize-none bg-transparent text-lg md:text-xl text-foreground placeholder:text-muted-foreground/70 focus:outline-none border-0"
+      />
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="h-9 w-9 rounded-full border border-border/60 flex items-center justify-center text-foreground/80 hover:bg-secondary transition"
+            aria-label="Add attachment"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          <div className="flex items-center rounded-full border border-border/60 bg-background/50 p-1">
+            <button
+              type="button"
+              onClick={() => setMode("app")}
+              className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm transition ${
+                mode === "app" ? "bg-secondary text-foreground" : "text-foreground/70 hover:text-foreground"
+              }`}
+            >
+              <Smartphone className="h-4 w-4" />
+              App
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("web")}
+              className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm transition ${
+                mode === "web" ? "bg-secondary text-foreground" : "text-foreground/70 hover:text-foreground"
+              }`}
+            >
+              <Globe className="h-4 w-4" />
+              Web
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="h-9 w-9 rounded-full flex items-center justify-center text-foreground/70 hover:bg-secondary transition"
+            aria-label="Theme"
+          >
+            <Palette className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/50 px-3 py-1.5 text-sm text-foreground hover:bg-secondary transition"
+          >
+            <Sparkles className="h-4 w-4 text-primary" />
+            3 Flash
+          </button>
+          <button
+            type="button"
+            className="h-9 w-9 rounded-full flex items-center justify-center text-foreground/70 hover:bg-secondary transition"
+            aria-label="Voice input"
+          >
+            <Mic className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            className="h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition disabled:opacity-50"
+            disabled={!value.trim()}
+            aria-label="Submit"
+          >
+            <ArrowUp className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
