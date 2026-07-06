@@ -75,24 +75,12 @@ function Index() {
             Turn volatile pixel signals into monitored sources, verifiable waves,
             searchable memory, and repeatable shader workflows.
           </p>
-          <div className="mt-10 flex flex-wrap items-center gap-3 pointer-events-auto">
-            <a
-              href="#install"
-              className="group inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-6 py-3 text-sm font-semibold hover:bg-primary/90 transition"
-            >
-              <Zap className="h-4 w-4 fill-current" />
-              Start monitoring
-            </a>
-            <a
-              href="#features"
-              className="inline-flex items-center gap-2 rounded-md border border-border bg-background/60 backdrop-blur text-foreground px-6 py-3 text-sm font-semibold hover:bg-secondary transition"
-            >
-              <MousePointer2 className="h-4 w-4" />
-              View workflow
-            </a>
+          <div className="mt-10 w-full max-w-4xl pointer-events-auto">
+            <PromptBox />
           </div>
         </div>
       </section>
+
 
 
       {/* FEATURES */}
