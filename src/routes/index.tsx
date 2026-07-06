@@ -29,7 +29,7 @@ function Index() {
       <section className="relative h-screen w-full overflow-hidden">
         <div className="absolute inset-0">
           <Dither
-            waveColor={[0.55, 0.55, 0.6]}
+            waveColor={[0.55, 0.85, 0.35]}
             waveAmplitude={0.32}
             waveFrequency={3}
             waveSpeed={0.05}
@@ -40,59 +40,59 @@ function Index() {
           />
         </div>
 
-        {/* subtle vignette for legibility */}
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_40%,_rgba(0,0,0,0.55)_100%)]" />
+        {/* vignette for legibility */}
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_35%,_rgba(0,0,0,0.75)_100%)]" />
 
-        <header className="relative z-10 flex items-center justify-between px-6 md:px-12 py-6">
-          <div className="flex items-center gap-2 text-sm tracking-[0.3em] uppercase text-white/90">
-            <span className="inline-block h-2 w-2 bg-white" />
-            Dither/OS
+        <header className="relative z-10 flex items-center justify-between px-6 md:px-10 py-6">
+          <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+            <Sparkles className="h-4 w-4" />
+            <span className="text-foreground">Dither</span>
           </div>
-          <nav className="hidden md:flex items-center gap-8 text-xs uppercase tracking-widest text-white/70">
-            <a href="#features" className="hover:text-white transition">Features</a>
-            <a href="#props" className="hover:text-white transition">Props</a>
-            <a href="#install" className="hover:text-white transition">Install</a>
+          <nav className="hidden md:flex items-center gap-1 rounded-full border border-border bg-background/60 backdrop-blur px-2 py-1.5 text-sm">
+            <a href="#features" className="px-4 py-1.5 rounded-full text-foreground/80 hover:text-foreground hover:bg-secondary transition">Features</a>
+            <a href="#props" className="px-4 py-1.5 rounded-full text-foreground/80 hover:text-foreground hover:bg-secondary transition">Props</a>
+            <a href="#install" className="px-4 py-1.5 rounded-full text-foreground/80 hover:text-foreground hover:bg-secondary transition">Install</a>
           </nav>
           <a
             href="#install"
-            className="text-xs uppercase tracking-widest border border-white/40 px-4 py-2 text-white hover:bg-white hover:text-black transition"
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-background/60 backdrop-blur px-4 py-2 text-sm text-foreground hover:bg-secondary transition"
           >
-            Get it
+            <Sparkles className="h-4 w-4 text-primary" />
+            Request access
           </a>
         </header>
 
-        <div className="relative z-10 flex h-[calc(100vh-96px)] flex-col items-center justify-center px-6 text-center pointer-events-none">
-          <span className="text-xs uppercase tracking-[0.5em] text-white/70 mb-6">
-            v1.0 · WebGL · ogl
-          </span>
-          <h1 className="text-[15vw] md:text-[10vw] leading-[0.85] font-black tracking-tighter text-white">
-            DITHER.
+        <div className="relative z-10 flex h-[calc(100vh-96px)] flex-col items-start justify-center px-6 md:px-16 pointer-events-none">
+          <div className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-background/60 backdrop-blur px-4 py-2 text-xs text-primary mb-8">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+            Agentic web intelligence
+          </div>
+          <h1 className="text-[18vw] md:text-[12vw] leading-[0.85] font-black tracking-tighter text-foreground">
+            Dither
           </h1>
-          <p className="mt-6 max-w-xl text-base md:text-lg text-white/80">
-            A Bayer-dithered wave shader you can drop behind anything. Mouse-reactive.
-            GPU-cheap. Unapologetically retro.
+          <p className="mt-8 max-w-lg text-lg md:text-xl text-foreground/80 leading-relaxed">
+            Turn volatile pixel signals into monitored sources, verifiable waves,
+            searchable memory, and repeatable shader workflows.
           </p>
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-3 pointer-events-auto">
+          <div className="mt-10 flex flex-wrap items-center gap-3 pointer-events-auto">
             <a
               href="#install"
-              className="group inline-flex items-center gap-2 bg-white text-black px-6 py-3 text-sm uppercase tracking-widest hover:bg-white/90 transition"
+              className="group inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-6 py-3 text-sm font-semibold hover:bg-primary/90 transition"
             >
-              Copy component
-              <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
+              <Zap className="h-4 w-4 fill-current" />
+              Start monitoring
             </a>
             <a
               href="#features"
-              className="inline-flex items-center gap-2 border border-white/40 text-white px-6 py-3 text-sm uppercase tracking-widest hover:bg-white/10 transition"
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-background/60 backdrop-blur text-foreground px-6 py-3 text-sm font-semibold hover:bg-secondary transition"
             >
-              What it does
+              <MousePointer2 className="h-4 w-4" />
+              View workflow
             </a>
-          </div>
-
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-[10px] uppercase tracking-[0.4em] text-white/60">
-            move your cursor ↴
           </div>
         </div>
       </section>
+
 
       {/* FEATURES */}
       <section id="features" className="border-t border-border">
