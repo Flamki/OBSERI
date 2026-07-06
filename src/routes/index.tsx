@@ -6,17 +6,17 @@ import { useState } from "react";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Dither — Retro WebGL Shader Backgrounds" },
+      { title: "OBSERI — Agentic web intelligence" },
       {
         name: "description",
         content:
-          "A drop-in WebGL dithered wave background component. Retro pixel aesthetic, mouse-reactive, GPU-accelerated.",
+          "Turn volatile web signals into monitored sources, verifiable data, searchable memory, and repeatable workflows.",
       },
-      { property: "og:title", content: "Dither — Retro WebGL Shader Backgrounds" },
+      { property: "og:title", content: "OBSERI — Agentic web intelligence" },
       {
         property: "og:description",
         content:
-          "A drop-in WebGL dithered wave background component. Retro pixel aesthetic, mouse-reactive, GPU-accelerated.",
+          "Turn volatile web signals into monitored sources, verifiable data, searchable memory, and repeatable workflows.",
       },
     ],
   }),
@@ -45,15 +45,9 @@ function Index() {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_35%,_rgba(0,0,0,0.75)_100%)]" />
 
         <header className="relative z-10 flex items-center justify-between px-6 md:px-10 py-6">
-          <div className="flex items-center gap-2 text-sm font-semibold text-primary">
-            <Sparkles className="h-4 w-4" />
-            <span className="text-foreground">Dither</span>
-          </div>
-          <nav className="hidden md:flex items-center gap-1 rounded-full border border-border bg-background/60 backdrop-blur px-2 py-1.5 text-sm">
-            <a href="#features" className="px-4 py-1.5 rounded-full text-foreground/80 hover:text-foreground hover:bg-secondary transition">Features</a>
-            <a href="#props" className="px-4 py-1.5 rounded-full text-foreground/80 hover:text-foreground hover:bg-secondary transition">Props</a>
-            <a href="#install" className="px-4 py-1.5 rounded-full text-foreground/80 hover:text-foreground hover:bg-secondary transition">Install</a>
-          </nav>
+          <span className="text-sm font-bold tracking-widest text-foreground uppercase">
+            OBSERI
+          </span>
           <a
             href="#install"
             className="inline-flex items-center gap-2 rounded-full border border-border bg-background/60 backdrop-blur px-4 py-2 text-sm text-foreground hover:bg-secondary transition"
@@ -69,7 +63,7 @@ function Index() {
             Agentic web intelligence
           </div>
           <h1 className="text-[18vw] md:text-[12vw] leading-[0.85] font-black tracking-tighter text-foreground">
-            Dither
+            OBSERI
           </h1>
           <p className="mt-8 max-w-lg text-lg md:text-xl text-foreground/80 leading-relaxed">
             Turn volatile pixel signals into monitored sources, verifiable waves,
@@ -206,7 +200,7 @@ function Index() {
 
       <footer className="border-t border-border">
         <div className="mx-auto max-w-6xl px-6 md:px-12 py-8 flex items-center justify-between text-xs uppercase tracking-widest text-muted-foreground">
-          <span>Dither/OS · 2026</span>
+          <span>OBSERI · 2026</span>
           <span>Made with ogl + WebGL</span>
         </div>
       </footer>
