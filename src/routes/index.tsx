@@ -200,7 +200,7 @@ function Index() {
 
       <footer className="border-t border-border">
         <div className="mx-auto max-w-6xl px-6 md:px-12 py-8 flex items-center justify-between text-xs uppercase tracking-widest text-muted-foreground">
-          <span>Dither/OS · 2026</span>
+          <span>OBSERI · 2026</span>
           <span>Made with ogl + WebGL</span>
         </div>
       </footer>
