@@ -63,7 +63,7 @@ function Index() {
             Agentic web intelligence
           </div>
           <h1 className="text-[18vw] md:text-[12vw] leading-[0.85] font-black tracking-tighter text-foreground">
-            Dither
+            OBSERI
           </h1>
           <p className="mt-8 max-w-lg text-lg md:text-xl text-foreground/80 leading-relaxed">
             Turn volatile pixel signals into monitored sources, verifiable waves,
