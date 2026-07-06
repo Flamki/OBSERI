@@ -29,19 +29,19 @@ function Index() {
       <section className="relative h-screen w-full overflow-hidden">
         <div className="absolute inset-0">
           <Dither
-            waveColor={[0.22, 0.25, 0.55]}
-            waveAmplitude={0.32}
-            waveFrequency={3}
-            waveSpeed={0.05}
-            colorNum={4}
+            waveColor={[0.32, 0.36, 0.72]}
+            waveAmplitude={0.35}
+            waveFrequency={2.5}
+            waveSpeed={0.04}
+            colorNum={5}
             pixelSize={2}
-            mouseRadius={0.35}
+            mouseRadius={0.4}
             enableMouseInteraction
           />
         </div>
 
         {/* vignette for legibility */}
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_35%,_rgba(0,0,0,0.75)_100%)]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_40%,_rgba(0,0,0,0.55)_100%)]" />
 
         <header className="relative z-10 flex items-center justify-between px-6 md:px-10 py-6">
           <div className="flex items-center gap-2 text-sm font-semibold text-primary">
