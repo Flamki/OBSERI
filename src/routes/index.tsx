@@ -1,7 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import Dither from "@/components/Dither";
-import { Sparkles, Zap, MousePointer2, Plus, Smartphone, Globe, Palette, Mic, ArrowUp } from "lucide-react";
+import FaultyTerminal from "@/components/FaultyTerminal";
+import { Sparkles, Zap, MousePointer2, Plus, Smartphone, Globe, Palette, Mic, ArrowUp, Menu, ChevronRight } from "lucide-react";
 import { useState } from "react";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -48,13 +57,96 @@ function Index() {
           <span className="text-xl font-bold tracking-tight text-foreground">
             Obseri<span className="text-primary">.</span>
           </span>
-          <a
-            href="#install"
-            className="inline-flex items-center gap-2 rounded-full border border-border bg-background/60 backdrop-blur px-4 py-2 text-sm text-foreground hover:bg-secondary transition"
-          >
-            <Sparkles className="h-4 w-4 text-primary" />
-            Request access
-          </a>
+          <div className="flex items-center gap-3">
+            <a
+              href="#install"
+              className="inline-flex items-center gap-2 rounded-full border border-border bg-background/60 backdrop-blur px-4 py-2 text-sm text-foreground hover:bg-secondary transition"
+            >
+              <Sparkles className="h-4 w-4 text-primary" />
+              Request access
+            </a>
+
+            <Sheet>
+              <SheetTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background/60 backdrop-blur text-foreground hover:bg-secondary cursor-pointer transition"
+                  aria-label="Toggle menu"
+                >
+                  <Menu className="h-4 w-4" />
+                </button>
+              </SheetTrigger>
+              <SheetContent className="border-l border-border/40 bg-background/80 backdrop-blur-xl text-foreground font-mono w-[320px] sm:w-[380px] p-6 flex flex-col justify-between">
+                <div>
+                  <SheetHeader className="text-left space-y-1 mb-8">
+                    <SheetTitle className="text-2xl font-black tracking-tighter text-foreground flex items-center gap-2">
+                      Obseri<span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                    </SheetTitle>
+                    <SheetDescription className="text-xs uppercase tracking-widest text-muted-foreground">
+                      Agentic Web Intelligence
+                    </SheetDescription>
+                  </SheetHeader>
+
+                  <div className="h-px bg-border/40 mb-8" />
+
+                  <nav className="space-y-4">
+                    {[
+                      { num: "01", label: "Features", href: "#features" },
+                      { num: "02", label: "Props", href: "#props" },
+                      { num: "03", label: "Install", href: "#install" },
+                    ].map((item) => (
+                      <a
+                        key={item.label}
+                        href={item.href}
+                        className="group flex items-center justify-between p-3 rounded-xl border border-transparent hover:border-border/30 hover:bg-secondary/40 transition-all duration-200"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] text-primary/70 font-bold bg-primary/10 px-2 py-0.5 rounded">
+                            {item.num}
+                          </span>
+                          <span className="text-sm font-bold tracking-tight text-foreground/80 group-hover:text-foreground group-hover:translate-x-1 transition-all duration-200">
+                            {item.label}
+                          </span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all duration-200" />
+                      </a>
+                    ))}
+                  </nav>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="h-px bg-border/40" />
+
+                  {/* System Stats Console Panel */}
+                  <div className="rounded-xl border border-border/30 bg-secondary/20 p-4 font-mono text-[10px] text-muted-foreground space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span>Status</span>
+                      <span className="text-primary font-bold flex items-center gap-1.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        Super Smooth (60 FPS)
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Performance</span>
+                      <span className="text-foreground/80">Intersection-Observed</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Octaves (Hero Waves)</span>
+                      <span className="text-foreground/80">4 (Optimized)</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Engine</span>
+                      <span className="text-foreground/80">React + WebGL (OGL)</span>
+                    </div>
+                  </div>
+
+                  <div className="text-[10px] text-center text-muted-foreground/60 tracking-wider">
+                    Obseri Systems v1.0.0
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
         </header>
 
         <div className="relative z-10 flex h-[calc(100vh-96px)] flex-col items-center justify-center px-6 md:px-16 pointer-events-none text-center">
@@ -194,10 +286,31 @@ function Index() {
         </div>
       </section>
 
-      <footer className="border-t border-border">
-        <div className="mx-auto max-w-6xl px-6 md:px-12 py-8 flex items-center justify-between text-xs uppercase tracking-widest text-muted-foreground">
-          <span>Obseri · 2026</span>
-          <span>Made with ogl + WebGL</span>
+      <footer className="relative border-t border-border overflow-hidden bg-background py-48">
+        <div className="absolute inset-0 z-0 opacity-40">
+          <FaultyTerminal
+            scale={1.8}
+            gridMul={[2, 1]}
+            digitSize={1.1}
+            timeScale={0.8}
+            pause={false}
+            scanlineIntensity={0.6}
+            glitchAmount={1.2}
+            flickerAmount={0.3}
+            noiseAmp={0.6}
+            chromaticAberration={0.8}
+            dither={0.1}
+            curvature={0.15}
+            tint="#86efac"
+            mouseReact={true}
+            mouseStrength={0.4}
+            pageLoadAnimation={false}
+            brightness={0.4}
+          />
+        </div>
+        <div className="relative z-10 mx-auto max-w-6xl px-6 md:px-12 flex items-center justify-between text-xs uppercase tracking-widest text-muted-foreground">
+          <span className="bg-background/80 backdrop-blur-sm px-3 py-1.5 border border-border/40 rounded">Obseri · 2026</span>
+          <span className="bg-background/80 backdrop-blur-sm px-3 py-1.5 border border-border/40 rounded">Made with ogl + WebGL</span>
         </div>
       </footer>
     </div>

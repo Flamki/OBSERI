@@ -68,7 +68,7 @@ float cnoise(vec2 P) {
   vec2 n_x = mix(vec2(n00, n01), vec2(n10, n11), fade_xy.x);
   return 2.3 * mix(n_x.x, n_x.y, fade_xy.y);
 }
-const int OCTAVES = 8;
+const int OCTAVES = 4;
 float fbm(vec2 p) {
   float value = 0.0;
   float amp = 1.0;
@@ -181,6 +181,15 @@ export default function Dither({
     const container = containerRef.current;
     if (!container) return;
 
+    let isVisible = true;
+    const observerIntersection = new IntersectionObserver(
+      ([entry]) => {
+        isVisible = entry.isIntersecting;
+      },
+      { threshold: 0.01 }
+    );
+    observerIntersection.observe(container);
+
     const renderer = new Renderer({ alpha: true });
     const gl = renderer.gl;
     gl.clearColor(0, 0, 0, 0);
@@ -241,6 +250,8 @@ export default function Dither({
 
     let animationId = 0;
     const update = (t: number) => {
+      animationId = requestAnimationFrame(update);
+      if (!isVisible) return;
       const p = propsRef.current;
       if (p.enableMouseInteraction) {
         const s = 0.05;
@@ -266,7 +277,6 @@ export default function Dither({
       program.uniforms.colorNum.value = p.colorNum;
       program.uniforms.pixelSize.value = p.pixelSize;
       renderer.render({ scene: mesh });
-      animationId = requestAnimationFrame(update);
     };
     animationId = requestAnimationFrame(update);
 
@@ -275,6 +285,7 @@ export default function Dither({
       window.removeEventListener("resize", resize);
       container.removeEventListener("mousemove", handleMouseMove);
       container.removeEventListener("mouseleave", handleMouseLeave);
+      observerIntersection.disconnect();
       if (canvas.parentNode === container) container.removeChild(canvas);
       gl.getExtension("WEBGL_lose_context")?.loseContext();
     };
