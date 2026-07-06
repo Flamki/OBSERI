@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import Dither from "@/components/Dither";
-import { ArrowRight, Sparkles, Zap, MousePointer2 } from "lucide-react";
+import { ArrowRight, Sparkles, Zap, MousePointer2, Plus, Smartphone, Globe, Palette, Mic, ArrowUp } from "lucide-react";
+import { useState } from "react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
