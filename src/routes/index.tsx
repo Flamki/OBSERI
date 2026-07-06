@@ -234,6 +234,87 @@ function Feature({
   );
 }
 
+function PromptBox() {
+  const [value, setValue] = useState("");
+  const [mode, setMode] = useState<"app" | "web">("app");
+
+  return (
+    <div className="rounded-3xl border border-border/60 bg-background/70 backdrop-blur-xl shadow-2xl p-5 md:p-6 text-left">
+      <textarea
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="What native mobile app shall we design?"
+        rows={4}
+        className="w-full resize-none bg-transparent text-lg md:text-xl text-foreground placeholder:text-muted-foreground/70 focus:outline-none border-0"
+      />
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="h-9 w-9 rounded-full border border-border/60 flex items-center justify-center text-foreground/80 hover:bg-secondary transition"
+            aria-label="Add attachment"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          <div className="flex items-center rounded-full border border-border/60 bg-background/50 p-1">
+            <button
+              type="button"
+              onClick={() => setMode("app")}
+              className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm transition ${
+                mode === "app" ? "bg-secondary text-foreground" : "text-foreground/70 hover:text-foreground"
+              }`}
+            >
+              <Smartphone className="h-4 w-4" />
+              App
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("web")}
+              className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm transition ${
+                mode === "web" ? "bg-secondary text-foreground" : "text-foreground/70 hover:text-foreground"
+              }`}
+            >
+              <Globe className="h-4 w-4" />
+              Web
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="h-9 w-9 rounded-full flex items-center justify-center text-foreground/70 hover:bg-secondary transition"
+            aria-label="Theme"
+          >
+            <Palette className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/50 px-3 py-1.5 text-sm text-foreground hover:bg-secondary transition"
+          >
+            <Sparkles className="h-4 w-4 text-primary" />
+            3 Flash
+          </button>
+          <button
+            type="button"
+            className="h-9 w-9 rounded-full flex items-center justify-center text-foreground/70 hover:bg-secondary transition"
+            aria-label="Voice input"
+          >
+            <Mic className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            className="h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition disabled:opacity-50"
+            disabled={!value.trim()}
+            aria-label="Submit"
+          >
+            <ArrowUp className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const PROPS = [
   { name: "waveSpeed", def: "0.05", desc: "Speed of wave animation." },
   { name: "waveFrequency", def: "3", desc: "Frequency of the wave pattern." },
