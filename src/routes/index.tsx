@@ -1,24 +1,31 @@
 import { createFileRoute } from "@tanstack/react-router";
+import Dither from "@/components/Dither";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
 function Index() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
+    <div className="relative w-full h-screen overflow-hidden bg-black">
+      <Dither
+        waveColor={[0.5, 0.5, 0.5]}
+        disableAnimation={false}
+        enableMouseInteraction={true}
+        mouseRadius={0.3}
+        colorNum={4}
+        waveAmplitude={0.3}
+        waveFrequency={3}
+        waveSpeed={0.05}
       />
+      <div className="relative z-10 flex h-full flex-col items-center justify-center text-center px-4 pointer-events-none">
+        <h1 className="text-5xl md:text-7xl font-bold text-white tracking-tight">
+          Dither
+        </h1>
+        <p className="mt-4 text-lg text-white/80 max-w-xl">
+          An animated WebGL dither shader background.
+        </p>
+      </div>
     </div>
   );
 }
