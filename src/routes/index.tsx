@@ -58,18 +58,14 @@ function Index() {
         </header>
 
         <div className="relative z-10 flex h-[calc(100vh-96px)] flex-col items-center justify-center px-6 md:px-16 pointer-events-none text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-background/60 backdrop-blur px-4 py-2 text-xs text-primary mb-8">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-            Agentic web intelligence
-          </div>
           <h1 className="text-[18vw] md:text-[12vw] leading-[0.85] font-black tracking-tighter text-foreground">
             Obseri<span className="text-primary">.</span>
           </h1>
-          <p className="mt-8 max-w-lg text-lg md:text-xl text-foreground/80 leading-relaxed">
+          <p className="mt-6 max-w-lg text-lg md:text-xl text-foreground/80 leading-relaxed">
             Turn volatile pixel signals into monitored sources, verifiable waves,
             searchable memory, and repeatable shader workflows.
           </p>
-          <div className="mt-10 w-full max-w-4xl pointer-events-auto">
+          <div className="mt-8 w-full max-w-4xl pointer-events-auto">
             <PromptBox />
           </div>
         </div>
