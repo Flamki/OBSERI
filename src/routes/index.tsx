@@ -5,17 +5,17 @@ import { ArrowRight, Sparkles, Zap, MousePointer2 } from "lucide-react";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Dither — Retro WebGL Shader Backgrounds" },
+      { title: "obseri — see the signal in the noise" },
       {
         name: "description",
         content:
-          "A drop-in WebGL dithered wave background component. Retro pixel aesthetic, mouse-reactive, GPU-accelerated.",
+          "A focused observability surface for web intelligence. Monitor, search, and verify signals in real time.",
       },
-      { property: "og:title", content: "Dither — Retro WebGL Shader Backgrounds" },
+      { property: "og:title", content: "obseri — see the signal in the noise" },
       {
         property: "og:description",
         content:
-          "A drop-in WebGL dithered wave background component. Retro pixel aesthetic, mouse-reactive, GPU-accelerated.",
+          "A focused observability surface for web intelligence. Monitor, search, and verify signals in real time.",
       },
     ],
   }),
