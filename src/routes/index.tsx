@@ -29,7 +29,7 @@ function Index() {
       <section className="relative h-screen w-full overflow-hidden">
         <div className="absolute inset-0">
           <Dither
-            waveColor={[0.55, 0.85, 0.35]}
+            waveColor={[0.22, 0.25, 0.55]}
             waveAmplitude={0.32}
             waveFrequency={3}
             waveSpeed={0.05}
@@ -46,7 +46,7 @@ function Index() {
         <header className="relative z-10 flex items-center justify-between px-6 md:px-10 py-6">
           <div className="flex items-center gap-2 text-sm font-semibold text-primary">
             <Sparkles className="h-4 w-4" />
-            <span className="text-foreground">Dither</span>
+            <span className="text-foreground">obseri</span>
           </div>
           <nav className="hidden md:flex items-center gap-1 rounded-full border border-border bg-background/60 backdrop-blur px-2 py-1.5 text-sm">
             <a href="#features" className="px-4 py-1.5 rounded-full text-foreground/80 hover:text-foreground hover:bg-secondary transition">Features</a>
@@ -62,33 +62,38 @@ function Index() {
           </a>
         </header>
 
-        <div className="relative z-10 flex h-[calc(100vh-96px)] flex-col items-start justify-center px-6 md:px-16 pointer-events-none">
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-background/60 backdrop-blur px-4 py-2 text-xs text-primary mb-8">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-            Agentic web intelligence
-          </div>
-          <h1 className="text-[18vw] md:text-[12vw] leading-[0.85] font-black tracking-tighter text-foreground">
-            Dither
-          </h1>
-          <p className="mt-8 max-w-lg text-lg md:text-xl text-foreground/80 leading-relaxed">
-            Turn volatile pixel signals into monitored sources, verifiable waves,
-            searchable memory, and repeatable shader workflows.
-          </p>
-          <div className="mt-10 flex flex-wrap items-center gap-3 pointer-events-auto">
-            <a
-              href="#install"
-              className="group inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-6 py-3 text-sm font-semibold hover:bg-primary/90 transition"
-            >
-              <Zap className="h-4 w-4 fill-current" />
-              Start monitoring
-            </a>
-            <a
-              href="#features"
-              className="inline-flex items-center gap-2 rounded-md border border-border bg-background/60 backdrop-blur text-foreground px-6 py-3 text-sm font-semibold hover:bg-secondary transition"
-            >
-              <MousePointer2 className="h-4 w-4" />
-              View workflow
-            </a>
+        <div className="relative z-10 flex h-[calc(100vh-96px)] items-center justify-center px-6 md:px-12">
+          <div className="relative w-full max-w-3xl overflow-hidden rounded-[2.5rem] border border-primary/20 bg-card/40 p-8 md:p-14 shadow-2xl backdrop-blur-2xl">
+            <div className="pointer-events-none absolute -left-1/4 -top-1/4 h-1/2 w-1/2 rounded-full bg-primary/20 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-1/4 -right-1/4 h-1/2 w-1/2 rounded-full bg-accent/10 blur-3xl" />
+            <div className="relative">
+              <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs text-primary">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                Agentic web intelligence
+              </div>
+              <h1 className="text-7xl md:text-9xl font-black tracking-tighter text-foreground">
+                obseri
+              </h1>
+              <p className="mt-6 max-w-md text-lg md:text-xl text-foreground/70 leading-relaxed">
+                What signal should we observe today?
+              </p>
+              <div className="mt-10 flex flex-wrap items-center gap-3">
+                <a
+                  href="#install"
+                  className="group inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-6 py-3 text-sm font-semibold hover:bg-primary/90 transition"
+                >
+                  <Zap className="h-4 w-4 fill-current" />
+                  Start observing
+                </a>
+                <a
+                  href="#features"
+                  className="inline-flex items-center gap-2 rounded-full border border-border bg-background/60 backdrop-blur text-foreground px-6 py-3 text-sm font-semibold hover:bg-secondary transition"
+                >
+                  <MousePointer2 className="h-4 w-4" />
+                  Explore workflow
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </section>
