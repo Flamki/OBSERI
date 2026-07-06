@@ -1,18 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import Dither from "@/components/Dither";
-import { ArrowRight, Sparkles, Zap, MousePointer2, Plus, Smartphone, Globe, Palette, Mic, ArrowUp } from "lucide-react";
+import { Sparkles, Zap, MousePointer2, Plus, Smartphone, Globe, Palette, Mic, ArrowUp } from "lucide-react";
 import { useState } from "react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "OBSERI — Agentic web intelligence" },
+      { title: "Obseri — Agentic web intelligence" },
       {
         name: "description",
         content:
           "Turn volatile web signals into monitored sources, verifiable data, searchable memory, and repeatable workflows.",
       },
-      { property: "og:title", content: "OBSERI — Agentic web intelligence" },
+      { property: "og:title", content: "Obseri — Agentic web intelligence" },
       {
         property: "og:description",
         content:
