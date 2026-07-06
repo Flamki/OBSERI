@@ -1,18 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import Dither from "@/components/Dither";
-import { ArrowRight, Sparkles, Zap, MousePointer2, Plus, Smartphone, Globe, Palette, Mic, ArrowUp } from "lucide-react";
+import { Sparkles, Zap, MousePointer2, Plus, Smartphone, Globe, Palette, Mic, ArrowUp } from "lucide-react";
 import { useState } from "react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "OBSERI — Agentic web intelligence" },
+      { title: "Obseri — Agentic web intelligence" },
       {
         name: "description",
         content:
           "Turn volatile web signals into monitored sources, verifiable data, searchable memory, and repeatable workflows.",
       },
-      { property: "og:title", content: "OBSERI — Agentic web intelligence" },
+      { property: "og:title", content: "Obseri — Agentic web intelligence" },
       {
         property: "og:description",
         content:
@@ -45,8 +45,8 @@ function Index() {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_35%,_rgba(0,0,0,0.75)_100%)]" />
 
         <header className="relative z-10 flex items-center justify-between px-6 md:px-10 py-6">
-          <span className="text-sm font-bold tracking-widest text-foreground uppercase">
-            OBSERI
+          <span className="text-xl font-bold tracking-tight text-foreground">
+            Obseri<span className="text-primary">.</span>
           </span>
           <a
             href="#install"
@@ -57,13 +57,13 @@ function Index() {
           </a>
         </header>
 
-        <div className="relative z-10 flex h-[calc(100vh-96px)] flex-col items-start justify-center px-6 md:px-16 pointer-events-none">
+        <div className="relative z-10 flex h-[calc(100vh-96px)] flex-col items-center justify-center px-6 md:px-16 pointer-events-none text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-background/60 backdrop-blur px-4 py-2 text-xs text-primary mb-8">
             <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
             Agentic web intelligence
           </div>
           <h1 className="text-[18vw] md:text-[12vw] leading-[0.85] font-black tracking-tighter text-foreground">
-            OBSERI
+            Obseri<span className="text-primary">.</span>
           </h1>
           <p className="mt-8 max-w-lg text-lg md:text-xl text-foreground/80 leading-relaxed">
             Turn volatile pixel signals into monitored sources, verifiable waves,
@@ -200,7 +200,7 @@ function Index() {
 
       <footer className="border-t border-border">
         <div className="mx-auto max-w-6xl px-6 md:px-12 py-8 flex items-center justify-between text-xs uppercase tracking-widest text-muted-foreground">
-          <span>OBSERI · 2026</span>
+          <span>Obseri · 2026</span>
           <span>Made with ogl + WebGL</span>
         </div>
       </footer>
