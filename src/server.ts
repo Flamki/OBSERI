@@ -47,6 +47,13 @@ function isH3SwallowedErrorBody(body: string): boolean {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      if (env && typeof env === "object") {
+        (
+          globalThis as typeof globalThis & {
+            __OBSERI_ENV__?: Record<string, unknown>;
+          }
+        ).__OBSERI_ENV__ = env as Record<string, unknown>;
+      }
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

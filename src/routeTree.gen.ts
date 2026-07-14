@@ -9,38 +9,216 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as WidgetSoulIdRouteImport } from './routes/widget.$soulId'
+import { Route as ApiScanRouteImport } from './routes/api.scan'
+import { Route as ApiIngestRouteImport } from './routes/api.ingest'
+import { Route as ApiChatRouteImport } from './routes/api.chat'
+import { Route as ApiWebhooksTestRouteImport } from './routes/api.webhooks.test'
+import { Route as ApiVoiceSpeakRouteImport } from './routes/api.voice.speak'
+import { Route as ApiVoiceProfilesRouteImport } from './routes/api.voice.profiles'
+import { Route as ApiVoiceCloneRouteImport } from './routes/api.voice.clone'
+import { Route as ApiSoulsPublishRouteImport } from './routes/api.souls.publish'
+import { Route as ApiSoulsSoulIdRouteImport } from './routes/api.souls.$soulId'
+import { Route as ApiIngestStreamRouteImport } from './routes/api.ingest.stream'
+import { Route as ApiSoulsSoulIdEventsRouteImport } from './routes/api.souls.$soulId.events'
 
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WidgetSoulIdRoute = WidgetSoulIdRouteImport.update({
+  id: '/widget/$soulId',
+  path: '/widget/$soulId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiScanRoute = ApiScanRouteImport.update({
+  id: '/api/scan',
+  path: '/api/scan',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiIngestRoute = ApiIngestRouteImport.update({
+  id: '/api/ingest',
+  path: '/api/ingest',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiChatRoute = ApiChatRouteImport.update({
+  id: '/api/chat',
+  path: '/api/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWebhooksTestRoute = ApiWebhooksTestRouteImport.update({
+  id: '/api/webhooks/test',
+  path: '/api/webhooks/test',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiVoiceSpeakRoute = ApiVoiceSpeakRouteImport.update({
+  id: '/api/voice/speak',
+  path: '/api/voice/speak',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiVoiceProfilesRoute = ApiVoiceProfilesRouteImport.update({
+  id: '/api/voice/profiles',
+  path: '/api/voice/profiles',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiVoiceCloneRoute = ApiVoiceCloneRouteImport.update({
+  id: '/api/voice/clone',
+  path: '/api/voice/clone',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSoulsPublishRoute = ApiSoulsPublishRouteImport.update({
+  id: '/api/souls/publish',
+  path: '/api/souls/publish',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSoulsSoulIdRoute = ApiSoulsSoulIdRouteImport.update({
+  id: '/api/souls/$soulId',
+  path: '/api/souls/$soulId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiIngestStreamRoute = ApiIngestStreamRouteImport.update({
+  id: '/stream',
+  path: '/stream',
+  getParentRoute: () => ApiIngestRoute,
+} as any)
+const ApiSoulsSoulIdEventsRoute = ApiSoulsSoulIdEventsRouteImport.update({
+  id: '/events',
+  path: '/events',
+  getParentRoute: () => ApiSoulsSoulIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/app': typeof AppRoute
+  '/api/chat': typeof ApiChatRoute
+  '/api/ingest': typeof ApiIngestRouteWithChildren
+  '/api/scan': typeof ApiScanRoute
+  '/widget/$soulId': typeof WidgetSoulIdRoute
+  '/api/ingest/stream': typeof ApiIngestStreamRoute
+  '/api/souls/$soulId': typeof ApiSoulsSoulIdRouteWithChildren
+  '/api/souls/publish': typeof ApiSoulsPublishRoute
+  '/api/voice/clone': typeof ApiVoiceCloneRoute
+  '/api/voice/profiles': typeof ApiVoiceProfilesRoute
+  '/api/voice/speak': typeof ApiVoiceSpeakRoute
+  '/api/webhooks/test': typeof ApiWebhooksTestRoute
+  '/api/souls/$soulId/events': typeof ApiSoulsSoulIdEventsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/app': typeof AppRoute
+  '/api/chat': typeof ApiChatRoute
+  '/api/ingest': typeof ApiIngestRouteWithChildren
+  '/api/scan': typeof ApiScanRoute
+  '/widget/$soulId': typeof WidgetSoulIdRoute
+  '/api/ingest/stream': typeof ApiIngestStreamRoute
+  '/api/souls/$soulId': typeof ApiSoulsSoulIdRouteWithChildren
+  '/api/souls/publish': typeof ApiSoulsPublishRoute
+  '/api/voice/clone': typeof ApiVoiceCloneRoute
+  '/api/voice/profiles': typeof ApiVoiceProfilesRoute
+  '/api/voice/speak': typeof ApiVoiceSpeakRoute
+  '/api/webhooks/test': typeof ApiWebhooksTestRoute
+  '/api/souls/$soulId/events': typeof ApiSoulsSoulIdEventsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/app': typeof AppRoute
+  '/api/chat': typeof ApiChatRoute
+  '/api/ingest': typeof ApiIngestRouteWithChildren
+  '/api/scan': typeof ApiScanRoute
+  '/widget/$soulId': typeof WidgetSoulIdRoute
+  '/api/ingest/stream': typeof ApiIngestStreamRoute
+  '/api/souls/$soulId': typeof ApiSoulsSoulIdRouteWithChildren
+  '/api/souls/publish': typeof ApiSoulsPublishRoute
+  '/api/voice/clone': typeof ApiVoiceCloneRoute
+  '/api/voice/profiles': typeof ApiVoiceProfilesRoute
+  '/api/voice/speak': typeof ApiVoiceSpeakRoute
+  '/api/webhooks/test': typeof ApiWebhooksTestRoute
+  '/api/souls/$soulId/events': typeof ApiSoulsSoulIdEventsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/app'
+    | '/api/chat'
+    | '/api/ingest'
+    | '/api/scan'
+    | '/widget/$soulId'
+    | '/api/ingest/stream'
+    | '/api/souls/$soulId'
+    | '/api/souls/publish'
+    | '/api/voice/clone'
+    | '/api/voice/profiles'
+    | '/api/voice/speak'
+    | '/api/webhooks/test'
+    | '/api/souls/$soulId/events'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/app'
+    | '/api/chat'
+    | '/api/ingest'
+    | '/api/scan'
+    | '/widget/$soulId'
+    | '/api/ingest/stream'
+    | '/api/souls/$soulId'
+    | '/api/souls/publish'
+    | '/api/voice/clone'
+    | '/api/voice/profiles'
+    | '/api/voice/speak'
+    | '/api/webhooks/test'
+    | '/api/souls/$soulId/events'
+  id:
+    | '__root__'
+    | '/'
+    | '/app'
+    | '/api/chat'
+    | '/api/ingest'
+    | '/api/scan'
+    | '/widget/$soulId'
+    | '/api/ingest/stream'
+    | '/api/souls/$soulId'
+    | '/api/souls/publish'
+    | '/api/voice/clone'
+    | '/api/voice/profiles'
+    | '/api/voice/speak'
+    | '/api/webhooks/test'
+    | '/api/souls/$soulId/events'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRoute
+  ApiChatRoute: typeof ApiChatRoute
+  ApiIngestRoute: typeof ApiIngestRouteWithChildren
+  ApiScanRoute: typeof ApiScanRoute
+  WidgetSoulIdRoute: typeof WidgetSoulIdRoute
+  ApiSoulsSoulIdRoute: typeof ApiSoulsSoulIdRouteWithChildren
+  ApiSoulsPublishRoute: typeof ApiSoulsPublishRoute
+  ApiVoiceCloneRoute: typeof ApiVoiceCloneRoute
+  ApiVoiceProfilesRoute: typeof ApiVoiceProfilesRoute
+  ApiVoiceSpeakRoute: typeof ApiVoiceSpeakRoute
+  ApiWebhooksTestRoute: typeof ApiWebhooksTestRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +226,130 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/widget/$soulId': {
+      id: '/widget/$soulId'
+      path: '/widget/$soulId'
+      fullPath: '/widget/$soulId'
+      preLoaderRoute: typeof WidgetSoulIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/scan': {
+      id: '/api/scan'
+      path: '/api/scan'
+      fullPath: '/api/scan'
+      preLoaderRoute: typeof ApiScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ingest': {
+      id: '/api/ingest'
+      path: '/api/ingest'
+      fullPath: '/api/ingest'
+      preLoaderRoute: typeof ApiIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/chat': {
+      id: '/api/chat'
+      path: '/api/chat'
+      fullPath: '/api/chat'
+      preLoaderRoute: typeof ApiChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/webhooks/test': {
+      id: '/api/webhooks/test'
+      path: '/api/webhooks/test'
+      fullPath: '/api/webhooks/test'
+      preLoaderRoute: typeof ApiWebhooksTestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/voice/speak': {
+      id: '/api/voice/speak'
+      path: '/api/voice/speak'
+      fullPath: '/api/voice/speak'
+      preLoaderRoute: typeof ApiVoiceSpeakRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/voice/profiles': {
+      id: '/api/voice/profiles'
+      path: '/api/voice/profiles'
+      fullPath: '/api/voice/profiles'
+      preLoaderRoute: typeof ApiVoiceProfilesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/voice/clone': {
+      id: '/api/voice/clone'
+      path: '/api/voice/clone'
+      fullPath: '/api/voice/clone'
+      preLoaderRoute: typeof ApiVoiceCloneRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/souls/publish': {
+      id: '/api/souls/publish'
+      path: '/api/souls/publish'
+      fullPath: '/api/souls/publish'
+      preLoaderRoute: typeof ApiSoulsPublishRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/souls/$soulId': {
+      id: '/api/souls/$soulId'
+      path: '/api/souls/$soulId'
+      fullPath: '/api/souls/$soulId'
+      preLoaderRoute: typeof ApiSoulsSoulIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ingest/stream': {
+      id: '/api/ingest/stream'
+      path: '/stream'
+      fullPath: '/api/ingest/stream'
+      preLoaderRoute: typeof ApiIngestStreamRouteImport
+      parentRoute: typeof ApiIngestRoute
+    }
+    '/api/souls/$soulId/events': {
+      id: '/api/souls/$soulId/events'
+      path: '/events'
+      fullPath: '/api/souls/$soulId/events'
+      preLoaderRoute: typeof ApiSoulsSoulIdEventsRouteImport
+      parentRoute: typeof ApiSoulsSoulIdRoute
+    }
   }
 }
 
+interface ApiIngestRouteChildren {
+  ApiIngestStreamRoute: typeof ApiIngestStreamRoute
+}
+
+const ApiIngestRouteChildren: ApiIngestRouteChildren = {
+  ApiIngestStreamRoute: ApiIngestStreamRoute,
+}
+
+const ApiIngestRouteWithChildren = ApiIngestRoute._addFileChildren(
+  ApiIngestRouteChildren,
+)
+
+interface ApiSoulsSoulIdRouteChildren {
+  ApiSoulsSoulIdEventsRoute: typeof ApiSoulsSoulIdEventsRoute
+}
+
+const ApiSoulsSoulIdRouteChildren: ApiSoulsSoulIdRouteChildren = {
+  ApiSoulsSoulIdEventsRoute: ApiSoulsSoulIdEventsRoute,
+}
+
+const ApiSoulsSoulIdRouteWithChildren = ApiSoulsSoulIdRoute._addFileChildren(
+  ApiSoulsSoulIdRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRoute,
+  ApiChatRoute: ApiChatRoute,
+  ApiIngestRoute: ApiIngestRouteWithChildren,
+  ApiScanRoute: ApiScanRoute,
+  WidgetSoulIdRoute: WidgetSoulIdRoute,
+  ApiSoulsSoulIdRoute: ApiSoulsSoulIdRouteWithChildren,
+  ApiSoulsPublishRoute: ApiSoulsPublishRoute,
+  ApiVoiceCloneRoute: ApiVoiceCloneRoute,
+  ApiVoiceProfilesRoute: ApiVoiceProfilesRoute,
+  ApiVoiceSpeakRoute: ApiVoiceSpeakRoute,
+  ApiWebhooksTestRoute: ApiWebhooksTestRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -1,0 +1,205 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+import { getRuntimeEnvironment } from "@/lib/runtime-env";
+
+const schema = z.object({
+  text: z.string().min(1).max(4_000),
+  profileId: z.string().min(1).max(120),
+  language: z.string().min(2).max(10).default("en"),
+  engine: z
+    .enum([
+      "qwen",
+      "qwen_custom_voice",
+      "luxtts",
+      "chatterbox",
+      "chatterbox_turbo",
+      "tada",
+      "kokoro",
+    ])
+    .optional(),
+  speed: z.number().min(0.5).max(2).optional(),
+});
+
+type CachedAudio = {
+  bytes: ArrayBuffer;
+  contentType: string;
+  createdAt: number;
+};
+
+const PREVIEW_CACHE_TTL_MS = 60 * 60 * 1_000;
+const PREVIEW_CACHE_LIMIT = 128;
+const previewCache = new Map<string, CachedAudio>();
+const previewInflight = new Map<string, Promise<CachedAudio>>();
+
+export const Route = createFileRoute("/api/voice/speak")({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        const parsed = schema.safeParse(await request.json());
+        if (!parsed.success)
+          return Response.json({ error: { message: "Invalid speech request." } }, { status: 400 });
+        const baseUrl = getRuntimeEnvironment().OBSERI_VOICEBOX_URL?.replace(/\/$/, "");
+        if (!baseUrl)
+          return Response.json(
+            { error: { message: "Voicebox is not configured." } },
+            { status: 503 },
+          );
+        try {
+          const engine =
+            parsed.data.engine ?? (await resolveProfileEngine(baseUrl, parsed.data.profileId));
+          const voiceboxRequest = {
+            profile_id: parsed.data.profileId,
+            text: parsed.data.text,
+            language: parsed.data.language,
+            engine,
+            model_size: engine === "qwen_custom_voice" ? "0.6B" : undefined,
+            normalize: true,
+          };
+          const cacheKey = JSON.stringify(voiceboxRequest);
+          const cacheable = parsed.data.text.length <= 240;
+          const cached = cacheable ? readCachedAudio(cacheKey) : null;
+          const audio =
+            cached ??
+            (cacheable
+              ? await generateCachedAudio(cacheKey, baseUrl, voiceboxRequest)
+              : await generateAudio(baseUrl, voiceboxRequest));
+          return new Response(audio.bytes.slice(0), {
+            status: 200,
+            headers: {
+              "content-type": audio.contentType,
+              "cache-control": "no-store",
+              "content-disposition": 'inline; filename="obseri-voice.wav"',
+              "x-obseri-voice-cache": cached ? "HIT" : "MISS",
+            },
+          });
+        } catch (error) {
+          return Response.json(
+            {
+              error: {
+                message: error instanceof Error ? error.message : "Voice generation failed.",
+              },
+            },
+            { status: 502 },
+          );
+        }
+      },
+    },
+  },
+});
+
+type VoiceboxGenerationRequest = {
+  profile_id: string;
+  text: string;
+  language: string;
+  engine?: string;
+  model_size?: string;
+  normalize: boolean;
+};
+
+function readCachedAudio(key: string) {
+  const cached = previewCache.get(key);
+  if (!cached) return null;
+  if (Date.now() - cached.createdAt > PREVIEW_CACHE_TTL_MS) {
+    previewCache.delete(key);
+    return null;
+  }
+  previewCache.delete(key);
+  previewCache.set(key, cached);
+  return cached;
+}
+
+async function generateCachedAudio(key: string, baseUrl: string, body: VoiceboxGenerationRequest) {
+  const existing = previewInflight.get(key);
+  if (existing) return existing;
+  const generation = generateAudio(baseUrl, body).then((audio) => {
+    previewCache.set(key, audio);
+    while (previewCache.size > PREVIEW_CACHE_LIMIT) {
+      const oldest = previewCache.keys().next().value;
+      if (typeof oldest !== "string") break;
+      previewCache.delete(oldest);
+    }
+    return audio;
+  });
+  previewInflight.set(key, generation);
+  try {
+    return await generation;
+  } finally {
+    previewInflight.delete(key);
+  }
+}
+
+async function generateAudio(baseUrl: string, body: VoiceboxGenerationRequest) {
+  let response = await fetch(`${baseUrl}/generate/stream`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(300_000),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    if (response.status === 400 && detail.toLowerCase().includes("not downloaded")) {
+      response = await generateAndFetchAudio(baseUrl, body);
+    } else {
+      throw new Error(readVoiceboxError(detail) || `Voicebox returned ${response.status}.`);
+    }
+  }
+  return {
+    bytes: await response.arrayBuffer(),
+    contentType: response.headers.get("content-type") ?? "audio/wav",
+    createdAt: Date.now(),
+  } satisfies CachedAudio;
+}
+
+function readVoiceboxError(detail: string) {
+  try {
+    const payload = JSON.parse(detail) as { detail?: string };
+    return payload.detail || detail;
+  } catch {
+    return detail;
+  }
+}
+
+async function resolveProfileEngine(baseUrl: string, profileId: string) {
+  const response = await fetch(`${baseUrl}/profiles/${encodeURIComponent(profileId)}`, {
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok)
+    throw new Error((await response.text()) || "Voicebox profile could not be loaded.");
+  const profile = (await response.json()) as {
+    preset_engine?: string | null;
+    default_engine?: string | null;
+  };
+  return profile.preset_engine || profile.default_engine || "qwen";
+}
+
+async function generateAndFetchAudio(baseUrl: string, body: VoiceboxGenerationRequest) {
+  const start = await fetch(`${baseUrl}/generate`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!start.ok) throw new Error((await start.text()) || "Voicebox model download failed.");
+  const generation = (await start.json()) as { id?: string };
+  if (!generation.id) throw new Error("Voicebox did not return a generation id.");
+
+  const deadline = Date.now() + 300_000;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    const statusResponse = await fetch(`${baseUrl}/history/${generation.id}`, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!statusResponse.ok)
+      throw new Error((await statusResponse.text()) || "Voicebox generation status failed.");
+    const status = (await statusResponse.json()) as { status?: string; error?: string | null };
+    if (status.status === "failed") throw new Error(status.error || "Voicebox generation failed.");
+    if (status.status === "completed") {
+      const audio = await fetch(`${baseUrl}/audio/${generation.id}`, {
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (!audio.ok) throw new Error((await audio.text()) || "Voicebox audio is unavailable.");
+      return audio;
+    }
+  }
+  throw new Error("Voicebox model preparation timed out. Please try again.");
+}

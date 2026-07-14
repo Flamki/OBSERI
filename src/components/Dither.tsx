@@ -186,7 +186,7 @@ export default function Dither({
       ([entry]) => {
         isVisible = entry.isIntersecting;
       },
-      { threshold: 0.01 }
+      { threshold: 0.01 },
     );
     observerIntersection.observe(container);
 

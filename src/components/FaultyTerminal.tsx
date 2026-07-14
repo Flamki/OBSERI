@@ -241,11 +241,7 @@ function hexToRgb(hex: string): [number, number, number] {
       .join("");
   }
   const num = parseInt(h, 16);
-  return [
-    ((num >> 16) & 255) / 255,
-    ((num >> 8) & 255) / 255,
-    (num & 255) / 255,
-  ];
+  return [((num >> 16) & 255) / 255, ((num >> 8) & 255) / 255, (num & 255) / 255];
 }
 
 export default function FaultyTerminal({
@@ -328,7 +324,7 @@ export default function FaultyTerminal({
       ([entry]) => {
         isVisible = entry.isIntersecting;
       },
-      { threshold: 0.01 }
+      { threshold: 0.01 },
     );
     observerIntersection.observe(ctn);
 
@@ -338,9 +334,12 @@ export default function FaultyTerminal({
 
     const geometry = new Triangle(gl);
     const resolvedTint = hexToRgb(propsRef.current.tint);
-    const ditherVal = typeof propsRef.current.dither === "boolean"
-      ? (propsRef.current.dither ? 1.0 : 0.0)
-      : propsRef.current.dither;
+    const ditherVal =
+      typeof propsRef.current.dither === "boolean"
+        ? propsRef.current.dither
+          ? 1.0
+          : 0.0
+        : propsRef.current.dither;
 
     const program = new Program(gl, {
       vertex: vertexShader,
@@ -381,7 +380,7 @@ export default function FaultyTerminal({
       program.uniforms.iResolution.value = new Color(
         gl.canvas.width,
         gl.canvas.height,
-        gl.canvas.width / gl.canvas.height
+        gl.canvas.width / gl.canvas.height,
       );
     };
 

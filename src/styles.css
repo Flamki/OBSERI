@@ -97,7 +97,6 @@
   --sidebar-ring: oklch(0.92 0.22 125);
 }
 
-
 .dark {
   --background: oklch(0.129 0.042 264.695);
   --foreground: oklch(0.984 0.003 247.858);
@@ -134,6 +133,10 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
   * {
     border-color: var(--color-border);
   }
@@ -141,5 +144,168 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+  }
+
+  button,
+  a,
+  select {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+@layer components {
+  .field-input {
+    width: 100%;
+    border: 1px solid color-mix(in oklch, var(--color-foreground) 10%, transparent);
+    border-radius: 0.75rem;
+    background: color-mix(in oklch, var(--color-background) 86%, transparent);
+    padding: 0.8rem 0.9rem;
+    color: var(--color-foreground);
+    font-size: 0.75rem;
+    outline: none;
+    transition:
+      border-color 150ms ease,
+      box-shadow 150ms ease;
+  }
+
+  .field-input:focus {
+    border-color: color-mix(in oklch, var(--color-primary) 55%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-primary) 10%, transparent);
+  }
+
+  .field-input::placeholder {
+    color: var(--color-muted-foreground);
+  }
+
+  .field-input option {
+    background: var(--color-background);
+    color: var(--color-foreground);
+  }
+
+  .soul-input {
+    width: 100%;
+    border: 1px solid color-mix(in oklch, var(--color-foreground) 9%, transparent);
+    border-radius: 0.9rem;
+    background: color-mix(in oklch, black 22%, transparent);
+    padding: 0.78rem 0.9rem;
+    color: var(--color-foreground);
+    font-size: 0.68rem;
+    line-height: 1.35rem;
+    outline: none;
+    transition:
+      border-color 150ms ease,
+      box-shadow 150ms ease;
+  }
+
+  .soul-input:focus {
+    border-color: color-mix(in oklch, var(--color-primary) 38%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-primary) 7%, transparent);
+  }
+
+  .soul-input::placeholder {
+    color: color-mix(in oklch, var(--color-muted-foreground) 65%, transparent);
+  }
+
+  .soul-input option {
+    background: #101512;
+    color: var(--color-foreground);
+  }
+
+  .clean-input {
+    width: 100%;
+    border: 1px solid #dfe0dc;
+    border-radius: 0.75rem;
+    background: #fff;
+    padding: 0.7rem 0.8rem;
+    color: #20221f;
+    font-size: 0.875rem;
+    line-height: 1.35rem;
+    outline: none;
+    transition:
+      border-color 150ms ease,
+      box-shadow 150ms ease,
+      background 150ms ease;
+  }
+
+  .clean-input:focus {
+    border-color: #9aa292;
+    box-shadow: 0 0 0 3px rgb(121 151 86 / 10%);
+  }
+
+  .clean-input::placeholder {
+    color: #9a9d97;
+  }
+
+  .primary-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.75rem;
+    background: #1d1f1c;
+    padding: 0.7rem 1rem;
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition:
+      background 150ms ease,
+      opacity 150ms ease;
+  }
+
+  .primary-button:hover {
+    background: #000;
+  }
+
+  .primary-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .secondary-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border: 1px solid #dfe1dc;
+    border-radius: 0.75rem;
+    background: #fff;
+    padding: 0.65rem 0.9rem;
+    color: #4f544d;
+    font-size: 0.75rem;
+    font-weight: 600;
+    transition:
+      background 150ms ease,
+      border-color 150ms ease;
+  }
+
+  .secondary-button:hover {
+    border-color: #cfd3cb;
+    background: #f7f8f5;
+  }
+
+  .icon-button {
+    display: inline-flex;
+    width: 2rem;
+    height: 2rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #dfe1dc;
+    border-radius: 0.625rem;
+    background: #fff;
+    color: #646961;
+    transition:
+      background 150ms ease,
+      border-color 150ms ease;
+  }
+
+  .icon-button:hover {
+    border-color: #cfd3cb;
+    background: #f5f6f3;
   }
 }
