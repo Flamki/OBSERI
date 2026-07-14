@@ -16,6 +16,7 @@
   var position = script.dataset.position === "bottom-left" ? "left" : "right";
   var accent = script.dataset.accent || "#b6ff60";
   var label = script.dataset.label || "Talk to this website";
+  var launcher = script.dataset.launcher === "orb" ? "orb" : "pill";
   var mobile = window.matchMedia("(max-width: 520px)");
   var open = false;
 
@@ -40,6 +41,10 @@
   button.setAttribute("aria-expanded", "false");
   button.style.cssText =
     "margin-top:12px;margin-left:auto;display:flex;height:58px;min-width:58px;align-items:center;justify-content:center;gap:10px;border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:0 18px;background:rgba(7,13,9,.88);color:white;box-shadow:0 18px 45px rgba(0,0,0,.35);backdrop-filter:blur(18px);cursor:pointer;font:700 12px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:-.02em;";
+  if (launcher === "orb") {
+    button.style.width = "58px";
+    button.style.padding = "0";
+  }
   button.innerHTML =
     '<span style="position:relative;display:block;width:20px;height:20px"><span style="position:absolute;inset:0;border-radius:50%;background:' +
     accent +
@@ -48,6 +53,9 @@
     '"></span><span style="position:absolute;inset:5px;border-radius:50%;background:#10140f"></span></span><span class="obseri-label">' +
     escapeHtml(label) +
     "</span>";
+  if (launcher === "orb") {
+    button.querySelector(".obseri-label").style.display = "none";
+  }
 
   button.addEventListener("click", function () {
     open = !open;

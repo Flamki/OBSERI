@@ -49,4 +49,4 @@ Before internet exposure, add DNS resolution and egress filtering to close DNS-r
 
 ## Reference repositories
 
-Sibling repositories under `Desktop/obseri` are architecture references with independent licenses and release cycles. Voicebox is integrated over HTTP under its MIT license. Do not merge histories or vendor large upstream code paths into this Lovable-connected repository.
+Sibling repositories under `Desktop/obseri` are architecture references with independent licenses and release cycles. Voicebox is integrated over HTTP under its MIT license. Keep upstream integrations behind explicit service boundaries rather than merging histories or vendoring large code paths into this application repository.

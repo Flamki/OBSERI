@@ -19,6 +19,7 @@ import {
   Menu,
   MessageCircle,
   Mic2,
+  Monitor,
   MoreHorizontal,
   Pause,
   Play,
@@ -28,7 +29,9 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Smartphone,
   Trash2,
+  Tablet,
   Upload,
   UserRound,
   WandSparkles,
@@ -86,7 +89,10 @@ const PAGE_META: Record<StudioView, { title: string; description: string }> = {
     description: "Decide who your website is and how it behaves.",
   },
   voice: { title: "Voice", description: "Choose how your website sounds." },
-  playground: { title: "Test", description: "Talk to your soul before visitors do." },
+  playground: {
+    title: "Test",
+    description: "Experience your website and its soul exactly as a visitor will.",
+  },
   deploy: { title: "Integrate", description: "Publish the widget and connect your systems." },
   conversations: {
     title: "Conversations",
@@ -380,10 +386,10 @@ function SoulStudio() {
           />
 
           <main
-            className={`mx-auto min-h-0 w-full max-w-[1240px] flex-1 px-5 sm:px-8 lg:px-10 ${
+            className={`mx-auto min-h-0 w-full flex-1 ${
               view === "playground"
-                ? "overflow-hidden py-5 lg:py-6"
-                : "overflow-y-auto py-8 lg:py-10"
+                ? "max-w-[1600px] overflow-hidden px-3 py-3 sm:px-5 sm:py-5"
+                : "max-w-[1240px] overflow-y-auto px-5 py-8 sm:px-8 lg:px-10 lg:py-10"
             }`}
           >
             {!soul ? (
@@ -406,7 +412,12 @@ function SoulStudio() {
             ) : view === "voice" ? (
               <VoiceView soul={soul} onUpdate={updateSoul} onNotice={setNotice} />
             ) : view === "playground" ? (
-              <PlaygroundView soul={soul} onMessagesChange={saveConversation} />
+              <PlaygroundView
+                soul={soul}
+                onUpdate={updateSoul}
+                onMessagesChange={saveConversation}
+                onIntegrate={() => navigate("deploy")}
+              />
             ) : view === "deploy" ? (
               <DeployView soul={soul} onUpdate={updateSoul} onNotice={setNotice} />
             ) : view === "conversations" ? (
@@ -1729,7 +1740,7 @@ function updateKnowledgePageContent(
         pageId,
         contentHash: hash,
         capturedAt: now,
-        reason: "manual_edit",
+        reason: "manual_edit" as const,
         wordCount: updated.wordCount,
       },
     ].slice(-500),
@@ -2263,9 +2274,9 @@ function VoiceView({
       : (deviceVoices.find((voice) => voice.browserVoiceName === soul.voice.browserVoiceName) ??
         defaultVoice);
   const mineVoices = Array.from(
-    new Map([
-      [activeVoice.id, activeVoice],
-      ...customVoices.map((voice) => [voice.id, voice]),
+    new Map<string, StudioVoice>([
+      [activeVoice.id, activeVoice] as const,
+      ...customVoices.map((voice) => [voice.id, voice] as const),
     ]).values(),
   );
   const tabVoices = libraryTab === "explore" ? exploreVoices : mineVoices;
@@ -2818,14 +2829,350 @@ function VoiceView({
 
 function PlaygroundView({
   soul,
+  onUpdate,
   onMessagesChange,
+  onIntegrate,
 }: {
   soul: Soul;
+  onUpdate: (updater: (soul: Soul) => Soul) => void;
   onMessagesChange: (messages: SoulMessage[], leadIntent: ChatResponse["leadIntent"]) => void;
+  onIntegrate: () => void;
 }) {
+  const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [chatOpen, setChatOpen] = useState(true);
+  const [address, setAddress] = useState(soul.siteUrl);
+  const [previewUrl, setPreviewUrl] = useState(soul.siteUrl);
+  const [frameKey, setFrameKey] = useState(0);
+  const [frameLoading, setFrameLoading] = useState(true);
+  const [addressError, setAddressError] = useState("");
+  const themes: Array<{
+    id: Soul["appearance"]["theme"];
+    label: string;
+    detail: string;
+  }> = [
+    { id: "light", label: "Clean", detail: "Bright and minimal" },
+    { id: "dark", label: "Midnight", detail: "Focused and cinematic" },
+    { id: "glass", label: "Glass", detail: "Soft and translucent" },
+  ];
+  const accents = ["#b6ff60", "#8fbd5b", "#7dd3fc", "#c4b5fd", "#fda4af", "#fbbf24"];
+  const frameWidth =
+    device === "mobile" ? "max-w-[390px]" : device === "tablet" ? "max-w-[820px]" : "max-w-none";
+  const updateAppearance = (patch: Partial<Soul["appearance"]>) =>
+    onUpdate((current) => ({
+      ...current,
+      appearance: { ...current.appearance, ...patch },
+      updatedAt: new Date().toISOString(),
+    }));
+
+  useEffect(() => {
+    setAddress(soul.siteUrl);
+    setPreviewUrl(soul.siteUrl);
+    setFrameLoading(true);
+    setAddressError("");
+  }, [soul.id, soul.siteUrl]);
+
+  useEffect(() => {
+    // An iframe can finish before React attaches its load listener during hydration.
+    // Never leave the preview looking busy when the website is already visible.
+    const timer = window.setTimeout(() => setFrameLoading(false), 5000);
+    return () => window.clearTimeout(timer);
+  }, [previewUrl, frameKey]);
+
+  function openAddress(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const candidate = /^https?:\/\//i.test(address.trim())
+      ? address.trim()
+      : `https://${address.trim()}`;
+    try {
+      const url = new URL(candidate);
+      if (!/^https?:$/.test(url.protocol)) throw new Error("Unsupported protocol");
+      setAddress(url.toString());
+      setPreviewUrl(url.toString());
+      setAddressError("");
+      setFrameLoading(true);
+      setFrameKey((current) => current + 1);
+    } catch {
+      setAddressError("Enter a valid public website URL.");
+    }
+  }
+
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col">
-      <SoulChat soul={soul} fill onMessagesChange={onMessagesChange} />
+    <div className="grid h-full min-h-0 gap-4 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_310px] lg:overflow-hidden">
+      <section className="flex min-h-[650px] min-w-0 flex-col overflow-hidden rounded-2xl border border-[#dfe1dc] bg-[#e9ebe6] shadow-[0_18px_55px_rgba(31,35,29,.08)] lg:min-h-0">
+        <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-[#dde0da] bg-white px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-[#30332f]">
+              <span
+                className={`h-2 w-2 rounded-full ${frameLoading ? "animate-pulse bg-[#e5a94b]" : "bg-[#6fa447]"}`}
+              />
+              {frameLoading ? "Loading website" : "Live website"}
+            </span>
+            <span className="hidden text-xs text-[#949890] sm:inline">
+              · {safeHost(previewUrl)}
+            </span>
+          </div>
+          <div className="flex rounded-lg border border-[#e0e2dd] bg-[#f5f6f3] p-1">
+            {(
+              [
+                { id: "desktop", label: "Desktop", icon: <Monitor className="h-3.5 w-3.5" /> },
+                { id: "tablet", label: "Tablet", icon: <Tablet className="h-3.5 w-3.5" /> },
+                { id: "mobile", label: "Mobile", icon: <Smartphone className="h-3.5 w-3.5" /> },
+              ] as const
+            ).map((option) => (
+              <button
+                key={option.id}
+                onClick={() => setDevice(option.id)}
+                aria-label={`${option.label} preview`}
+                title={`${option.label} preview`}
+                className={`flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition ${
+                  device === option.id
+                    ? "bg-white text-[#20231f] shadow-sm"
+                    : "text-[#858a82] hover:text-[#343832]"
+                }`}
+              >
+                {option.icon}
+                <span className="hidden xl:inline">{option.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex min-h-0 flex-1 items-stretch justify-center overflow-auto p-3 sm:p-4">
+          <div
+            className={`flex h-full min-h-[560px] w-full flex-col overflow-hidden rounded-xl border border-black/10 bg-white shadow-[0_18px_48px_rgba(28,33,25,.15)] transition-[max-width] duration-300 ${frameWidth}`}
+          >
+            <div className="flex h-11 shrink-0 items-center gap-3 border-b border-[#e7e9e4] bg-[#f8f8f6] px-3">
+              <div className="hidden gap-1.5 sm:flex">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#ff6b61]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#f2bd45]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#65c466]" />
+              </div>
+              <form onSubmit={openAddress} className="flex min-w-0 flex-1 items-center gap-2">
+                <Globe2 className="h-3.5 w-3.5 shrink-0 text-[#90958d]" />
+                <input
+                  value={address}
+                  onChange={(event) => setAddress(event.target.value)}
+                  aria-label="Preview website URL"
+                  className="min-w-0 flex-1 bg-transparent text-xs text-[#5f645c] outline-none"
+                />
+              </form>
+              <button
+                onClick={() => {
+                  setFrameLoading(true);
+                  setFrameKey((current) => current + 1);
+                }}
+                className="rounded-md p-1.5 text-[#747970] hover:bg-[#e9ebe6]"
+                aria-label="Reload website preview"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${frameLoading ? "animate-spin" : ""}`} />
+              </button>
+              <a
+                href={previewUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-md p-1.5 text-[#747970] hover:bg-[#e9ebe6]"
+                aria-label="Open website in a new tab"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            </div>
+
+            <div className="relative min-h-0 flex-1 overflow-hidden bg-white">
+              <iframe
+                key={`${previewUrl}-${frameKey}`}
+                src={previewUrl}
+                title={`${soul.name} website preview`}
+                referrerPolicy="strict-origin-when-cross-origin"
+                onLoad={() => setFrameLoading(false)}
+                className="absolute inset-0 h-full w-full border-0 bg-white"
+              />
+
+              <div
+                className={`absolute bottom-[78px] z-20 w-[370px] max-w-[calc(100%-24px)] transition-all duration-300 ${
+                  soul.appearance.position === "bottom-right"
+                    ? "right-3 sm:right-5"
+                    : "left-3 sm:left-5"
+                } ${chatOpen ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-4 opacity-0"}`}
+                style={{ height: "min(560px, calc(100% - 96px))" }}
+              >
+                <SoulChat soul={soul} fill onMessagesChange={onMessagesChange} />
+              </div>
+
+              <button
+                onClick={() => setChatOpen((current) => !current)}
+                className={`absolute bottom-4 z-30 flex h-12 items-center justify-center gap-2 border border-black/10 bg-[#171a16] text-white shadow-[0_12px_35px_rgba(0,0,0,.3)] transition hover:-translate-y-0.5 ${
+                  soul.appearance.position === "bottom-right"
+                    ? "right-4 sm:right-5"
+                    : "left-4 sm:left-5"
+                } ${soul.appearance.launcher === "pill" ? "rounded-full px-4" : "w-12 rounded-full"}`}
+                aria-expanded={chatOpen}
+                aria-label={chatOpen ? "Close website guide" : soul.appearance.welcomeLabel}
+              >
+                {chatOpen ? (
+                  <X className="h-4 w-4" />
+                ) : (
+                  <span
+                    className="flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold text-[#171a16]"
+                    style={{ backgroundColor: soul.appearance.accent }}
+                  >
+                    {soul.personality.name.charAt(0)}
+                  </span>
+                )}
+                {soul.appearance.launcher === "pill" && (
+                  <span className="max-w-36 truncate text-xs font-semibold">
+                    {chatOpen ? "Close" : soul.appearance.welcomeLabel}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside className="min-h-0 overflow-y-auto rounded-2xl border border-[#dfe1dc] bg-white shadow-sm">
+        <div className="border-b border-[#eceee9] p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold">Visitor experience</p>
+              <p className="mt-1 text-xs leading-5 text-[#7d827a]">
+                Tune it while using the real assistant.
+              </p>
+            </div>
+            <span className="rounded-full bg-[#edf5e6] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[.12em] text-[#5d8438]">
+              Live
+            </span>
+          </div>
+          {addressError && (
+            <p className="mt-3 text-xs font-medium text-[#a34b3e]">{addressError}</p>
+          )}
+        </div>
+
+        <div className="space-y-6 p-5">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[.12em] text-[#8b9088]">
+              Chat style
+            </p>
+            <div className="mt-3 grid gap-2">
+              {themes.map((theme) => (
+                <button
+                  key={theme.id}
+                  onClick={() => updateAppearance({ theme: theme.id })}
+                  className={`flex items-center justify-between rounded-xl border p-3 text-left transition ${
+                    soul.appearance.theme === theme.id
+                      ? "border-[#8fbd5b] bg-[#f3f8ed]"
+                      : "border-[#e4e6e1] hover:border-[#cfd3ca] hover:bg-[#fafbf8]"
+                  }`}
+                >
+                  <span>
+                    <span className="block text-sm font-semibold">{theme.label}</span>
+                    <span className="mt-0.5 block text-xs text-[#81867e]">{theme.detail}</span>
+                  </span>
+                  {soul.appearance.theme === theme.id && (
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1d211b] text-white">
+                      <Check className="h-3.5 w-3.5" />
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[.12em] text-[#8b9088]">
+              Accent
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {accents.map((accent) => (
+                <button
+                  key={accent}
+                  onClick={() => updateAppearance({ accent })}
+                  className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition hover:scale-105 ${
+                    soul.appearance.accent.toLowerCase() === accent.toLowerCase()
+                      ? "border-[#22251f]"
+                      : "border-transparent"
+                  }`}
+                  aria-label={`Use accent ${accent}`}
+                >
+                  <span
+                    className="h-6 w-6 rounded-full shadow-inner"
+                    style={{ backgroundColor: accent }}
+                  />
+                </button>
+              ))}
+              <label className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[#dde0da] bg-[#f6f7f4] text-xs text-[#777c74] hover:bg-[#eef0eb]">
+                +
+                <input
+                  type="color"
+                  value={soul.appearance.accent}
+                  onChange={(event) => updateAppearance({ accent: event.target.value })}
+                  className="sr-only"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Launcher">
+              <select
+                value={soul.appearance.launcher}
+                onChange={(event) =>
+                  updateAppearance({
+                    launcher: event.target.value as Soul["appearance"]["launcher"],
+                  })
+                }
+                className="clean-input"
+              >
+                <option value="orb">Orb</option>
+                <option value="pill">Label</option>
+              </select>
+            </Field>
+            <Field label="Position">
+              <select
+                value={soul.appearance.position}
+                onChange={(event) =>
+                  updateAppearance({
+                    position: event.target.value as Soul["appearance"]["position"],
+                  })
+                }
+                className="clean-input"
+              >
+                <option value="bottom-right">Right</option>
+                <option value="bottom-left">Left</option>
+              </select>
+            </Field>
+          </div>
+
+          <label className="block">
+            <span className="text-sm font-medium">Launcher message</span>
+            <input
+              value={soul.appearance.welcomeLabel}
+              maxLength={48}
+              onChange={(event) => updateAppearance({ welcomeLabel: event.target.value })}
+              className="clean-input mt-2"
+            />
+          </label>
+
+          <div className="rounded-xl border border-[#e2e5de] bg-[#f8f9f6] p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <MessageCircle className="h-4 w-4 text-[#719d47]" /> Real conversation
+            </div>
+            <p className="mt-2 text-xs leading-5 text-[#777c74]">
+              Messages here use the same knowledge, citations, personality, and selected voice as
+              your installed widget.
+            </p>
+          </div>
+
+          <button onClick={onIntegrate} className="primary-button w-full justify-center">
+            Looks right — integrate it
+            <ChevronRight className="h-4 w-4" />
+          </button>
+
+          <p className="text-center text-[11px] leading-4 text-[#92968f]">
+            If a site blocks embedded previews, open it in a new tab. The installed widget is
+            unaffected.
+          </p>
+        </div>
+      </aside>
     </div>
   );
 }
@@ -2842,7 +3189,8 @@ function DeployView({
   const [tab, setTab] = useState<"widget" | "webhook">("widget");
   const [busy, setBusy] = useState(false);
   const origin = typeof window === "undefined" ? "https://app.obseri.com" : window.location.origin;
-  const code = `<script\n  src="${origin}/obseri-widget.js"\n  data-soul-id="${soul.id}"\n  data-position="${soul.appearance.position}"\n  data-accent="${soul.appearance.accent}"\n  async\n></script>`;
+  const widgetLabel = soul.appearance.welcomeLabel.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+  const code = `<script\n  src="${origin}/obseri-widget.js"\n  data-soul-id="${soul.id}"\n  data-position="${soul.appearance.position}"\n  data-accent="${soul.appearance.accent}"\n  data-launcher="${soul.appearance.launcher}"\n  data-label="${widgetLabel}"\n  async\n></script>`;
   const updateAppearance = (patch: Partial<Soul["appearance"]>) =>
     onUpdate((current) => ({ ...current, appearance: { ...current.appearance, ...patch } }));
   const updateChannels = (patch: Partial<Soul["channels"]>) =>
@@ -3783,6 +4131,7 @@ const DEMO_SOUL: Soul = {
     accent: "#8fbd5b",
     position: "bottom-right",
     launcher: "pill",
+    theme: "light",
     glass: 0.82,
     welcomeLabel: "Ask this website",
   },

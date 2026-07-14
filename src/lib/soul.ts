@@ -129,6 +129,7 @@ export type AppearanceConfig = {
   accent: string;
   position: "bottom-right" | "bottom-left";
   launcher: "orb" | "pill";
+  theme: "light" | "dark" | "glass";
   glass: number;
   welcomeLabel: string;
 };
@@ -228,6 +229,7 @@ export function createSoul(siteUrl: string, name?: string): Soul {
       accent: "#b6ff60",
       position: "bottom-right",
       launcher: "orb",
+      theme: "light",
       glass: 0.82,
       welcomeLabel: "Talk to this website",
     },
@@ -283,6 +285,10 @@ export function normalizeWorkspace(workspace: SoulWorkspace): SoulWorkspace {
     souls: workspace.souls.map((soul) => ({
       ...soul,
       knowledge: normalizeKnowledgeBase(soul.knowledge, soul.siteUrl),
+      appearance: {
+        ...soul.appearance,
+        theme: soul.appearance.theme ?? "light",
+      },
     })),
   };
 }
