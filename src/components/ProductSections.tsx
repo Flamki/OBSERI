@@ -1,15 +1,15 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import CardSwap, { Card } from "@/components/CardSwap";
 import {
   ArrowRight,
   Check,
-  Code2,
   ExternalLink,
-  Fingerprint,
-  Globe2,
+  MessageCircle,
   Mic2,
+  PhoneCall,
   RefreshCw,
+  Send,
   ShieldCheck,
   Webhook,
 } from "lucide-react";
@@ -20,7 +20,7 @@ const displayFont =
 export default function ProductSections() {
   return (
     <main className="overflow-hidden bg-[#f4f1f3] text-[#17171a]">
-      <HowItWorks />
+      <PlayableAgent />
       <StudioSection />
       <IdentitySection />
       <TrustSection />
@@ -30,50 +30,223 @@ export default function ProductSections() {
   );
 }
 
-function HowItWorks() {
-  const steps = [
+function PlayableAgent() {
+  const demos = [
     {
-      icon: <Globe2 />,
-      title: "Learn",
-      body: "Maps the useful pages and keeps every source attached.",
+      question: "Which plan fits my team?",
+      answer:
+        "For a growing team, Pro adds shared knowledge, lead capture, and conversation history.",
+      source: "Pricing",
     },
     {
-      icon: <Fingerprint />,
-      title: "Shape",
-      body: "Takes on your tone, rules, and chosen voice.",
+      question: "Can I book a demo?",
+      answer: "Yes. I can collect your details and pass the request to the sales team now.",
+      source: "Contact",
     },
     {
-      icon: <Code2 />,
-      title: "Launch",
-      body: "Goes live as voice and chat with one lightweight script.",
+      question: "Is my data secure?",
+      answer: "Workspace access is scoped, sources remain visible, and webhook events are signed.",
+      source: "Security",
     },
   ];
+  const [mode, setMode] = useState<"voice" | "chat">("voice");
+  const [voiceState, setVoiceState] = useState<"idle" | "listening" | "speaking">("idle");
+  const [activeDemo, setActiveDemo] = useState(0);
+  const voiceTimers = useRef<number[]>([]);
+
+  useEffect(
+    () => () => {
+      voiceTimers.current.forEach((timer) => window.clearTimeout(timer));
+    },
+    [],
+  );
+
+  const switchMode = (nextMode: "voice" | "chat") => {
+    voiceTimers.current.forEach((timer) => window.clearTimeout(timer));
+    voiceTimers.current = [];
+    setVoiceState("idle");
+    setMode(nextMode);
+  };
+
+  const startVoiceDemo = () => {
+    voiceTimers.current.forEach((timer) => window.clearTimeout(timer));
+    setVoiceState("listening");
+    voiceTimers.current = [
+      window.setTimeout(() => setVoiceState("speaking"), 1200),
+      window.setTimeout(() => setVoiceState("idle"), 5000),
+    ];
+  };
+
+  const voiceCopy = {
+    idle: "Start a natural conversation",
+    listening: "Listening...",
+    speaking: "Answering from your website",
+  };
 
   return (
     <section
       id="how"
-      className="bg-[linear-gradient(180deg,#f4f4ef_0%,#f4f1f3_25%,#ede8f0_100%)] px-6 py-24 [contain-intrinsic-size:auto_760px] [content-visibility:auto] sm:py-32 lg:px-10 lg:py-36"
+      className="bg-[linear-gradient(180deg,#f4f4ef_0%,#f4f1f3_22%,#ede8f0_100%)] px-3 py-20 [contain-intrinsic-size:auto_980px] [content-visibility:auto] sm:px-5 sm:py-28 lg:py-32"
     >
-      <div className="mx-auto max-w-[1240px]">
-        <div className="mx-auto max-w-3xl text-center">
-          <Eyebrow centered>From one URL</Eyebrow>
-          <h2
-            className={`mt-6 text-[clamp(2.8rem,5vw,4.8rem)] font-normal leading-[0.96] tracking-[-0.05em] ${displayFont}`}
-          >
-            A live agent, without the setup maze.
-          </h2>
+      <div className="mx-auto max-w-[1440px]">
+        <div className="mx-auto flex max-w-[1240px] flex-col justify-between gap-6 px-3 sm:px-5 lg:flex-row lg:items-end">
+          <div>
+            <Eyebrow>Live on your website</Eyebrow>
+            <h2
+              className={`mt-6 text-[clamp(2.9rem,5vw,5rem)] font-normal leading-[0.95] tracking-[-0.05em] ${displayFont}`}
+            >
+              Try the agent.
+            </h2>
+          </div>
+          <p className="max-w-sm text-[13px] leading-6 text-black/44">
+            Switch between voice and chat. Ask a question. Watch the experience your visitors get.
+          </p>
         </div>
 
-        <div className="mt-16 grid overflow-hidden rounded-[2rem] border border-black/[0.07] bg-black/[0.07] md:grid-cols-3">
-          {steps.map((step) => (
-            <article key={step.title} className="bg-white/55 p-7 backdrop-blur-sm sm:p-9">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#ff5c7a]/15 bg-[#fff4f2] text-[#b53d55] [&_svg]:h-4 [&_svg]:w-4">
-                {step.icon}
+        <div className="mt-12 overflow-hidden rounded-[2rem] border border-black/[0.08] bg-[#fbfaf8] shadow-[0_35px_120px_rgba(79,54,86,.11)] sm:rounded-[2.6rem]">
+          <div className="flex h-12 items-center gap-2 border-b border-black/[0.07] bg-white/75 px-5">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#ff8d85]" />
+            <span className="h-2.5 w-2.5 rounded-full bg-[#e9c26d]" />
+            <span className="h-2.5 w-2.5 rounded-full bg-[#9dc49d]" />
+            <span className="ml-3 rounded-full bg-black/[0.045] px-3 py-1.5 text-[9px] text-black/35">
+              yourwebsite.com
+            </span>
+          </div>
+
+          <div className="relative min-h-[700px] overflow-hidden bg-[radial-gradient(circle_at_18%_22%,rgba(255,142,129,.3),transparent_27%),radial-gradient(circle_at_76%_72%,rgba(153,137,199,.24),transparent_31%),linear-gradient(135deg,#f9f2ec,#eae8f2)] p-5 sm:p-8 lg:p-12">
+            <div className="pointer-events-none absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(20,18,23,.055)_1px,transparent_1px),linear-gradient(90deg,rgba(20,18,23,.055)_1px,transparent_1px)] [background-size:44px_44px] [mask-image:radial-gradient(circle_at_38%_42%,black,transparent_65%)]" />
+
+            <div className="relative flex items-center justify-between">
+              <span className="text-[13px] font-bold uppercase tracking-[0.2em]">Northstar</span>
+              <nav className="hidden gap-6 text-[10px] text-black/42 sm:flex">
+                <span>Product</span>
+                <span>Customers</span>
+                <span>Pricing</span>
+              </nav>
+              <span className="rounded-full border border-black/10 bg-white/45 px-3 py-2 text-[9px] font-semibold backdrop-blur-md">
+                Start free
               </span>
-              <h3 className="mt-16 text-lg font-semibold tracking-[-0.025em]">{step.title}</h3>
-              <p className="mt-3 max-w-[17rem] text-[13px] leading-6 text-black/46">{step.body}</p>
-            </article>
-          ))}
+            </div>
+
+            <div className="relative mt-20 max-w-[680px] sm:mt-28">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-black/38">
+                Example customer website
+              </p>
+              <h3
+                className={`mt-5 text-[clamp(3.2rem,6.2vw,6.7rem)] font-normal leading-[0.88] tracking-[-0.06em] ${displayFont}`}
+              >
+                Work moves better when everyone sees it.
+              </h3>
+              <div className="mt-8 flex gap-2">
+                <span className="rounded-full bg-[#17171a] px-4 py-2.5 text-[10px] font-semibold text-white">
+                  Explore product
+                </span>
+                <span className="rounded-full border border-black/10 bg-white/35 px-4 py-2.5 text-[10px] font-semibold backdrop-blur-md">
+                  View pricing
+                </span>
+              </div>
+            </div>
+
+            <div className="relative mt-16 grid max-w-[680px] gap-2 sm:grid-cols-3 lg:mt-24">
+              {["Planning", "Projects", "Insights"].map((item, index) => (
+                <div
+                  key={item}
+                  className="rounded-[1.3rem] border border-white/55 bg-white/36 p-4 backdrop-blur-md"
+                >
+                  <span className="text-[9px] text-black/36">0{index + 1}</span>
+                  <p className="mt-7 text-[11px] font-semibold">{item}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="relative mt-6 w-full rounded-[1.8rem] border border-black/[0.08] bg-white/88 p-3 shadow-[0_24px_80px_rgba(55,36,63,.18)] backdrop-blur-2xl sm:p-4 lg:absolute lg:bottom-5 lg:right-5 lg:mt-0 lg:w-[370px]">
+              <div className="flex items-center justify-between border-b border-black/[0.07] pb-3">
+                <div className="flex rounded-full bg-black/[0.045] p-1">
+                  <button
+                    type="button"
+                    onClick={() => switchMode("voice")}
+                    className={`flex h-9 items-center gap-2 rounded-full px-3 text-[10px] font-semibold transition ${mode === "voice" ? "bg-[#17171a] text-white shadow-sm" : "text-black/42 hover:text-black"}`}
+                  >
+                    <Mic2 className="h-3.5 w-3.5" /> Voice
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => switchMode("chat")}
+                    className={`flex h-9 items-center gap-2 rounded-full px-3 text-[10px] font-semibold transition ${mode === "chat" ? "bg-[#17171a] text-white shadow-sm" : "text-black/42 hover:text-black"}`}
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" /> Chat
+                  </button>
+                </div>
+                <span className="flex items-center gap-1.5 pr-1 text-[9px] text-black/34">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#ff5c7a] shadow-[0_0_10px_rgba(255,92,122,.65)]" />
+                  Ona
+                </span>
+              </div>
+
+              {mode === "voice" ? (
+                <div className="flex min-h-[330px] flex-col items-center justify-center text-center">
+                  <button
+                    type="button"
+                    onClick={startVoiceDemo}
+                    aria-label="Start voice demo"
+                    className={`relative flex h-32 w-32 items-center justify-center rounded-full bg-[radial-gradient(circle_at_34%_28%,#ffd0c5,#ff7180_42%,#8e7bbb_100%)] shadow-[0_24px_70px_rgba(165,67,100,.28)] transition duration-500 hover:scale-[1.03] ${voiceState !== "idle" ? "scale-[1.04]" : ""}`}
+                  >
+                    {voiceState !== "idle" && (
+                      <span className="absolute inset-[-14px] animate-ping rounded-full border border-[#ff5c7a]/30" />
+                    )}
+                    <span className="relative flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#17171a] shadow-xl">
+                      <PhoneCall className="h-5 w-5" />
+                    </span>
+                  </button>
+
+                  <div className="mt-7 flex h-8 items-center gap-1">
+                    {[12, 23, 17, 30, 20, 36, 16, 28, 14, 24, 11].map((height, index) => (
+                      <span
+                        key={index}
+                        className={`w-1 rounded-full bg-[#b44259]/60 ${voiceState !== "idle" ? "animate-pulse" : ""}`}
+                        style={{
+                          height,
+                          animationDelay: `${index * 65}ms`,
+                          animationDuration: `${620 + (index % 4) * 110}ms`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <p className="mt-3 text-[12px] font-semibold">{voiceCopy[voiceState]}</p>
+                  <p className="mt-2 max-w-[15rem] text-[10px] leading-5 text-black/38">
+                    {voiceState === "speaking"
+                      ? "I can explain the plans and help you choose the right one."
+                      : "Tap the orb to experience the voice flow."}
+                  </p>
+                </div>
+              ) : (
+                <div className="flex min-h-[330px] flex-col pt-4">
+                  <div className="rounded-2xl bg-black/[0.045] p-4 text-[11px] leading-5 text-black/62">
+                    {demos[activeDemo].answer}
+                    <span className="mt-3 flex items-center gap-1.5 text-[9px] font-semibold text-[#a4314a]">
+                      <Check className="h-3 w-3" /> Source: {demos[activeDemo].source}
+                    </span>
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    {demos.map((demo, index) => (
+                      <button
+                        key={demo.question}
+                        type="button"
+                        onClick={() => setActiveDemo(index)}
+                        className={`w-full rounded-xl border px-3 py-2.5 text-left text-[10px] transition ${activeDemo === index ? "border-[#ff5c7a]/30 bg-[#fff1ef] text-black" : "border-black/[0.07] text-black/45 hover:bg-black/[0.025]"}`}
+                      >
+                        {demo.question}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-auto flex items-center rounded-full border border-black/[0.08] bg-white px-4 py-2.5 text-[10px] text-black/35 shadow-sm">
+                    Ask this website
+                    <Send className="ml-auto h-3.5 w-3.5 text-[#b44259]" />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </section>
