@@ -141,13 +141,13 @@ function Hero() {
         </Link>
       </header>
 
-      <div className="relative z-10 mx-auto flex min-h-[820px] w-full min-w-0 max-w-[1500px] flex-col items-center justify-center px-6 pb-16 pt-28 text-center sm:min-h-[860px] lg:min-h-[900px] lg:px-10">
+      <div className="relative z-10 mx-auto flex min-h-[820px] w-full min-w-0 max-w-[1500px] flex-col items-center justify-center px-6 pb-36 pt-24 text-center sm:min-h-[860px] sm:pb-40 lg:min-h-[900px] lg:px-10 lg:pb-48">
         <img src="/obseri-pulse-mark.svg" alt="" className="mb-7 h-10 w-10" />
         <h1 className="w-full min-w-0 max-w-[1180px] [font-family:Baskerville,'Iowan_Old_Style','Palatino_Linotype','Times_New_Roman',serif] text-[clamp(3.25rem,5.2vw,5.6rem)] font-normal leading-[0.96] tracking-[-0.055em]">
-          Let your website make sales for you.
+          Make every visit a conversation.
         </h1>
         <p className="mt-5 w-full min-w-0 max-w-[620px] text-[14px] leading-7 text-black/52 sm:text-[17px]">
-          Trained on your content. Built to answer, qualify, and convert.
+          A voice and chat agent trained on your website—built to answer, qualify, and convert.
         </p>
 
         <form
