@@ -6,7 +6,7 @@ import type { Soul } from "@/lib/soul";
 
 export const Route = createFileRoute("/widget/$soulId")({
   validateSearch: (search: Record<string, unknown>) => ({
-    mode: search.mode === "voice" ? ("voice" as const) : ("chat" as const),
+    mode: search.mode === "chat" ? ("chat" as const) : ("voice" as const),
   }),
   head: () => ({
     meta: [{ title: "Website soul · Obseri" }, { name: "robots", content: "noindex, nofollow" }],
@@ -36,12 +36,14 @@ function EmbeddedSoul() {
   }, [soulId]);
 
   return (
-    <main className="min-h-screen bg-transparent p-2 font-mono text-foreground">
+    <main className="min-h-screen bg-transparent p-2 font-sans text-foreground">
       {soul ? (
         <SoulChat
           soul={soul}
           compact
-          voiceMode={mode === "voice"}
+          voiceMode
+          initialPanelMode={mode}
+          onClose={() => window.parent.postMessage({ type: "obseri:close" }, "*")}
           onMessagesChange={(messages, leadIntent) => {
             void fetch(`/api/souls/${encodeURIComponent(soul.id)}/events`, {
               method: "POST",

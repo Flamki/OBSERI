@@ -2,30 +2,58 @@ import { useEffect, useRef, useState } from "react";
 import {
   ArrowUp,
   BookOpen,
+  ChevronDown,
   ExternalLink,
   LoaderCircle,
+  Maximize2,
+  MessageCircle,
   Mic,
   MicOff,
+  Minimize2,
   Phone,
   PhoneOff,
   RotateCcw,
   Volume2,
   VolumeX,
+  X,
 } from "lucide-react";
 import { rankKnowledgeChunks, type ChatResponse } from "@/lib/conversation";
 import type { KnowledgeChunk, Soul, SoulMessage } from "@/lib/soul";
+
+const VOICE_LANGUAGES = [
+  { code: "en-US", name: "English", flag: "US" },
+  { code: "hi-IN", name: "Hindi", flag: "IN" },
+  { code: "es-ES", name: "Spanish", flag: "ES" },
+  { code: "fr-FR", name: "French", flag: "FR" },
+  { code: "de-DE", name: "German", flag: "DE" },
+  { code: "pt-BR", name: "Portuguese", flag: "BR" },
+  { code: "ar-SA", name: "Arabic", flag: "SA" },
+] as const;
+
+function countryFlag(countryCode: string) {
+  return String.fromCodePoint(
+    ...countryCode
+      .toUpperCase()
+      .split("")
+      .map((character) => 127397 + character.charCodeAt(0)),
+  );
+}
 
 export default function SoulChat({
   soul,
   compact = false,
   fill = false,
   voiceMode = false,
+  initialPanelMode = "voice",
+  onClose,
   onMessagesChange,
 }: {
   soul: Soul;
   compact?: boolean;
   fill?: boolean;
   voiceMode?: boolean;
+  initialPanelMode?: "voice" | "chat";
+  onClose?: () => void;
   onMessagesChange?: (messages: SoulMessage[], leadIntent: ChatResponse["leadIntent"]) => void;
 }) {
   const [messages, setMessages] = useState<SoulMessage[]>(() => [
@@ -39,8 +67,13 @@ export default function SoulChat({
   const [voiceStatus, setVoiceStatus] = useState<"idle" | "listening" | "thinking" | "speaking">(
     "idle",
   );
+  const [voicePanelView, setVoicePanelView] = useState<"voice" | "chat">(initialPanelMode);
+  const [languageOpen, setLanguageOpen] = useState(false);
+  const [callLanguage, setCallLanguage] = useState(soul.voice.language || "en-US");
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [error, setError] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const voiceCallActiveRef = useRef(false);
   const messagesRef = useRef(messages);
@@ -66,12 +99,26 @@ export default function SoulChat({
     messagesRef.current = greeting;
     setMessages(greeting);
     setSoundEnabled(soul.voice.enabled);
+    setCallLanguage(soul.voice.language || "en-US");
+    setVoicePanelView(initialPanelMode);
     stopVoiceCall();
-  }, [soul.id, soul.personality.greeting, soul.voice.enabled]);
+  }, [
+    soul.id,
+    soul.personality.greeting,
+    soul.voice.enabled,
+    soul.voice.language,
+    initialPanelMode,
+  ]);
 
   useEffect(() => {
     if (!voiceMode) stopVoiceCall();
   }, [voiceMode]);
+
+  useEffect(() => {
+    const syncFullscreen = () => setIsFullscreen(document.fullscreenElement === panelRef.current);
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+  }, []);
 
   useEffect(
     () => () => {
@@ -141,7 +188,7 @@ export default function SoulChat({
       messagesRef.current = completed;
       setMessages(completed);
       onMessagesChange?.(completed, data.leadIntent);
-      const shouldSpeak = soundEnabled;
+      const shouldSpeak = !voiceMode && soundEnabled;
       if (shouldSpeak) {
         setVoiceStatus("speaking");
         try {
@@ -307,7 +354,7 @@ export default function SoulChat({
       body: JSON.stringify({
         text,
         profileId: soul.voice.profileId,
-        language: soul.voice.language,
+        language: callLanguage,
       }),
       signal,
     });
@@ -343,7 +390,7 @@ export default function SoulChat({
   async function speakBrowserSegment(text: string) {
     if (!("speechSynthesis" in window)) return;
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = soul.voice.language;
+    utterance.lang = callLanguage;
     utterance.rate = soul.voice.speed;
     utterance.pitch = soul.voice.pitch;
     const voice = window.speechSynthesis
@@ -377,7 +424,7 @@ export default function SoulChat({
     }
     const recognition = new constructor();
     recognitionRef.current = recognition;
-    recognition.lang = soul.voice.language;
+    recognition.lang = callLanguage;
     recognition.interimResults = autoSend;
     recognition.continuous = false;
     let transcript = "";
@@ -488,143 +535,246 @@ export default function SoulChat({
     window.speechSynthesis?.cancel();
   }
 
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement === panelRef.current) {
+        await document.exitFullscreen();
+      } else {
+        await panelRef.current?.requestFullscreen();
+      }
+    } catch {
+      setError("Fullscreen is not available in this browser.");
+    }
+  }
+
+  function showPanelView(view: "voice" | "chat") {
+    setVoicePanelView(view);
+    setLanguageOpen(false);
+    if (view === "chat") stopVoiceCall();
+  }
+
   if (voiceMode) {
-    const lastVisitor = [...messages].reverse().find((message) => message.role === "visitor");
-    const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant");
+    const selectedLanguage =
+      VOICE_LANGUAGES.find((language) => language.code === callLanguage) ?? VOICE_LANGUAGES[0];
     const statusLabel =
       voiceStatus === "listening"
-        ? "Listening…"
+        ? "Listening..."
         : voiceStatus === "thinking"
-          ? "Thinking…"
+          ? "Thinking..."
           : voiceStatus === "speaking"
-            ? "Speaking…"
-            : "Ready to talk";
+            ? `${soul.personality.name} is speaking...`
+            : `Talk with ${soul.personality.name}`;
 
     return (
       <div
-        className={`flex flex-col overflow-hidden rounded-2xl border ${shellTone} ${
-          fill ? "h-full min-h-[420px]" : compact ? "h-[560px]" : "h-[650px]"
+        ref={panelRef}
+        className={`relative flex flex-col overflow-hidden border bg-white text-[#1f211e] shadow-[0_24px_80px_rgba(20,24,18,.16)] ${
+          isFullscreen
+            ? "h-screen rounded-none"
+            : `rounded-[30px] ${fill ? "h-full min-h-[440px]" : compact ? "h-[620px]" : "h-[680px]"}`
         }`}
       >
-        <div className={`flex items-center justify-between border-b px-5 py-4 ${dividerTone}`}>
-          <div className="flex min-w-0 items-center gap-3">
-            <span
-              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-[#20221f]"
-              style={{ backgroundColor: soul.appearance.accent }}
+        <div className="relative z-20 flex h-[72px] shrink-0 items-center justify-between px-4">
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => showPanelView(voicePanelView === "voice" ? "chat" : "voice")}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f4f3f0] text-[#5b5d57] transition hover:bg-[#ebeae6] hover:text-[#20221f]"
+              aria-label={voicePanelView === "voice" ? "Open text chat" : "Open voice chat"}
             >
-              {soul.personality.name.charAt(0)}
-              <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#55a65a]" />
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{soul.personality.name}</p>
-              <p className={`mt-0.5 truncate text-xs ${mutedTone}`}>Voice conversation</p>
-            </div>
+              {voicePanelView === "voice" ? (
+                <MessageCircle className="h-[19px] w-[19px]" />
+              ) : (
+                <Phone className="h-[18px] w-[18px]" />
+              )}
+            </button>
+            {onClose && (
+              <button
+                onClick={() => {
+                  stopVoiceCall();
+                  onClose();
+                }}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-[#999b95] transition hover:bg-[#f4f3f0] hover:text-[#20221f]"
+                aria-label="Close conversation"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
-          <span
-            className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
-              voiceCallActive
-                ? isDark
-                  ? "bg-[#b6ff60]/15 text-[#c9ff8a]"
-                  : "bg-[#edf6e5] text-[#557d31]"
-                : isDark
-                  ? "bg-white/8 text-white/48"
-                  : "bg-[#f1f2ef] text-[#747971]"
-            }`}
+
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <button
+              onClick={() => setLanguageOpen((current) => !current)}
+              className="flex h-11 items-center gap-2 rounded-full border border-[#e6e5e1] bg-white px-4 text-sm font-medium shadow-sm transition hover:bg-[#fafaf8]"
+              aria-expanded={languageOpen}
+            >
+              <span className="text-base" aria-hidden="true">
+                {countryFlag(selectedLanguage.flag)}
+              </span>
+              <span>{selectedLanguage.name}</span>
+              <ChevronDown className="h-4 w-4 text-[#858881]" />
+            </button>
+            {languageOpen && (
+              <div className="absolute left-1/2 top-[50px] z-30 max-h-64 w-52 -translate-x-1/2 overflow-y-auto rounded-2xl border border-[#e3e2de] bg-white p-2 shadow-[0_18px_50px_rgba(25,28,22,.16)]">
+                {VOICE_LANGUAGES.map((language) => (
+                  <button
+                    key={language.code}
+                    onClick={() => {
+                      stopVoiceCall();
+                      setCallLanguage(language.code);
+                      setLanguageOpen(false);
+                    }}
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition hover:bg-[#f4f3f0] ${
+                      language.code === callLanguage ? "bg-[#f4f3f0] font-semibold" : ""
+                    }`}
+                  >
+                    <span className="text-base">{countryFlag(language.flag)}</span>
+                    <span>{language.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={() => void toggleFullscreen()}
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f4f3f0] text-[#5b5d57] transition hover:bg-[#ebeae6] hover:text-[#20221f]"
+            aria-label={isFullscreen ? "Exit fullscreen" : "Open fullscreen"}
           >
-            {voiceCallActive ? "Call active" : "Voice ready"}
-          </span>
+            {isFullscreen ? (
+              <Minimize2 className="h-[18px] w-[18px]" />
+            ) : (
+              <Maximize2 className="h-[18px] w-[18px]" />
+            )}
+          </button>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 py-8 text-center">
-          <div className="relative">
-            {voiceCallActive && (
-              <>
-                <span
-                  className="absolute inset-[-16px] animate-pulse rounded-full opacity-20"
-                  style={{ backgroundColor: soul.appearance.accent }}
-                />
-                <span
-                  className="absolute inset-[-8px] animate-pulse rounded-full opacity-25 [animation-delay:180ms]"
-                  style={{ backgroundColor: soul.appearance.accent }}
-                />
-              </>
-            )}
-            <span
-              className="relative flex h-24 w-24 items-center justify-center rounded-full text-3xl font-semibold text-[#171a16] shadow-[0_18px_45px_rgba(0,0,0,.18)]"
-              style={{ backgroundColor: soul.appearance.accent }}
-            >
-              {soul.personality.name.charAt(0)}
-            </span>
-          </div>
-
-          <h3 className="mt-7 text-xl font-semibold">{statusLabel}</h3>
-          <p className={`mt-2 max-w-xs text-sm leading-6 ${mutedTone}`}>
-            {voiceCallActive
-              ? "Speak naturally. I’ll answer, then listen again automatically."
-              : `Start a hands-free conversation with ${soul.personality.name}.`}
-          </p>
-
-          <div className="mt-6 flex h-9 items-center justify-center gap-1.5" aria-hidden="true">
-            {[14, 24, 32, 20, 28, 16, 22].map((height, index) => (
-              <span
-                key={`${height}-${index}`}
-                className={`w-1.5 rounded-full transition-all ${voiceCallActive ? "animate-pulse" : "opacity-30"}`}
+        {voicePanelView === "voice" ? (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-7 pb-4 pt-2 text-center">
+            <div className="relative flex h-[190px] w-[190px] shrink-0 items-center justify-center">
+              <div
+                className={`absolute inset-0 rounded-full ${voiceCallActive ? "animate-[spin_10s_linear_infinite]" : ""}`}
                 style={{
-                  height,
-                  backgroundColor: soul.appearance.accent,
-                  animationDelay: `${index * 90}ms`,
+                  background:
+                    "radial-gradient(circle at 28% 24%,rgba(255,229,76,.95),transparent 31%),radial-gradient(circle at 74% 70%,rgba(47,180,255,.95),transparent 35%),radial-gradient(circle at 24% 78%,rgba(75,205,224,.9),transparent 33%),radial-gradient(circle at 75% 20%,rgba(106,211,237,.85),transparent 31%),#88c8d4",
+                  filter: "saturate(.9)",
+                  boxShadow:
+                    "inset 0 0 30px rgba(255,255,255,.28),0 20px 48px rgba(61,143,164,.22)",
                 }}
               />
-            ))}
+              <div
+                className="pointer-events-none absolute inset-0 rounded-full opacity-35 mix-blend-overlay"
+                style={{
+                  backgroundImage:
+                    "repeating-radial-gradient(circle at 40% 45%,rgba(255,255,255,.65) 0 1px,transparent 1px 3px)",
+                }}
+              />
+              {voiceCallActive && (
+                <span className="absolute -inset-3 animate-pulse rounded-full border border-[#66c5d5]/35" />
+              )}
+              <button
+                onClick={voiceCallActive ? stopVoiceCall : startVoiceCall}
+                className={`relative z-10 flex h-14 w-14 items-center justify-center rounded-full bg-white text-[#11130f] shadow-[0_8px_28px_rgba(25,35,28,.2)] transition hover:scale-105 ${
+                  voiceCallActive ? "text-[#b34b43]" : ""
+                }`}
+                aria-label={voiceCallActive ? "End voice call" : "Start voice call"}
+              >
+                {voiceCallActive ? (
+                  <PhoneOff className="h-5 w-5" />
+                ) : (
+                  <Phone className="h-5 w-5 fill-current" />
+                )}
+              </button>
+            </div>
+            <h3 className="mt-6 text-[17px] font-semibold">{statusLabel}</h3>
+            <p className="mt-2 max-w-[300px] text-sm leading-5 text-[#777a74]">
+              {voiceCallActive
+                ? "Speak naturally. The conversation keeps listening after every reply."
+                : "Ask about this website by voice or message."}
+            </p>
+            {error && (
+              <div className="mt-4 w-full max-w-sm rounded-xl border border-[#eed5ce] bg-[#fff6f2] px-4 py-3 text-sm text-[#934b3a]">
+                {error}
+              </div>
+            )}
           </div>
+        ) : (
+          <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex ${message.role === "visitor" ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-[88%] rounded-[22px] px-4 py-3 text-sm leading-6 ${
+                    message.role === "visitor"
+                      ? "rounded-br-md border border-[#e1e0dc] bg-white text-[#22241f] shadow-sm"
+                      : "rounded-bl-md bg-[#f2f1ee] text-[#31332e]"
+                  }`}
+                >
+                  <p className="whitespace-pre-wrap">{message.content}</p>
+                  {!!message.citations?.length && (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {message.citations.map((citation, index) => (
+                        <a
+                          key={`${citation.chunkId}-${index}`}
+                          href={citation.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 rounded-full border border-[#dcded8] bg-white px-2.5 py-1 text-[11px] text-[#61655e]"
+                        >
+                          {citation.title.slice(0, 26)}
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+            {sending && (
+              <div className="flex items-center gap-2 text-sm text-[#777a74]">
+                <LoaderCircle className="h-4 w-4 animate-spin" /> {soul.personality.name} is
+                thinking...
+              </div>
+            )}
+            {error && (
+              <div className="rounded-xl border border-[#eed5ce] bg-[#fff6f2] px-4 py-3 text-sm text-[#934b3a]">
+                {error}
+              </div>
+            )}
+          </div>
+        )}
 
-          {(lastVisitor || lastAssistant) && (
-            <div
-              className={`mt-6 w-full max-w-sm rounded-2xl border p-4 text-left ${
-                isDark ? "border-white/10 bg-white/5" : "border-[#e4e6e1] bg-[#fafbf9]"
-              }`}
+        <div className="shrink-0 px-4 pb-4 pt-2">
+          <div className="flex items-end gap-2 rounded-full border border-[#dededa] bg-white p-1.5 pl-5 shadow-[0_4px_16px_rgba(25,29,22,.06)] focus-within:border-[#b9bdb4]">
+            <textarea
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void sendMessage();
+                  if (voicePanelView === "voice") showPanelView("chat");
+                }
+              }}
+              rows={1}
+              placeholder="Ask this website..."
+              className="max-h-24 min-h-10 flex-1 resize-none bg-transparent py-2.5 text-sm outline-none placeholder:text-[#a3a59f]"
+            />
+            <button
+              onClick={() => {
+                void sendMessage();
+                if (voicePanelView === "voice") showPanelView("chat");
+              }}
+              disabled={!value.trim() || sending}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#22241f] text-white transition hover:bg-black disabled:bg-[#eeede9] disabled:text-[#aaaca6]"
+              aria-label="Send message"
             >
-              {lastVisitor && (
-                <p className={`text-xs ${mutedTone}`}>
-                  You:{" "}
-                  <span className={isDark ? "text-white/75" : "text-[#3f433d]"}>
-                    {lastVisitor.content}
-                  </span>
-                </p>
-              )}
-              {lastAssistant && (
-                <p className={`mt-2 line-clamp-2 text-xs leading-5 ${mutedTone}`}>
-                  {soul.personality.name}:{" "}
-                  <span className={isDark ? "text-white/75" : "text-[#3f433d]"}>
-                    {lastAssistant.content}
-                  </span>
-                </p>
-              )}
-            </div>
-          )}
-
-          {error && (
-            <div className="mt-5 w-full max-w-sm rounded-xl border border-[#eed5ce] bg-[#fff6f2] px-4 py-3 text-sm text-[#934b3a]">
-              {error}
-            </div>
-          )}
-        </div>
-
-        <div className={`border-t p-5 ${dividerTone}`}>
-          <button
-            onClick={voiceCallActive ? stopVoiceCall : startVoiceCall}
-            className={`mx-auto flex h-14 items-center justify-center gap-2 rounded-full px-7 text-sm font-semibold shadow-lg transition hover:-translate-y-0.5 ${
-              voiceCallActive
-                ? "bg-[#b84c43] text-white hover:bg-[#a9433b]"
-                : "bg-[#20231f] text-white hover:bg-black"
-            }`}
-            aria-label={voiceCallActive ? "End voice call" : "Start voice call"}
-          >
-            {voiceCallActive ? <PhoneOff className="h-5 w-5" /> : <Phone className="h-5 w-5" />}
-            {voiceCallActive ? "End call" : "Start voice call"}
-          </button>
-          <p className={`mt-3 text-center text-xs ${isDark ? "text-white/34" : "text-[#969993]"}`}>
-            Microphone access is used only during the call
+              <ArrowUp className="h-4 w-4" />
+            </button>
+          </div>
+          <p className="mt-2 text-center text-[10px] text-[#a0a29c]">
+            Voice uses your microphone only while the call is active
           </p>
         </div>
       </div>

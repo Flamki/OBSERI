@@ -14,10 +14,7 @@
   var scriptUrl = new URL(script.src, window.location.href);
   var origin = scriptUrl.origin;
   var position = script.dataset.position === "bottom-left" ? "left" : "right";
-  var accent = script.dataset.accent || "#b6ff60";
   var mobile = window.matchMedia("(max-width: 520px)");
-  var currentMode = null;
-  var open = false;
 
   var root = document.createElement("div");
   root.id = "obseri-soul-" + soulId;
@@ -29,92 +26,52 @@
   var frame = document.createElement("iframe");
   frame.title = "Obseri website assistant";
   frame.allow = "microphone; autoplay";
+  frame.allowFullscreen = true;
   frame.referrerPolicy = "strict-origin-when-cross-origin";
   frame.style.cssText =
-    "display:none;width:390px;height:660px;max-height:calc(100vh - 110px);border:0;background:transparent;filter:drop-shadow(0 24px 48px rgba(0,0,0,.36));";
+    "display:none;width:410px;height:680px;max-height:calc(100vh - 32px);border:0;background:transparent;filter:drop-shadow(0 24px 48px rgba(0,0,0,.18));";
 
-  var launcher = document.createElement("div");
-  launcher.setAttribute("role", "group");
-  launcher.setAttribute("aria-label", "Choose how to talk with this website");
+  var launcher = document.createElement("button");
+  launcher.type = "button";
+  launcher.setAttribute("aria-label", "Open voice chat");
+  launcher.setAttribute("aria-expanded", "false");
   launcher.style.cssText =
-    "margin-top:12px;display:flex;width:max-content;align-items:center;gap:4px;padding:6px;border:1px solid rgba(255,255,255,.14);border-radius:999px;background:rgba(13,17,13,.9);box-shadow:0 16px 40px rgba(0,0,0,.34);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);" +
+    "margin-top:12px;display:flex;width:max-content;align-items:center;gap:12px;padding:8px 18px 8px 9px;border:1px solid rgba(25,28,23,.1);border-radius:999px;background:#fff;color:#20221f;box-shadow:0 12px 36px rgba(24,29,20,.12);cursor:pointer;font:500 16px/1.1 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;transition:transform 180ms ease,box-shadow 180ms ease;" +
     (position === "left" ? "margin-right:auto;" : "margin-left:auto;");
 
-  var voiceButton = createLauncherButton("Start voice conversation", phoneIcon());
-  var chatButton = createLauncherButton("Open text chat", chatIcon());
-  var divider = document.createElement("span");
-  divider.setAttribute("aria-hidden", "true");
-  divider.style.cssText =
-    "display:block;width:1px;height:20px;margin:0 1px;background:rgba(255,255,255,.1);";
+  var orb = document.createElement("span");
+  orb.setAttribute("aria-hidden", "true");
+  orb.style.cssText =
+    "display:block;width:42px;height:42px;flex:0 0 42px;border-radius:50%;background:radial-gradient(circle at 28% 24%,rgba(255,229,76,.98),transparent 31%),radial-gradient(circle at 74% 70%,rgba(47,180,255,.98),transparent 35%),radial-gradient(circle at 24% 78%,rgba(75,205,224,.92),transparent 33%),radial-gradient(circle at 75% 20%,rgba(106,211,237,.88),transparent 31%),#88c8d4;box-shadow:inset 0 0 12px rgba(255,255,255,.25),0 5px 14px rgba(56,143,165,.2);";
+  var label = document.createElement("span");
+  label.textContent = "Voice chat";
+  launcher.appendChild(orb);
+  launcher.appendChild(label);
 
-  voiceButton.addEventListener("click", function () {
-    toggleMode("voice");
+  launcher.addEventListener("mouseenter", function () {
+    launcher.style.transform = "translateY(-2px)";
+    launcher.style.boxShadow = "0 16px 42px rgba(24,29,20,.16)";
   });
-  chatButton.addEventListener("click", function () {
-    toggleMode("chat");
+  launcher.addEventListener("mouseleave", function () {
+    launcher.style.transform = "translateY(0)";
+    launcher.style.boxShadow = "0 12px 36px rgba(24,29,20,.12)";
   });
-
-  function createLauncherButton(label, icon) {
-    var button = document.createElement("button");
-    button.type = "button";
-    button.setAttribute("aria-label", label);
-    button.setAttribute("aria-expanded", "false");
-    button.innerHTML = icon;
-    button.style.cssText =
-      "display:flex;width:44px;height:44px;flex:0 0 44px;align-items:center;justify-content:center;border:0;border-radius:999px;padding:0;background:transparent;color:rgba(255,255,255,.62);box-shadow:none;cursor:pointer;transition:color 180ms ease,box-shadow 180ms ease,background 180ms ease;";
-    button.addEventListener("mouseenter", function () {
-      if (button.getAttribute("aria-pressed") !== "true") {
-        button.style.background = "rgba(255,255,255,.09)";
-        button.style.color = "#ffffff";
-      }
-    });
-    button.addEventListener("mouseleave", function () {
-      renderLauncherState();
-    });
-    return button;
-  }
-
-  function toggleMode(mode) {
-    if (open && currentMode === mode) {
-      open = false;
-      frame.style.display = "none";
-      renderLauncherState();
-      return;
+  launcher.addEventListener("click", function () {
+    if (!frame.src) {
+      frame.src = origin + "/widget/" + encodeURIComponent(soulId) + "?mode=voice";
     }
-
-    if (currentMode !== mode) {
-      frame.src =
-        origin + "/widget/" + encodeURIComponent(soulId) + "?mode=" + encodeURIComponent(mode);
-      frame.title = mode === "voice" ? "Obseri voice conversation" : "Obseri text chat";
-    }
-    currentMode = mode;
-    open = true;
     frame.style.display = "block";
-    renderLauncherState();
-  }
+    launcher.style.display = "none";
+    launcher.setAttribute("aria-expanded", "true");
+  });
 
-  function renderLauncherState() {
-    renderButton(voiceButton, open && currentMode === "voice", "voice");
-    renderButton(chatButton, open && currentMode === "chat", "chat");
-    voiceButton.setAttribute("aria-expanded", String(open && currentMode === "voice"));
-    chatButton.setAttribute("aria-expanded", String(open && currentMode === "chat"));
-    voiceButton.setAttribute(
-      "aria-label",
-      open && currentMode === "voice" ? "Close voice conversation" : "Start voice conversation",
-    );
-    chatButton.setAttribute(
-      "aria-label",
-      open && currentMode === "chat" ? "Close text chat" : "Open text chat",
-    );
-    voiceButton.setAttribute("aria-pressed", String(open && currentMode === "voice"));
-    chatButton.setAttribute("aria-pressed", String(open && currentMode === "chat"));
-  }
-
-  function renderButton(button, active, mode) {
-    button.style.background = active ? (mode === "voice" ? accent : "#ffffff") : "transparent";
-    button.style.color = active ? "#171a16" : "rgba(255,255,255,.62)";
-    button.style.boxShadow = active ? "0 5px 14px rgba(0,0,0,.24)" : "none";
-  }
+  window.addEventListener("message", function (event) {
+    if (event.source !== frame.contentWindow || event.origin !== origin) return;
+    if (!event.data || event.data.type !== "obseri:close") return;
+    frame.style.display = "none";
+    launcher.style.display = "flex";
+    launcher.setAttribute("aria-expanded", "false");
+  });
 
   function layout() {
     if (mobile.matches) {
@@ -127,25 +84,13 @@
       root.style.left = position === "left" ? "20px" : "auto";
       root.style.right = position === "right" ? "20px" : "auto";
       root.style.bottom = "20px";
-      frame.style.width = "390px";
-      frame.style.height = "660px";
+      frame.style.width = "410px";
+      frame.style.height = "680px";
     }
   }
 
-  function phoneIcon() {
-    return '<svg aria-hidden="true" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.68 2.8a2 2 0 0 1-.45 2.11L8.07 9.9a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.32 1.84.55 2.8.68A2 2 0 0 1 22 16.92z"/></svg>';
-  }
-
-  function chatIcon() {
-    return '<svg aria-hidden="true" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>';
-  }
-
   layout();
-  renderLauncherState();
   mobile.addEventListener("change", layout);
-  launcher.appendChild(voiceButton);
-  launcher.appendChild(divider);
-  launcher.appendChild(chatButton);
   root.appendChild(frame);
   root.appendChild(launcher);
   document.body.appendChild(root);
