@@ -493,7 +493,7 @@ function Sidebar({
 }) {
   const [soulMenuOpen, setSoulMenuOpen] = useState(false);
   const items: Array<{ id: StudioView; label: string; icon: ReactNode }> = [
-    { id: "playground", label: "Agent", icon: <Sparkles /> },
+    { id: "playground", label: "Agent", icon: <Monitor /> },
     { id: "knowledge", label: "Knowledge", icon: <BookOpen /> },
     { id: "personality", label: "Personality", icon: <WandSparkles /> },
     { id: "voice", label: "Voice", icon: <Mic2 /> },
@@ -651,7 +651,7 @@ function Sidebar({
             <span className={collapsed ? "lg:hidden" : ""}>Settings</span>
           </button>
           <a
-            href="mailto:hello@obseri.com"
+            href="mailto:flamki@obseri.com"
             className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#666a64] hover:bg-[#f5f5f3] ${collapsed ? "lg:justify-center lg:px-0" : ""}`}
             aria-label="Help"
             title={collapsed ? "Help" : undefined}
