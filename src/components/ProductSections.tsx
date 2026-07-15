@@ -1,23 +1,25 @@
+import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import CardSwap, { Card } from "@/components/CardSwap";
 import {
   ArrowRight,
+  Check,
   Code2,
   ExternalLink,
   Fingerprint,
   Globe2,
-  MessageCircle,
   Mic2,
   RefreshCw,
   ShieldCheck,
-  Volume2,
   Webhook,
 } from "lucide-react";
 
+const displayFont =
+  "[font-family:Baskerville,'Iowan_Old_Style','Palatino_Linotype','Times_New_Roman',serif]";
+
 export default function ProductSections() {
   return (
-    <main className="overflow-hidden bg-[#f4f4ef] text-[#181b18]">
-      <SignalLine />
+    <main className="overflow-hidden bg-[#f4f1f3] text-[#17171a]">
       <HowItWorks />
       <StudioSection />
       <IdentitySection />
@@ -28,80 +30,48 @@ export default function ProductSections() {
   );
 }
 
-function SignalLine() {
-  const signals = ["Deep crawl", "Living knowledge", "Designed personality", "Natural voice"];
-  return (
-    <section className="border-b border-black/7 bg-[#f4f4ef] px-6">
-      <div className="mx-auto flex max-w-[1320px] flex-wrap items-center justify-between gap-x-8 gap-y-4 py-7 text-[10px] font-semibold uppercase tracking-[0.2em] text-black/38">
-        <span className="text-black/72">One URL. A complete website soul.</span>
-        <div className="flex flex-wrap gap-x-8 gap-y-3">
-          {signals.map((signal) => (
-            <span key={signal} className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#ff5c7a]" /> {signal}
-            </span>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function HowItWorks() {
   const steps = [
     {
-      number: "01",
-      title: "Give it your URL",
-      body: "Obseri maps the important parts of your site, respects crawl policy, removes duplicate content, and keeps every source attached.",
       icon: <Globe2 />,
+      title: "Learn",
+      body: "Maps the useful pages and keeps every source attached.",
     },
     {
-      number: "02",
-      title: "Shape who it becomes",
-      body: "Name the presence, define its role, tone, boundaries, greeting, voice, and what it should do when it does not know.",
       icon: <Fingerprint />,
+      title: "Shape",
+      body: "Takes on your tone, rules, and chosen voice.",
     },
     {
-      number: "03",
-      title: "Put it on your site",
-      body: "Test real questions, publish one lightweight widget, and route useful conversation or lead events into your own stack.",
       icon: <Code2 />,
+      title: "Launch",
+      body: "Goes live as voice and chat with one lightweight script.",
     },
   ];
+
   return (
     <section
       id="how"
-      className="px-6 py-24 [contain-intrinsic-size:auto_900px] [content-visibility:auto] sm:py-32 lg:px-10 lg:py-40"
+      className="bg-[linear-gradient(180deg,#f4f4ef_0%,#f4f1f3_25%,#ede8f0_100%)] px-6 py-24 [contain-intrinsic-size:auto_760px] [content-visibility:auto] sm:py-32 lg:px-10 lg:py-36"
     >
-      <div className="mx-auto max-w-[1320px]">
-        <div className="grid gap-10 lg:grid-cols-[0.72fr_1.28fr] lg:items-end">
-          <div>
-            <Eyebrow>Simple by design</Eyebrow>
-            <h2 className="mt-6 max-w-xl text-4xl font-semibold leading-[0.98] tracking-[-0.055em] sm:text-6xl">
-              Turn your website into an AI voice agent in three moves.
-            </h2>
-          </div>
-          <p className="max-w-xl text-[15px] leading-7 text-black/48 lg:justify-self-end">
-            The hard work—discovery, extraction, chunking, retrieval, citations, personality, and
-            deployment—happens behind one calm workflow.
-          </p>
+      <div className="mx-auto max-w-[1240px]">
+        <div className="mx-auto max-w-3xl text-center">
+          <Eyebrow centered>From one URL</Eyebrow>
+          <h2
+            className={`mt-6 text-[clamp(2.8rem,5vw,4.8rem)] font-normal leading-[0.96] tracking-[-0.05em] ${displayFont}`}
+          >
+            A live agent, without the setup maze.
+          </h2>
         </div>
 
-        <div className="mt-16 grid overflow-hidden rounded-[2rem] border border-black/8 bg-black/8 md:grid-cols-3">
+        <div className="mt-16 grid overflow-hidden rounded-[2rem] border border-black/[0.07] bg-black/[0.07] md:grid-cols-3">
           {steps.map((step) => (
-            <article
-              key={step.number}
-              className="group bg-[#fafaf6] p-7 transition hover:bg-white sm:p-9 lg:min-h-[390px]"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-black/24">{step.number}</span>
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f8dfdf] text-[#b7445a] [&_svg]:h-4 [&_svg]:w-4">
-                  {step.icon}
-                </span>
-              </div>
-              <div className="mt-24 lg:mt-36">
-                <h3 className="text-xl font-semibold tracking-[-0.025em]">{step.title}</h3>
-                <p className="mt-4 text-[13px] leading-6 text-black/45">{step.body}</p>
-              </div>
+            <article key={step.title} className="bg-white/55 p-7 backdrop-blur-sm sm:p-9">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#ff5c7a]/15 bg-[#fff4f2] text-[#b53d55] [&_svg]:h-4 [&_svg]:w-4">
+                {step.icon}
+              </span>
+              <h3 className="mt-16 text-lg font-semibold tracking-[-0.025em]">{step.title}</h3>
+              <p className="mt-3 max-w-[17rem] text-[13px] leading-6 text-black/46">{step.body}</p>
             </article>
           ))}
         </div>
@@ -114,40 +84,44 @@ function StudioSection() {
   return (
     <section
       id="studio"
-      className="px-3 py-8 [contain-intrinsic-size:auto_700px] [content-visibility:auto] sm:px-5 lg:py-14"
+      className="bg-[#ede8f0] px-3 py-4 [contain-intrinsic-size:auto_720px] [content-visibility:auto] sm:px-5 lg:py-8"
     >
-      <div className="relative mx-auto min-h-[610px] max-w-[1500px] overflow-hidden rounded-[2rem] border border-white/10 bg-[#151518] text-white sm:rounded-[2.5rem]">
-        <div className="grid min-h-[610px] items-center px-7 py-16 sm:px-12 lg:grid-cols-[0.72fr_1.28fr] lg:px-20">
-          <div className="relative z-20 max-w-[430px] pb-[440px] lg:pb-0">
-            <h2 className="text-4xl font-semibold leading-[0.98] tracking-[-0.05em] sm:text-5xl">
-              Train an AI chatbot on your website—automatically.
+      <div className="relative mx-auto min-h-[620px] max-w-[1500px] overflow-hidden rounded-[2rem] border border-white/10 bg-[#121115] text-white sm:rounded-[2.5rem]">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(255,92,122,.12),transparent_30%),radial-gradient(circle_at_86%_78%,rgba(142,123,187,.18),transparent_32%)]" />
+        <div className="relative grid min-h-[620px] items-center px-7 py-16 sm:px-12 lg:grid-cols-[0.76fr_1.24fr] lg:px-20">
+          <div className="relative z-20 max-w-[430px] pb-[410px] lg:pb-0">
+            <Eyebrow dark>Soul Studio</Eyebrow>
+            <h2
+              className={`mt-7 text-[clamp(2.7rem,4.2vw,4.5rem)] font-normal leading-[0.95] tracking-[-0.05em] ${displayFont}`}
+            >
+              See exactly what your agent knows.
             </h2>
-            <p className="mt-5 max-w-sm text-lg leading-7 text-white/42">
-              Crawl every page. Keep it current. Verify every answer.
+            <p className="mt-5 max-w-sm text-[14px] leading-7 text-white/45">
+              Inspect sources, refresh changes, and test retrieval before visitors ask.
             </p>
             <Link
               to="/app"
               className="mt-8 inline-flex items-center gap-2 text-[12px] font-semibold text-[#ff8399] transition hover:text-white"
             >
-              Explore Soul Studio <ArrowRight className="h-4 w-4" />
+              Open Soul Studio <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
 
-          <div className="absolute bottom-0 right-0 h-[500px] w-full lg:h-[560px] lg:w-[62%]">
+          <div className="absolute bottom-0 right-0 h-[470px] w-full lg:h-[560px] lg:w-[62%]">
             <CardSwap
-              width={560}
-              height={400}
-              cardDistance={58}
-              verticalDistance={68}
-              delay={5000}
+              width={540}
+              height={370}
+              cardDistance={54}
+              verticalDistance={62}
+              delay={5200}
               pauseOnHover={false}
-              skewAmount={5}
+              skewAmount={4}
               easing="elastic"
               className="scale-[0.58] sm:scale-[0.78] lg:scale-100"
             >
-              <StudioVisualCard title="Deep crawl" variant="crawl" />
-              <StudioVisualCard title="Living knowledge" variant="knowledge" />
-              <StudioVisualCard title="Retrieval ready" variant="retrieval" />
+              <StudioVisualCard title="Sources" variant="sources" />
+              <StudioVisualCard title="Freshness" variant="freshness" />
+              <StudioVisualCard title="Retrieval" variant="retrieval" />
             </CardSwap>
           </div>
         </div>
@@ -161,117 +135,100 @@ function StudioVisualCard({
   variant,
 }: {
   title: string;
-  variant: "crawl" | "knowledge" | "retrieval";
+  variant: "sources" | "freshness" | "retrieval";
 }) {
-  const backgrounds = {
-    crawl:
-      "bg-[radial-gradient(circle_at_17%_72%,rgba(255,92,122,.24),transparent_20%),radial-gradient(ellipse_at_73%_48%,rgba(255,255,255,.13),transparent_34%),linear-gradient(145deg,#0b0b0d_5%,#19171b_48%,#08080a_100%)]",
-    knowledge:
-      "bg-[radial-gradient(ellipse_at_22%_28%,rgba(158,145,201,.26),transparent_27%),radial-gradient(circle_at_77%_74%,rgba(255,92,122,.18),transparent_23%),linear-gradient(155deg,#08080a,#1b181d_48%,#09090b)]",
-    retrieval:
-      "bg-[radial-gradient(ellipse_at_76%_24%,rgba(196,151,255,.18),transparent_26%),radial-gradient(ellipse_at_25%_78%,rgba(255,255,255,.14),transparent_30%),linear-gradient(135deg,#080808,#171717_48%,#050505)]",
-  };
-
   return (
-    <Card className="cursor-pointer border border-white/55 bg-[#0b0b0d] text-white shadow-[0_30px_80px_rgba(0,0,0,.52)]">
-      <div className="flex h-16 items-center gap-3 border-b border-white/35 bg-gradient-to-b from-white/[0.055] to-transparent px-5">
-        <span className="h-2.5 w-2.5 rounded-full bg-white" />
-        <span className="text-[15px] font-medium tracking-[-0.02em]">{title}</span>
+    <Card className="cursor-pointer border border-white/45 bg-[#0b0b0d] text-white shadow-[0_30px_80px_rgba(0,0,0,.52)]">
+      <div className="flex h-16 items-center gap-3 border-b border-white/15 bg-white/[0.035] px-5">
+        <span className="h-2 w-2 rounded-full bg-[#ff8399] shadow-[0_0_16px_rgba(255,92,122,.65)]" />
+        <span className="text-[14px] font-medium tracking-[-0.02em]">{title}</span>
       </div>
-      <div className={`relative h-[336px] overflow-hidden ${backgrounds[variant]}`}>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_12%,rgba(0,0,0,.5)_86%)]" />
-        {variant === "crawl" && <CrawlData />}
-        {variant === "knowledge" && <KnowledgeData />}
+      <div className="relative h-[306px] overflow-hidden bg-[radial-gradient(circle_at_76%_20%,rgba(142,123,187,.16),transparent_29%),radial-gradient(circle_at_18%_82%,rgba(255,92,122,.14),transparent_26%),#111014]">
+        {variant === "sources" && <SourcesData />}
+        {variant === "freshness" && <FreshnessData />}
         {variant === "retrieval" && <RetrievalData />}
       </div>
     </Card>
   );
 }
 
-function CrawlData() {
+function SourcesData() {
+  const sources = [
+    ["Product pages", "Indexed"],
+    ["Pricing", "Updated"],
+    ["Documentation", "Indexed"],
+  ];
+
   return (
-    <div className="relative z-10 flex h-full flex-col p-8">
-      <div className="flex items-center justify-between text-[10px] text-white/38">
-        <span>obseri.com</span>
-        <span className="flex items-center gap-2 text-[#ff8399]">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#ff5c7a]" /> Live crawl
-        </span>
-      </div>
-      <div className="mt-auto">
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-5xl font-semibold tracking-[-0.06em]">148</p>
-            <p className="mt-2 text-[11px] text-white/40">pages mapped</p>
+    <div className="relative z-10 h-full p-7">
+      <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-white/28">
+        Source map
+      </p>
+      <div className="mt-6 divide-y divide-white/8 rounded-2xl border border-white/10 bg-black/20 px-4">
+        {sources.map(([name, status]) => (
+          <div key={name} className="flex items-center justify-between py-4">
+            <span className="text-[11px] text-white/68">{name}</span>
+            <span className="flex items-center gap-1.5 text-[9px] text-[#ff9caf]">
+              <Check className="h-3 w-3" /> {status}
+            </span>
           </div>
-          <p className="pb-1 text-[10px] text-white/30">12 updated · 0 blocked</p>
-        </div>
-        <div className="mt-6 h-1 overflow-hidden rounded-full bg-white/10">
-          <div className="h-full w-[86%] rounded-full bg-gradient-to-r from-[#ff5c7a] to-[#9e91c9]" />
-        </div>
-        <div className="mt-3 flex justify-between text-[9px] text-white/25">
-          <span>Discovery</span>
-          <span>Indexing 86%</span>
-        </div>
+        ))}
       </div>
+      <p className="absolute bottom-6 left-7 text-[9px] text-white/28">
+        Sources stay attached to every block.
+      </p>
     </div>
   );
 }
 
-function KnowledgeData() {
+function FreshnessData() {
   return (
-    <div className="relative z-10 h-full">
-      <div className="absolute left-8 top-8">
-        <p className="text-4xl font-semibold tracking-[-0.06em]">624</p>
-        <p className="mt-2 text-[10px] text-white/35">connected knowledge blocks</p>
+    <div className="relative z-10 flex h-full flex-col p-7">
+      <div className="flex items-center justify-between">
+        <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-white/28">
+          Change detection
+        </p>
+        <RefreshCw className="h-3.5 w-3.5 text-[#ff9caf]" />
       </div>
-      <div className="absolute left-[17%] top-[58%] h-px w-[65%] -rotate-6 bg-gradient-to-r from-transparent via-white/22 to-transparent" />
-      <div className="absolute left-[25%] top-[41%] h-px w-[52%] rotate-[17deg] bg-gradient-to-r from-transparent via-white/18 to-transparent" />
-      {[
-        ["Product", "left-[18%] top-[62%]"],
-        ["Pricing", "left-[46%] top-[48%]"],
-        ["Docs", "right-[17%] top-[65%]"],
-      ].map(([label, position]) => (
-        <span
-          key={label}
-          className={`absolute ${position} rounded-full border border-white/14 bg-black/35 px-3 py-2 text-[9px] text-white/60 backdrop-blur-md`}
-        >
-          {label}
-        </span>
-      ))}
-      <span className="absolute left-1/2 top-[61%] h-3 w-3 -translate-x-1/2 rounded-full bg-[#ff5c7a] shadow-[0_0_28px_rgba(255,92,122,.65)]" />
+      <div className="my-auto">
+        <p className="max-w-sm text-3xl font-medium leading-tight tracking-[-0.045em]">
+          Refresh only what changed.
+        </p>
+        <p className="mt-4 max-w-xs text-[11px] leading-5 text-white/38">
+          New revisions are visible before they replace the live knowledge.
+        </p>
+      </div>
+      <div className="h-1 overflow-hidden rounded-full bg-white/8">
+        <div className="h-full w-[72%] rounded-full bg-gradient-to-r from-[#ff5c7a] to-[#9e91c9]" />
+      </div>
     </div>
   );
 }
 
 function RetrievalData() {
-  const matches = [
-    ["Pricing", "96%", "w-[96%]"],
-    ["Documentation", "89%", "w-[89%]"],
-    ["FAQ", "74%", "w-[74%]"],
-  ];
+  const matches = ["Pricing", "Plan details", "Billing FAQ"];
+
   return (
-    <div className="relative z-10 h-full p-8">
-      <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-white/28">
-        Test query
+    <div className="relative z-10 h-full p-7">
+      <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-white/28">
+        Test question
       </p>
       <p className="mt-3 text-[17px] font-medium tracking-[-0.025em]">
-        What does the Pro plan include?
+        What is included in the Pro plan?
       </p>
-      <div className="mt-7 space-y-4">
-        {matches.map(([label, score, width]) => (
-          <div key={label}>
-            <div className="flex justify-between text-[9px] text-white/38">
-              <span>{label}</span>
-              <span>{score}</span>
-            </div>
-            <div className="mt-2 h-1 rounded-full bg-white/8">
-              <div className={`h-full ${width} rounded-full bg-white/45`} />
-            </div>
-          </div>
+      <div className="mt-7 flex flex-wrap gap-2">
+        {matches.map((match) => (
+          <span
+            key={match}
+            className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-2 text-[9px] text-white/48"
+          >
+            {match}
+          </span>
         ))}
       </div>
-      <p className="absolute bottom-7 left-8 flex items-center gap-2 text-[9px] text-[#ff8399]">
-        <span className="h-1.5 w-1.5 rounded-full bg-[#ff5c7a]" /> Answer ready with 3 citations
+      <p className="absolute bottom-7 left-7 flex items-center gap-2 text-[9px] text-[#ff9caf]">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#ff5c7a]" /> Answer grounded in visible
+        sources
       </p>
     </div>
   );
@@ -279,71 +236,61 @@ function RetrievalData() {
 
 function IdentitySection() {
   return (
-    <section className="px-6 py-24 [contain-intrinsic-size:auto_850px] [content-visibility:auto] sm:py-32 lg:px-10 lg:py-40">
-      <div className="mx-auto max-w-[1320px]">
-        <div className="max-w-3xl">
-          <Eyebrow>More than answers</Eyebrow>
-          <h2 className="mt-6 text-4xl font-semibold leading-[0.98] tracking-[-0.055em] sm:text-6xl">
-            A website assistant that speaks in your brand’s voice.
+    <section className="bg-[#ede8f0] px-6 py-24 [contain-intrinsic-size:auto_760px] [content-visibility:auto] sm:py-32 lg:px-10 lg:py-36">
+      <div className="mx-auto grid max-w-[1240px] overflow-hidden rounded-[2.3rem] border border-white/75 bg-[linear-gradient(135deg,#f6dedb_0%,#eee4ed_48%,#dfdcf2_100%)] shadow-[0_30px_100px_rgba(75,52,82,.08)] lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="flex flex-col justify-center p-8 sm:p-12 lg:p-16">
+          <Eyebrow>Personality + voice</Eyebrow>
+          <h2
+            className={`mt-7 max-w-xl text-[clamp(2.8rem,4.6vw,4.8rem)] font-normal leading-[0.95] tracking-[-0.05em] ${displayFont}`}
+          >
+            Make it sound like you.
           </h2>
+          <p className="mt-5 max-w-md text-[14px] leading-7 text-black/48">
+            Choose how it behaves, what it will not say, and the voice visitors hear.
+          </p>
         </div>
-        <div className="mt-16 grid gap-4 lg:grid-cols-2">
-          <article className="relative min-h-[480px] overflow-hidden rounded-[2rem] bg-[#f4dedb] p-8 sm:p-10">
-            <Fingerprint className="h-5 w-5 text-[#a84155]" />
-            <h3 className="mt-8 max-w-md text-3xl font-semibold tracking-[-0.045em] sm:text-4xl">
-              A personality designed for your brand.
-            </h3>
-            <p className="mt-5 max-w-md text-[13px] leading-6 text-black/50">
-              Set its name, purpose, tone, traits, greeting, boundaries, escalation behavior, and
-              lead instinct—without writing a system prompt from scratch.
-            </p>
-            <div className="absolute inset-x-8 bottom-8 rounded-2xl border border-black/8 bg-white/65 p-4 backdrop-blur-xl sm:inset-x-10">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold">Ona</p>
-                  <p className="mt-1 text-[9px] text-black/38">Warm · clear · quietly bold</p>
-                </div>
-                <span className="rounded-full bg-[#a84155] px-2.5 py-1 text-[8px] font-semibold text-white">
-                  Active
-                </span>
-              </div>
-              <p className="mt-4 text-[11px] leading-5 text-black/62">
-                “Help people understand what Obseri can add to their website.”
-              </p>
-            </div>
-          </article>
-          <article className="relative min-h-[480px] overflow-hidden rounded-[2rem] bg-[#e4e1f4] p-8 sm:p-10">
-            <Volume2 className="h-5 w-5 text-[#6f5d9c]" />
-            <h3 className="mt-8 max-w-md text-3xl font-semibold tracking-[-0.045em] sm:text-4xl">
-              A voice that feels like it belongs.
-            </h3>
-            <p className="mt-5 max-w-md text-[13px] leading-6 text-black/50">
-              Start instantly with browser speech, connect managed voice profiles, or create an
-              authorized clone with explicit consent attached.
-            </p>
-            <div className="absolute inset-x-8 bottom-8 rounded-2xl border border-black/8 bg-[#17151c] p-5 text-white shadow-2xl sm:inset-x-10">
-              <div className="flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#ff9caf] text-[#3c1520]">
-                  <Mic2 className="h-4 w-4" />
-                </span>
-                <div>
-                  <p className="text-[11px] font-semibold">Natural voice</p>
-                  <p className="mt-1 text-[8px] text-white/35">English · conversational</p>
-                </div>
-              </div>
-              <div className="mt-5 flex h-10 items-center gap-1">
-                {[14, 24, 19, 33, 16, 27, 11, 35, 21, 29, 15, 25, 10, 19, 13].map(
-                  (height, index) => (
-                    <span
-                      key={index}
-                      className="w-1 flex-1 rounded-full bg-[#ff9caf]/65"
-                      style={{ height }}
-                    />
-                  ),
-                )}
+
+        <div className="m-3 min-h-[430px] rounded-[1.8rem] border border-white/50 bg-[#151419] p-7 text-white shadow-2xl sm:m-5 sm:p-9">
+          <div className="flex items-center justify-between border-b border-white/10 pb-6">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#ff8ba0] text-[#3e1520]">
+                <Mic2 className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-[12px] font-semibold">Ona</p>
+                <p className="mt-1 text-[9px] text-white/34">Website guide</p>
               </div>
             </div>
-          </article>
+            <span className="flex items-center gap-2 text-[9px] text-[#ff9caf]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#ff5c7a] shadow-[0_0_12px_rgba(255,92,122,.7)]" />
+              Ready
+            </span>
+          </div>
+
+          <div className="flex min-h-[205px] items-center justify-center">
+            <div className="flex h-28 items-center gap-1.5">
+              {[18, 34, 24, 52, 31, 66, 39, 78, 47, 60, 28, 50, 35, 68, 42, 30, 20].map(
+                (height, index) => (
+                  <span
+                    key={index}
+                    className="w-1.5 rounded-full bg-gradient-to-b from-[#ff8399] to-[#9e91c9] opacity-80"
+                    style={{ height }}
+                  />
+                ),
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 border-t border-white/10 pt-6">
+            {["Warm", "Clear", "Concise", "Escalates when unsure"].map((trait) => (
+              <span
+                key={trait}
+                className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-2 text-[9px] text-white/48"
+              >
+                {trait}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -351,52 +298,50 @@ function IdentitySection() {
 }
 
 function TrustSection() {
-  const promises = [
+  const controls: Array<{ icon: ReactNode; title: string; body: string }> = [
     {
       icon: <ShieldCheck />,
-      title: "Grounded by default",
-      body: "Answers use captured evidence and return the source. Missing knowledge stays missing instead of becoming a confident guess.",
+      title: "Grounded answers",
+      body: "Evidence stays visible; missing knowledge stays unanswered.",
     },
     {
       icon: <RefreshCw />,
-      title: "Fresh without starting over",
-      body: "Conditional refresh and content hashes identify what changed, preserve what did not, and keep a revision history.",
+      title: "Safe refreshes",
+      body: "Review changed content before it replaces the live revision.",
     },
     {
       icon: <Webhook />,
-      title: "Yours to integrate",
-      body: "A small widget handles the visitor experience while signed events connect the useful parts to your existing systems.",
+      title: "Signed delivery",
+      body: "Scoped widget tokens and verified webhooks protect each workspace.",
     },
   ];
+
   return (
     <section
       id="trust"
-      className="border-y border-black/8 bg-[#ebece6] px-6 py-24 [contain-intrinsic-size:auto_650px] [content-visibility:auto] sm:py-32 lg:px-10"
+      className="bg-[#f4f1f3] px-6 py-24 [contain-intrinsic-size:auto_620px] [content-visibility:auto] sm:py-32 lg:px-10 lg:py-36"
     >
-      <div className="mx-auto max-w-[1320px]">
-        <div className="flex flex-col justify-between gap-8 lg:flex-row lg:items-end">
-          <div>
-            <Eyebrow>Trust is a feature</Eyebrow>
-            <h2 className="mt-6 max-w-3xl text-4xl font-semibold tracking-[-0.055em] sm:text-6xl">
-              Alive, without becoming unpredictable.
-            </h2>
-          </div>
-          <p className="max-w-md text-[13px] leading-6 text-black/45">
-            The system exposes its sources, refresh state, boundaries, and delivery path so you
-            remain in control.
-          </p>
+      <div className="mx-auto max-w-[1240px]">
+        <div className="max-w-3xl">
+          <Eyebrow>Built for control</Eyebrow>
+          <h2
+            className={`mt-6 text-[clamp(2.8rem,4.8vw,4.8rem)] font-normal leading-[0.96] tracking-[-0.05em] ${displayFont}`}
+          >
+            Nothing important hides behind the magic.
+          </h2>
         </div>
-        <div className="mt-14 grid gap-3 md:grid-cols-3">
-          {promises.map((promise) => (
+
+        <div className="mt-16 divide-y divide-black/[0.08] border-y border-black/[0.08]">
+          {controls.map((control) => (
             <article
-              key={promise.title}
-              className="rounded-[1.5rem] border border-black/8 bg-[#f7f7f2] p-7 sm:p-8"
+              key={control.title}
+              className="grid gap-5 py-7 sm:grid-cols-[3rem_0.65fr_1.35fr] sm:items-center sm:py-8"
             >
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#b7445a] shadow-sm [&_svg]:h-4 [&_svg]:w-4">
-                {promise.icon}
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f8dfdf] text-[#b7445a] [&_svg]:h-4 [&_svg]:w-4">
+                {control.icon}
               </span>
-              <h3 className="mt-16 text-lg font-semibold tracking-[-0.025em]">{promise.title}</h3>
-              <p className="mt-4 text-[12px] leading-6 text-black/43">{promise.body}</p>
+              <h3 className="text-[15px] font-semibold tracking-[-0.02em]">{control.title}</h3>
+              <p className="max-w-xl text-[12px] leading-6 text-black/43">{control.body}</p>
             </article>
           ))}
         </div>
@@ -407,24 +352,19 @@ function TrustSection() {
 
 function FinalCta() {
   return (
-    <section className="px-4 py-4 [contain-intrinsic-size:auto_600px] [content-visibility:auto] sm:px-6 lg:px-10">
-      <div className="relative mx-auto flex min-h-[560px] max-w-[1360px] items-center justify-center overflow-hidden rounded-[2.6rem] bg-[#0b0b0d] px-6 py-24 text-center text-white">
-        <div className="absolute left-1/2 top-1/2 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#ff5c7a]/12 blur-[120px]" />
-        <div className="absolute inset-0 opacity-25 [background-image:radial-gradient(rgba(255,92,122,.25)_1px,transparent_1px)] [background-size:28px_28px] [mask-image:radial-gradient(circle,black,transparent_70%)]" />
-        <div className="relative max-w-4xl">
-          <MessageCircle className="mx-auto h-6 w-6 text-[#ff5c7a]" />
-          <h2 className="mt-8 text-5xl font-semibold leading-[0.9] tracking-[-0.065em] sm:text-7xl lg:text-8xl">
-            Build an AI assistant your visitors can talk to.
+    <section className="bg-[#f4f1f3] px-4 pb-4 [contain-intrinsic-size:auto_340px] [content-visibility:auto] sm:px-6 lg:px-10">
+      <div className="relative mx-auto flex min-h-[330px] max-w-[1360px] items-center justify-center overflow-hidden rounded-[2.4rem] bg-[#111014] px-6 py-20 text-center text-white">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_0%,rgba(255,92,122,.17),transparent_34%),radial-gradient(circle_at_78%_100%,rgba(142,123,187,.2),transparent_38%)]" />
+        <div className="relative">
+          <img src="/obseri-pulse-mark.svg" alt="" className="mx-auto h-8 w-8" />
+          <h2 className={`mt-7 text-4xl font-normal tracking-[-0.04em] sm:text-5xl ${displayFont}`}>
+            Ready to build?
           </h2>
-          <p className="mx-auto mt-7 max-w-xl text-[14px] leading-7 text-white/42">
-            Give Obseri the URL. Shape the soul. Let every visitor meet the most useful version of
-            your website.
-          </p>
           <Link
             to="/app"
-            className="mt-10 inline-flex h-12 items-center gap-2 rounded-full bg-[#ff5c7a] px-6 text-[12px] font-bold text-white transition hover:scale-[1.02] hover:bg-white hover:text-black"
+            className="mt-8 inline-flex h-12 items-center gap-2 rounded-full bg-[#ff5c7a] px-6 text-[12px] font-bold text-white transition hover:scale-[1.02] hover:bg-white hover:text-black"
           >
-            Build your website soul <ArrowRight className="h-4 w-4" />
+            Open Soul Studio <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       </div>
@@ -434,37 +374,47 @@ function FinalCta() {
 
 function Footer() {
   return (
-    <footer className="px-6 py-10 lg:px-10">
-      <div className="mx-auto flex max-w-[1320px] flex-col gap-6 border-t border-black/8 pt-8 text-[10px] text-black/35 sm:flex-row sm:items-center sm:justify-between">
+    <footer className="bg-[#f4f1f3] px-6 py-10 lg:px-10">
+      <div className="mx-auto flex max-w-[1240px] flex-col gap-6 border-t border-black/[0.08] pt-8 text-[10px] text-black/35 sm:flex-row sm:items-center sm:justify-between">
         <img src="/obseri-logo-dark.svg" alt="Obseri" className="h-7 w-auto" />
-        <nav className="flex flex-wrap gap-x-4 gap-y-2">
+        <nav className="flex flex-wrap gap-x-5 gap-y-2">
           <a href="/ai-voice-agent-for-website" className="transition hover:text-black">
-            AI voice agent
+            Voice agent
           </a>
           <a href="/ai-chatbot-trained-on-your-website" className="transition hover:text-black">
-            Website-trained chatbot
+            Website chatbot
+          </a>
+          <a href="#trust" className="transition hover:text-black">
+            Trust
           </a>
         </nav>
         <a
-          href="https://github.com/jamiepine/voicebox"
-          target="_blank"
-          rel="noreferrer"
+          href="mailto:flamki@obseri.com"
           className="inline-flex items-center gap-1.5 transition hover:text-black"
         >
-          Optional voice infrastructure by Voicebox <ExternalLink className="h-3 w-3" />
+          flamki@obseri.com <ExternalLink className="h-3 w-3" />
         </a>
       </div>
     </footer>
   );
 }
 
-function Eyebrow({ children, dark = false }: { children: React.ReactNode; dark?: boolean }) {
+function Eyebrow({
+  children,
+  dark = false,
+  centered = false,
+}: {
+  children: ReactNode;
+  dark?: boolean;
+  centered?: boolean;
+}) {
   return (
     <p
-      className={`flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.22em] ${dark ? "text-[#ff8399]" : "text-[#a84155]"}`}
+      className={`flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.22em] ${centered ? "justify-center" : ""} ${dark ? "text-[#ff8399]" : "text-[#a84155]"}`}
     >
       <span className={`h-px w-7 ${dark ? "bg-[#ff5c7a]/55" : "bg-[#a84155]/45"}`} />
       {children}
+      {centered && <span className="h-px w-7 bg-[#a84155]/45" />}
     </p>
   );
 }
