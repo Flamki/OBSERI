@@ -26,7 +26,7 @@ self-serve customers.
 | -------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Landing experience               | Done and live             | Responsive premium landing page with optimized WebGL effects and quick-start URL entry                                                                                   |
 | Soul Studio                      | Done and live             | Knowledge, personality, voice, live website simulation, integration, conversations, and settings in one workspace                                                        |
-| Visitor experience simulator    | Done and live             | Renders the website behind the real assistant with desktop, tablet, mobile, theme, launcher, accent, and placement controls                                               |
+| Visitor experience simulator     | Done and live             | Renders the website behind the real assistant with desktop, tablet, mobile, theme, launcher, accent, and placement controls                                              |
 | Website ingestion                | Done and live             | Same-origin discovery, robots and sitemap support, bounded depth/page limits, canonicalization, deduplication, revisions, refresh validators, and visible crawl progress |
 | Retrieval and chat               | Done and live             | Source-grounded answers, visible citations, deterministic fallback, and an OpenAI-compatible hosted provider                                                             |
 | Personality                      | Done and live             | Name, role, purpose, tone, traits, greeting, instructions, unknown response, and guardrails                                                                              |
@@ -130,6 +130,7 @@ to connect hosted services. Never commit `.env.local` or provider credentials.
 | `OBSERI_CHAT_API_URL`       | Optional dedicated grounded-chat endpoint                        |
 | `OBSERI_CHAT_API_KEY`       | Server-only grounded-chat credential                             |
 | `OBSERI_CHAT_MODEL`         | Grounded-chat model identifier                                   |
+| `OBSERI_VOICE_MODEL`        | Optional low-latency model for streamed live voice turns         |
 | `OBSERI_VOICEBOX_URL`       | Public or local Voicebox REST base URL                           |
 | `OBSERI_ENABLE_QWEN_VOICES` | Enables Qwen presets only when the worker has adequate GPU/RAM   |
 

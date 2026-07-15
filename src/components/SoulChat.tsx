@@ -12,8 +12,8 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import type { ChatResponse } from "@/lib/conversation";
-import type { Soul, SoulMessage } from "@/lib/soul";
+import { rankKnowledgeChunks, type ChatResponse } from "@/lib/conversation";
+import type { KnowledgeChunk, Soul, SoulMessage } from "@/lib/soul";
 
 export default function SoulChat({
   soul,
@@ -43,6 +43,9 @@ export default function SoulChat({
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const voiceCallActiveRef = useRef(false);
+  const messagesRef = useRef(messages);
+  const sendingRef = useRef(false);
+  const voiceRequestRef = useRef<AbortController | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const theme = soul.appearance.theme ?? "light";
   const isDark = theme === "dark";
@@ -59,7 +62,9 @@ export default function SoulChat({
     : "text-[#777b74] hover:bg-[#f2f3f0] hover:text-[#252824]";
 
   useEffect(() => {
-    setMessages([greetingMessage(soul.id, soul.personality.greeting)]);
+    const greeting = [greetingMessage(soul.id, soul.personality.greeting)];
+    messagesRef.current = greeting;
+    setMessages(greeting);
     setSoundEnabled(soul.voice.enabled);
     stopVoiceCall();
   }, [soul.id, soul.personality.greeting, soul.voice.enabled]);
@@ -71,6 +76,7 @@ export default function SoulChat({
   useEffect(
     () => () => {
       voiceCallActiveRef.current = false;
+      voiceRequestRef.current?.abort();
       recognitionRef.current?.abort();
       audioRef.current?.pause();
       window.speechSynthesis?.cancel();
@@ -84,21 +90,27 @@ export default function SoulChat({
 
   async function sendMessage(text = value, continueVoiceCall = false) {
     const question = text.trim();
-    if (!question || sending) return;
+    if (!question || sendingRef.current) return;
     const visitor: SoulMessage = {
       id: crypto.randomUUID(),
       role: "visitor",
       content: question,
       createdAt: new Date().toISOString(),
     };
-    const nextMessages = [...messages, visitor];
+    const nextMessages = [...messagesRef.current, visitor];
+    messagesRef.current = nextMessages;
     setMessages(nextMessages);
     setValue("");
     setError("");
+    sendingRef.current = true;
     setSending(true);
     if (continueVoiceCall) setVoiceStatus("thinking");
 
     try {
+      if (continueVoiceCall) {
+        await streamVoiceMessage(nextMessages);
+        return;
+      }
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -126,9 +138,10 @@ export default function SoulChat({
         citations: data.citations,
       };
       const completed = [...nextMessages, assistant];
+      messagesRef.current = completed;
       setMessages(completed);
       onMessagesChange?.(completed, data.leadIntent);
-      const shouldSpeak = continueVoiceCall ? voiceCallActiveRef.current : soundEnabled;
+      const shouldSpeak = soundEnabled;
       if (shouldSpeak) {
         setVoiceStatus("speaking");
         try {
@@ -137,71 +150,211 @@ export default function SoulChat({
           setError("I couldn’t play the spoken answer. You can continue by voice.");
         }
       }
-      if (continueVoiceCall && voiceCallActiveRef.current) {
-        window.setTimeout(() => startListening(true), 220);
-      }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The conversation was interrupted.");
+      if (!(cause instanceof DOMException && cause.name === "AbortError")) {
+        setError(cause instanceof Error ? cause.message : "The conversation was interrupted.");
+      }
       if (continueVoiceCall) stopVoiceCall();
     } finally {
+      voiceRequestRef.current = null;
+      sendingRef.current = false;
       setSending(false);
+    }
+  }
+
+  async function streamVoiceMessage(nextMessages: SoulMessage[]) {
+    const requestController = new AbortController();
+    voiceRequestRef.current?.abort();
+    voiceRequestRef.current = requestController;
+    const response = await fetch("/api/chat/stream", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        soulId: soul.id,
+        personality: soul.personality,
+        chunks: prepareVoiceChunks(nextMessages.at(-1)?.content ?? "", soul),
+        messages: nextMessages.slice(-8).map((message) => ({
+          role: message.role,
+          content: message.content,
+        })),
+      }),
+      signal: requestController.signal,
+    });
+    if (!response.ok || !response.body) {
+      const payload = (await response.json().catch(() => null)) as {
+        error?: { message?: string };
+      } | null;
+      throw new Error(payload?.error?.message || "The voice response was interrupted.");
+    }
+
+    const assistantId = crypto.randomUUID();
+    const speaker = createStreamingSpeaker();
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let answer = "";
+    let citations: SoulMessage["citations"] = [];
+    let leadIntent: ChatResponse["leadIntent"] = "none";
+
+    const updateDraft = () => {
+      const assistant: SoulMessage = {
+        id: assistantId,
+        role: "assistant",
+        content: answer,
+        createdAt: new Date().toISOString(),
+        citations,
+      };
+      const completed = [...nextMessages, assistant];
+      messagesRef.current = completed;
+      setMessages(completed);
+      return completed;
+    };
+
+    try {
+      while (true) {
+        const { done, value: chunk } = await reader.read();
+        buffer += decoder.decode(chunk, { stream: !done });
+        const lines = buffer.split("\n");
+        buffer = done ? "" : (lines.pop() ?? "");
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const event = JSON.parse(line) as VoiceStreamEvent;
+          if (event.type === "meta") {
+            citations = event.citations;
+            leadIntent = event.leadIntent;
+          } else if (event.type === "delta" && event.text) {
+            if (!answer) setVoiceStatus("speaking");
+            answer += event.text;
+            speaker.push(event.text);
+            updateDraft();
+          } else if (event.type === "error") {
+            throw new Error(event.message || "The voice stream was interrupted.");
+          }
+        }
+        if (done) break;
+      }
+      answer = answer.trim();
+      if (!answer) throw new Error("The voice response was empty.");
+      const completed = updateDraft();
+      onMessagesChange?.(completed, leadIntent);
+      await speaker.finish();
+      if (voiceCallActiveRef.current) window.setTimeout(() => startListening(true), 60);
+    } finally {
+      reader.releaseLock();
     }
   }
 
   async function speak(text: string) {
     if (soul.voice.provider === "voicebox" && soul.voice.profileId) {
-      const response = await fetch("/api/voice/speak", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          text,
-          profileId: soul.voice.profileId,
-          language: soul.voice.language,
-        }),
-      });
-      if (response.ok) {
-        const href = URL.createObjectURL(await response.blob());
-        const audio = new Audio(href);
-        audioRef.current = audio;
-        await new Promise<void>((resolve, reject) => {
-          let settled = false;
-          const finish = (playbackError?: Error) => {
-            if (settled) return;
-            settled = true;
-            URL.revokeObjectURL(href);
-            audioRef.current = null;
-            if (playbackError) reject(playbackError);
-            else resolve();
-          };
-          audio.onended = () => finish();
-          audio.onpause = () => finish();
-          audio.onerror = () => finish(new Error("Voice playback failed."));
-          void audio
-            .play()
-            .catch((cause) =>
-              finish(cause instanceof Error ? cause : new Error("Voice playback failed.")),
-            );
-        });
-        return;
-      }
+      await playAudioBlob(await fetchVoiceboxAudio(text));
+      return;
     }
 
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = soul.voice.language;
-      utterance.rate = soul.voice.speed;
-      utterance.pitch = soul.voice.pitch;
-      const voice = window.speechSynthesis
-        .getVoices()
-        .find((candidate) => candidate.name === soul.voice.browserVoiceName);
-      if (voice) utterance.voice = voice;
-      await new Promise<void>((resolve) => {
-        utterance.onend = () => resolve();
-        utterance.onerror = () => resolve();
-        window.speechSynthesis.speak(utterance);
-      });
+      await speakBrowserSegment(text);
     }
+  }
+
+  function createStreamingSpeaker() {
+    let pendingText = "";
+    let playback = Promise.resolve();
+    window.speechSynthesis?.cancel();
+    audioRef.current?.pause();
+
+    const queue = (text: string) => {
+      const segment = text.trim();
+      if (!segment) return;
+      if (soul.voice.provider === "voicebox" && soul.voice.profileId) {
+        const audio = fetchVoiceboxAudio(segment, voiceRequestRef.current?.signal).catch(
+          () => null,
+        );
+        playback = playback.then(async () => {
+          if (!voiceCallActiveRef.current) return;
+          const blob = await audio;
+          if (blob) await playAudioBlob(blob);
+          else await speakBrowserSegment(segment);
+        });
+      } else {
+        playback = playback.then(() =>
+          voiceCallActiveRef.current ? speakBrowserSegment(segment) : Promise.resolve(),
+        );
+      }
+    };
+
+    return {
+      push(delta: string) {
+        pendingText += delta;
+        while (true) {
+          const splitAt = findSpeechBoundary(pendingText);
+          if (splitAt < 0) break;
+          queue(pendingText.slice(0, splitAt));
+          pendingText = pendingText.slice(splitAt);
+        }
+      },
+      async finish() {
+        queue(pendingText);
+        pendingText = "";
+        await playback;
+      },
+    };
+  }
+
+  async function fetchVoiceboxAudio(text: string, signal?: AbortSignal) {
+    const response = await fetch("/api/voice/speak", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        text,
+        profileId: soul.voice.profileId,
+        language: soul.voice.language,
+      }),
+      signal,
+    });
+    if (!response.ok) throw new Error("Voice generation failed.");
+    return response.blob();
+  }
+
+  async function playAudioBlob(blob: Blob) {
+    const href = URL.createObjectURL(blob);
+    const audio = new Audio(href);
+    audioRef.current = audio;
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const finish = (playbackError?: Error) => {
+        if (settled) return;
+        settled = true;
+        URL.revokeObjectURL(href);
+        if (audioRef.current === audio) audioRef.current = null;
+        if (playbackError) reject(playbackError);
+        else resolve();
+      };
+      audio.onended = () => finish();
+      audio.onpause = () => finish();
+      audio.onerror = () => finish(new Error("Voice playback failed."));
+      void audio
+        .play()
+        .catch((cause) =>
+          finish(cause instanceof Error ? cause : new Error("Voice playback failed.")),
+        );
+    });
+  }
+
+  async function speakBrowserSegment(text: string) {
+    if (!("speechSynthesis" in window)) return;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = soul.voice.language;
+    utterance.rate = soul.voice.speed;
+    utterance.pitch = soul.voice.pitch;
+    const voice = window.speechSynthesis
+      .getVoices()
+      .find((candidate) => candidate.name === soul.voice.browserVoiceName);
+    if (voice) utterance.voice = voice;
+    await new Promise<void>((resolve) => {
+      utterance.onend = () => resolve();
+      utterance.onerror = () => resolve();
+      window.speechSynthesis.speak(utterance);
+    });
   }
 
   function startListening(autoSend: boolean) {
@@ -225,23 +378,45 @@ export default function SoulChat({
     const recognition = new constructor();
     recognitionRef.current = recognition;
     recognition.lang = soul.voice.language;
-    recognition.interimResults = false;
+    recognition.interimResults = autoSend;
     recognition.continuous = false;
-    let heardResult = false;
-    recognition.onresult = (event) => {
-      heardResult = true;
-      const transcript = event.results[0]?.[0]?.transcript ?? "";
+    let transcript = "";
+    let submitted = false;
+    let endpointTimer: number | undefined;
+    const submitTranscript = () => {
+      if (submitted) return;
+      const clean = transcript.trim();
+      if (!clean) return;
+      submitted = true;
+      if (endpointTimer) window.clearTimeout(endpointTimer);
       setListening(false);
       recognitionRef.current = null;
-      if (autoSend) void sendMessage(transcript, true);
-      else setValue(transcript);
+      if (autoSend) void sendMessage(clean, true);
+      else setValue(clean);
+    };
+    recognition.onresult = (event) => {
+      let nextTranscript = "";
+      let hasFinalResult = false;
+      for (let index = 0; index < event.results.length; index += 1) {
+        const result = event.results[index];
+        nextTranscript += `${result?.[0]?.transcript ?? ""} `;
+        if (result?.isFinal) hasFinalResult = true;
+      }
+      transcript = nextTranscript.trim();
+      if (!transcript) return;
+      if (!autoSend || hasFinalResult) {
+        submitTranscript();
+        return;
+      }
+      if (endpointTimer) window.clearTimeout(endpointTimer);
+      endpointTimer = window.setTimeout(() => recognition.stop(), 520);
     };
     recognition.onerror = (event) => {
-      heardResult = true;
+      if (endpointTimer) window.clearTimeout(endpointTimer);
       setListening(false);
       recognitionRef.current = null;
       if (autoSend && event.error === "no-speech" && voiceCallActiveRef.current) {
-        window.setTimeout(() => startListening(true), 350);
+        window.setTimeout(() => startListening(true), 160);
         return;
       }
       setError(
@@ -252,10 +427,15 @@ export default function SoulChat({
       if (autoSend) stopVoiceCall();
     };
     recognition.onend = () => {
+      if (endpointTimer) window.clearTimeout(endpointTimer);
       setListening(false);
       recognitionRef.current = null;
-      if (autoSend && !heardResult && voiceCallActiveRef.current) {
-        window.setTimeout(() => startListening(true), 350);
+      if (!submitted && transcript) {
+        submitTranscript();
+        return;
+      }
+      if (autoSend && !submitted && voiceCallActiveRef.current) {
+        window.setTimeout(() => startListening(true), 160);
       }
     };
     try {
@@ -288,6 +468,8 @@ export default function SoulChat({
 
   function stopVoiceCall() {
     voiceCallActiveRef.current = false;
+    voiceRequestRef.current?.abort();
+    voiceRequestRef.current = null;
     recognitionRef.current?.abort();
     recognitionRef.current = null;
     audioRef.current?.pause();
@@ -299,7 +481,9 @@ export default function SoulChat({
   }
 
   function restart() {
-    setMessages([greetingMessage(soul.id, soul.personality.greeting)]);
+    const greeting = [greetingMessage(soul.id, soul.personality.greeting)];
+    messagesRef.current = greeting;
+    setMessages(greeting);
     setError("");
     window.speechSynthesis?.cancel();
   }
@@ -615,8 +799,20 @@ export default function SoulChat({
 }
 
 type SpeechRecognitionResultEvent = {
-  results: ArrayLike<{ [index: number]: { transcript: string } }>;
+  results: ArrayLike<{ [index: number]: { transcript: string }; isFinal: boolean }>;
 };
+
+type VoiceStreamEvent =
+  | {
+      type: "meta";
+      citations: NonNullable<SoulMessage["citations"]>;
+      followUp: string;
+      leadIntent: ChatResponse["leadIntent"];
+      mode: ChatResponse["mode"];
+    }
+  | { type: "delta"; text: string }
+  | { type: "done" }
+  | { type: "error"; message?: string };
 
 type SpeechRecognitionInstance = {
   lang: string;
@@ -631,6 +827,30 @@ type SpeechRecognitionInstance = {
 };
 
 type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
+
+function findSpeechBoundary(text: string) {
+  if (text.length < 24) return -1;
+  const sentence = text.match(/^[\s\S]{24,}?[.!?](?:["')\]]*)\s/);
+  if (sentence) return sentence[0].length;
+  if (text.length < 110) return -1;
+  const comma = text.slice(45, 100).lastIndexOf(", ");
+  if (comma >= 0) return 45 + comma + 2;
+  const space = text.lastIndexOf(" ", 92);
+  return space >= 45 ? space + 1 : -1;
+}
+
+function prepareVoiceChunks(question: string, soul: Soul): KnowledgeChunk[] {
+  const chunks = soul.knowledge.pages.flatMap((page) => page.chunks);
+  const ranked = rankKnowledgeChunks(question, chunks);
+  return (ranked.length ? ranked.slice(0, 48) : chunks.slice(0, 48)).map((chunk) => ({
+    id: chunk.id,
+    pageUrl: chunk.pageUrl,
+    pageTitle: chunk.pageTitle,
+    text: chunk.text,
+    order: chunk.order,
+    tokenEstimate: chunk.tokenEstimate,
+  }));
+}
 
 function greetingMessage(soulId: string, greeting: string): SoulMessage {
   return {

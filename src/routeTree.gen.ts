@@ -22,6 +22,7 @@ import { Route as ApiVoiceCloneRouteImport } from './routes/api.voice.clone'
 import { Route as ApiSoulsPublishRouteImport } from './routes/api.souls.publish'
 import { Route as ApiSoulsSoulIdRouteImport } from './routes/api.souls.$soulId'
 import { Route as ApiIngestStreamRouteImport } from './routes/api.ingest.stream'
+import { Route as ApiChatStreamRouteImport } from './routes/api.chat.stream'
 import { Route as ApiSoulsSoulIdEventsRouteImport } from './routes/api.souls.$soulId.events'
 
 const AppRoute = AppRouteImport.update({
@@ -89,6 +90,11 @@ const ApiIngestStreamRoute = ApiIngestStreamRouteImport.update({
   path: '/stream',
   getParentRoute: () => ApiIngestRoute,
 } as any)
+const ApiChatStreamRoute = ApiChatStreamRouteImport.update({
+  id: '/stream',
+  path: '/stream',
+  getParentRoute: () => ApiChatRoute,
+} as any)
 const ApiSoulsSoulIdEventsRoute = ApiSoulsSoulIdEventsRouteImport.update({
   id: '/events',
   path: '/events',
@@ -98,10 +104,11 @@ const ApiSoulsSoulIdEventsRoute = ApiSoulsSoulIdEventsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRoute
-  '/api/chat': typeof ApiChatRoute
+  '/api/chat': typeof ApiChatRouteWithChildren
   '/api/ingest': typeof ApiIngestRouteWithChildren
   '/api/scan': typeof ApiScanRoute
   '/widget/$soulId': typeof WidgetSoulIdRoute
+  '/api/chat/stream': typeof ApiChatStreamRoute
   '/api/ingest/stream': typeof ApiIngestStreamRoute
   '/api/souls/$soulId': typeof ApiSoulsSoulIdRouteWithChildren
   '/api/souls/publish': typeof ApiSoulsPublishRoute
@@ -114,10 +121,11 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app': typeof AppRoute
-  '/api/chat': typeof ApiChatRoute
+  '/api/chat': typeof ApiChatRouteWithChildren
   '/api/ingest': typeof ApiIngestRouteWithChildren
   '/api/scan': typeof ApiScanRoute
   '/widget/$soulId': typeof WidgetSoulIdRoute
+  '/api/chat/stream': typeof ApiChatStreamRoute
   '/api/ingest/stream': typeof ApiIngestStreamRoute
   '/api/souls/$soulId': typeof ApiSoulsSoulIdRouteWithChildren
   '/api/souls/publish': typeof ApiSoulsPublishRoute
@@ -131,10 +139,11 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/app': typeof AppRoute
-  '/api/chat': typeof ApiChatRoute
+  '/api/chat': typeof ApiChatRouteWithChildren
   '/api/ingest': typeof ApiIngestRouteWithChildren
   '/api/scan': typeof ApiScanRoute
   '/widget/$soulId': typeof WidgetSoulIdRoute
+  '/api/chat/stream': typeof ApiChatStreamRoute
   '/api/ingest/stream': typeof ApiIngestStreamRoute
   '/api/souls/$soulId': typeof ApiSoulsSoulIdRouteWithChildren
   '/api/souls/publish': typeof ApiSoulsPublishRoute
@@ -153,6 +162,7 @@ export interface FileRouteTypes {
     | '/api/ingest'
     | '/api/scan'
     | '/widget/$soulId'
+    | '/api/chat/stream'
     | '/api/ingest/stream'
     | '/api/souls/$soulId'
     | '/api/souls/publish'
@@ -169,6 +179,7 @@ export interface FileRouteTypes {
     | '/api/ingest'
     | '/api/scan'
     | '/widget/$soulId'
+    | '/api/chat/stream'
     | '/api/ingest/stream'
     | '/api/souls/$soulId'
     | '/api/souls/publish'
@@ -185,6 +196,7 @@ export interface FileRouteTypes {
     | '/api/ingest'
     | '/api/scan'
     | '/widget/$soulId'
+    | '/api/chat/stream'
     | '/api/ingest/stream'
     | '/api/souls/$soulId'
     | '/api/souls/publish'
@@ -198,7 +210,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRoute
-  ApiChatRoute: typeof ApiChatRoute
+  ApiChatRoute: typeof ApiChatRouteWithChildren
   ApiIngestRoute: typeof ApiIngestRouteWithChildren
   ApiScanRoute: typeof ApiScanRoute
   WidgetSoulIdRoute: typeof WidgetSoulIdRoute
@@ -303,6 +315,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIngestStreamRouteImport
       parentRoute: typeof ApiIngestRoute
     }
+    '/api/chat/stream': {
+      id: '/api/chat/stream'
+      path: '/stream'
+      fullPath: '/api/chat/stream'
+      preLoaderRoute: typeof ApiChatStreamRouteImport
+      parentRoute: typeof ApiChatRoute
+    }
     '/api/souls/$soulId/events': {
       id: '/api/souls/$soulId/events'
       path: '/events'
@@ -312,6 +331,17 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface ApiChatRouteChildren {
+  ApiChatStreamRoute: typeof ApiChatStreamRoute
+}
+
+const ApiChatRouteChildren: ApiChatRouteChildren = {
+  ApiChatStreamRoute: ApiChatStreamRoute,
+}
+
+const ApiChatRouteWithChildren =
+  ApiChatRoute._addFileChildren(ApiChatRouteChildren)
 
 interface ApiIngestRouteChildren {
   ApiIngestStreamRoute: typeof ApiIngestStreamRoute
@@ -340,7 +370,7 @@ const ApiSoulsSoulIdRouteWithChildren = ApiSoulsSoulIdRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRoute,
-  ApiChatRoute: ApiChatRoute,
+  ApiChatRoute: ApiChatRouteWithChildren,
   ApiIngestRoute: ApiIngestRouteWithChildren,
   ApiScanRoute: ApiScanRoute,
   WidgetSoulIdRoute: WidgetSoulIdRoute,
