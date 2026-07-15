@@ -437,7 +437,14 @@ function Footer() {
     <footer className="px-6 py-10 lg:px-10">
       <div className="mx-auto flex max-w-[1320px] flex-col gap-6 border-t border-black/8 pt-8 text-[10px] text-black/35 sm:flex-row sm:items-center sm:justify-between">
         <img src="/obseri-logo-dark.svg" alt="Obseri" className="h-7 w-auto" />
-        <span>Knowledge · Personality · Voice · Presence</span>
+        <nav className="flex flex-wrap gap-x-4 gap-y-2">
+          <a href="/ai-voice-agent-for-website" className="transition hover:text-black">
+            AI voice agent
+          </a>
+          <a href="/ai-chatbot-trained-on-your-website" className="transition hover:text-black">
+            Website-trained chatbot
+          </a>
+        </nav>
         <a
           href="https://github.com/jamiepine/voicebox"
           target="_blank"

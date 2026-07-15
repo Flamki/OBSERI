@@ -5,6 +5,8 @@
 ## Product
 
 - [Obseri](https://obseri.com/): Product overview, capabilities, trust model, and quick start.
+- [AI voice agent for websites](https://obseri.com/ai-voice-agent-for-website): Voice and text agent capabilities, setup, use cases, and buyer questions.
+- [AI chatbot trained on your website](https://obseri.com/ai-chatbot-trained-on-your-website): Crawling, source-grounded knowledge, refresh, retrieval testing, and deployment.
 - [Soul Studio](https://obseri.com/app): Build and test website knowledge, personality, voice, integrations, and conversations.
 
 ## Core capabilities

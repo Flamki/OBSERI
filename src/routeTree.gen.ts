@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/app'
+import { Route as AiVoiceAgentForWebsiteRouteImport } from './routes/ai-voice-agent-for-website'
+import { Route as AiChatbotTrainedOnYourWebsiteRouteImport } from './routes/ai-chatbot-trained-on-your-website'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WidgetSoulIdRouteImport } from './routes/widget.$soulId'
 import { Route as ApiScanRouteImport } from './routes/api.scan'
@@ -30,6 +32,17 @@ const AppRoute = AppRouteImport.update({
   path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AiVoiceAgentForWebsiteRoute = AiVoiceAgentForWebsiteRouteImport.update({
+  id: '/ai-voice-agent-for-website',
+  path: '/ai-voice-agent-for-website',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AiChatbotTrainedOnYourWebsiteRoute =
+  AiChatbotTrainedOnYourWebsiteRouteImport.update({
+    id: '/ai-chatbot-trained-on-your-website',
+    path: '/ai-chatbot-trained-on-your-website',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -103,6 +116,8 @@ const ApiSoulsSoulIdEventsRoute = ApiSoulsSoulIdEventsRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ai-chatbot-trained-on-your-website': typeof AiChatbotTrainedOnYourWebsiteRoute
+  '/ai-voice-agent-for-website': typeof AiVoiceAgentForWebsiteRoute
   '/app': typeof AppRoute
   '/api/chat': typeof ApiChatRouteWithChildren
   '/api/ingest': typeof ApiIngestRouteWithChildren
@@ -120,6 +135,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/ai-chatbot-trained-on-your-website': typeof AiChatbotTrainedOnYourWebsiteRoute
+  '/ai-voice-agent-for-website': typeof AiVoiceAgentForWebsiteRoute
   '/app': typeof AppRoute
   '/api/chat': typeof ApiChatRouteWithChildren
   '/api/ingest': typeof ApiIngestRouteWithChildren
@@ -138,6 +155,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/ai-chatbot-trained-on-your-website': typeof AiChatbotTrainedOnYourWebsiteRoute
+  '/ai-voice-agent-for-website': typeof AiVoiceAgentForWebsiteRoute
   '/app': typeof AppRoute
   '/api/chat': typeof ApiChatRouteWithChildren
   '/api/ingest': typeof ApiIngestRouteWithChildren
@@ -157,6 +176,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/ai-chatbot-trained-on-your-website'
+    | '/ai-voice-agent-for-website'
     | '/app'
     | '/api/chat'
     | '/api/ingest'
@@ -174,6 +195,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/ai-chatbot-trained-on-your-website'
+    | '/ai-voice-agent-for-website'
     | '/app'
     | '/api/chat'
     | '/api/ingest'
@@ -191,6 +214,8 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/ai-chatbot-trained-on-your-website'
+    | '/ai-voice-agent-for-website'
     | '/app'
     | '/api/chat'
     | '/api/ingest'
@@ -209,6 +234,8 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AiChatbotTrainedOnYourWebsiteRoute: typeof AiChatbotTrainedOnYourWebsiteRoute
+  AiVoiceAgentForWebsiteRoute: typeof AiVoiceAgentForWebsiteRoute
   AppRoute: typeof AppRoute
   ApiChatRoute: typeof ApiChatRouteWithChildren
   ApiIngestRoute: typeof ApiIngestRouteWithChildren
@@ -229,6 +256,20 @@ declare module '@tanstack/react-router' {
       path: '/app'
       fullPath: '/app'
       preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ai-voice-agent-for-website': {
+      id: '/ai-voice-agent-for-website'
+      path: '/ai-voice-agent-for-website'
+      fullPath: '/ai-voice-agent-for-website'
+      preLoaderRoute: typeof AiVoiceAgentForWebsiteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ai-chatbot-trained-on-your-website': {
+      id: '/ai-chatbot-trained-on-your-website'
+      path: '/ai-chatbot-trained-on-your-website'
+      fullPath: '/ai-chatbot-trained-on-your-website'
+      preLoaderRoute: typeof AiChatbotTrainedOnYourWebsiteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -369,6 +410,8 @@ const ApiSoulsSoulIdRouteWithChildren = ApiSoulsSoulIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AiChatbotTrainedOnYourWebsiteRoute: AiChatbotTrainedOnYourWebsiteRoute,
+  AiVoiceAgentForWebsiteRoute: AiVoiceAgentForWebsiteRoute,
   AppRoute: AppRoute,
   ApiChatRoute: ApiChatRouteWithChildren,
   ApiIngestRoute: ApiIngestRouteWithChildren,
