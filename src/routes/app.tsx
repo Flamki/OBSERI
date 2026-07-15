@@ -2018,8 +2018,9 @@ function PersonalityView({
     <Page
       title="Shape the personality"
       description="Keep it recognizable, useful, and true to the website."
+      hideHeader
     >
-      <div className="grid min-h-[calc(100vh-140px)] xl:grid-cols-[minmax(0,1fr)_400px]">
+      <div className="grid min-h-[calc(100vh-64px)] xl:grid-cols-[minmax(0,1fr)_400px]">
         <div className="min-w-0 xl:border-r xl:border-[#e5e6e2]">
           <Card>
             <SectionHeading title="Identity" description="What should visitors call it?" />
@@ -3392,20 +3393,9 @@ function DeployView({
     <Page
       title="Put it on your website"
       description="Publish once, then paste one script into your site."
-      action={
-        <button onClick={() => void publish()} disabled={busy} className="primary-button">
-          {busy ? (
-            <LoaderCircle className="h-4 w-4 animate-spin" />
-          ) : soul.status === "live" ? (
-            <RefreshCw className="h-4 w-4" />
-          ) : (
-            <Upload className="h-4 w-4" />
-          )}
-          {soul.status === "live" ? "Publish changes" : "Publish soul"}
-        </button>
-      }
+      hideHeader
     >
-      <div className="flex h-12 items-end gap-6 border-b border-[#e5e6e2] bg-[#fafaf8] px-6 sm:px-8">
+      <div className="flex h-12 items-center gap-6 border-b border-[#e5e6e2] bg-[#fafaf8] px-6 sm:px-8">
         <button
           onClick={() => setTab("widget")}
           className={`h-full border-b-2 px-1 text-sm font-medium ${tab === "widget" ? "border-[#1d201c] text-[#171916]" : "border-transparent text-[#70746d]"}`}
@@ -3418,9 +3408,23 @@ function DeployView({
         >
           Webhooks
         </button>
+        <button
+          onClick={() => void publish()}
+          disabled={busy}
+          className="primary-button ml-auto h-9 px-3.5 text-xs"
+        >
+          {busy ? (
+            <LoaderCircle className="h-4 w-4 animate-spin" />
+          ) : soul.status === "live" ? (
+            <RefreshCw className="h-4 w-4" />
+          ) : (
+            <Upload className="h-4 w-4" />
+          )}
+          {soul.status === "live" ? "Publish changes" : "Publish soul"}
+        </button>
       </div>
       {tab === "widget" ? (
-        <div className="grid min-h-[calc(100vh-188px)] xl:grid-cols-[minmax(0,1fr)_440px]">
+        <div className="grid min-h-[calc(100vh-112px)] xl:grid-cols-[minmax(0,1fr)_440px]">
           <div className="min-w-0 xl:border-r xl:border-[#e5e6e2]">
             <Card>
               <SectionHeading
@@ -3497,7 +3501,7 @@ function DeployView({
               </div>
             </Card>
           </div>
-          <div className="bg-[#f2f2ee] p-5 xl:sticky xl:top-0 xl:h-[calc(100vh-188px)]">
+          <div className="bg-[#f2f2ee] p-5 xl:sticky xl:top-0 xl:h-[calc(100vh-112px)]">
             <div className="h-full bg-[#ecece7] p-3">
               <div className="relative h-full min-h-[610px] overflow-hidden bg-white">
                 <div className="border-b border-[#ecece9] p-4">
@@ -3543,7 +3547,7 @@ function DeployView({
           </div>
         </div>
       ) : (
-        <div className="min-h-[calc(100vh-188px)]">
+        <div className="min-h-[calc(100vh-112px)]">
           <Card>
             <div className="flex items-start justify-between gap-4">
               <SectionHeading
@@ -3605,9 +3609,10 @@ function ConversationsView({ soul, onTest }: { soul: Soul; onTest: () => void })
     <Page
       title="Visitor conversations"
       description="Review questions, answer quality, and buying intent."
+      hideHeader
     >
       {soul.conversations.length ? (
-        <div className="grid min-h-[calc(100vh-140px)] overflow-hidden bg-white lg:grid-cols-[340px_1fr]">
+        <div className="grid min-h-[calc(100vh-64px)] overflow-hidden bg-white lg:grid-cols-[340px_1fr]">
           <div className="border-b border-[#e7e8e4] lg:border-b-0 lg:border-r">
             <div className="border-b border-[#ecece9] p-4">
               <div className="relative">
@@ -3658,7 +3663,7 @@ function ConversationsView({ soul, onTest }: { soul: Soul; onTest: () => void })
           </div>
         </div>
       ) : (
-        <Card className="flex min-h-[calc(100vh-140px)] items-center justify-center border-b-0">
+        <Card className="flex min-h-[calc(100vh-64px)] items-center justify-center border-b-0">
           <EmptyPanel
             icon={<MessageCircle />}
             title="No conversations yet"
@@ -3677,8 +3682,8 @@ function ConversationsView({ soul, onTest }: { soul: Soul; onTest: () => void })
 
 function HelpView() {
   return (
-    <Page title="Help" description="Get a direct answer from the Obseri team.">
-      <div className="grid min-h-[calc(100vh-140px)] lg:grid-cols-[minmax(0,1fr)_400px]">
+    <Page title="Help" description="Get a direct answer from the Obseri team." hideHeader>
+      <div className="grid min-h-[calc(100vh-64px)] lg:grid-cols-[minmax(0,1fr)_400px]">
         <section className="flex flex-col justify-between border-b border-[#e5e6e2] p-6 sm:p-8 lg:border-b-0 lg:border-r lg:p-10">
           <div>
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#edf4e6] text-[#5c8336]">
@@ -3750,8 +3755,12 @@ function SettingsView({
   onDelete: () => void;
 }) {
   return (
-    <Page title="Profile and workspace" description="Local founder settings for this build.">
-      <div className="grid min-h-[calc(100vh-140px)] lg:grid-cols-[minmax(0,1fr)_380px]">
+    <Page
+      title="Profile and workspace"
+      description="Local founder settings for this build."
+      hideHeader
+    >
+      <div className="grid min-h-[calc(100vh-64px)] lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 lg:border-r lg:border-[#e5e6e2]">
           <Card>
             <SectionHeading
