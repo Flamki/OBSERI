@@ -22,6 +22,8 @@ import {
   Mic2,
   Monitor,
   MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pause,
   Play,
   Plus,
@@ -81,6 +83,7 @@ type StudioView =
   | "settings";
 
 const STORAGE_KEY = "obseri.soul-studio.v1";
+const SIDEBAR_STORAGE_KEY = "obseri.sidebar-collapsed.v1";
 
 const PAGE_META: Record<StudioView, { title: string; description: string }> = {
   home: { title: "Home", description: "Everything your website soul needs, in one place." },
@@ -107,6 +110,7 @@ function SoulStudio() {
   const [view, setView] = useState<StudioView>("home");
   const [hydrated, setHydrated] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [quickStartUrl, setQuickStartUrl] = useState("");
@@ -117,6 +121,7 @@ function SoulStudio() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) setWorkspace(normalizeWorkspace(JSON.parse(saved) as SoulWorkspace));
+      setSidebarCollapsed(localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true");
     } catch {
       // Keep the starter workspace when local data is unavailable.
     } finally {
@@ -145,6 +150,10 @@ function SoulStudio() {
   useEffect(() => {
     if (hydrated) localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace));
   }, [hydrated, workspace]);
+
+  useEffect(() => {
+    if (hydrated) localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarCollapsed));
+  }, [hydrated, sidebarCollapsed]);
 
   useEffect(() => {
     if (!notice) return;
@@ -369,19 +378,23 @@ function SoulStudio() {
           workspace={workspace}
           soul={soul}
           view={view}
+          collapsed={sidebarCollapsed}
           mobileOpen={mobileNav}
           onClose={() => setMobileNav(false)}
           onNavigate={navigate}
           onNew={() => setCreateOpen(true)}
+          onExpand={() => setSidebarCollapsed(false)}
           onSoulChange={(id) => setWorkspace((current) => ({ ...current, activeSoulId: id }))}
         />
 
         <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
           <Topbar
-            meta={PAGE_META[view]}
+            workspace={workspace}
             soul={soul}
+            sidebarCollapsed={sidebarCollapsed}
             profileOpen={profileOpen}
             onMenu={() => setMobileNav(true)}
+            onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
             onProfile={() => setProfileOpen((current) => !current)}
             onNavigate={navigate}
           />
@@ -470,19 +483,23 @@ function Sidebar({
   workspace,
   soul,
   view,
+  collapsed,
   mobileOpen,
   onClose,
   onNavigate,
   onNew,
+  onExpand,
   onSoulChange,
 }: {
   workspace: SoulWorkspace;
   soul: Soul | null;
   view: StudioView;
+  collapsed: boolean;
   mobileOpen: boolean;
   onClose: () => void;
   onNavigate: (view: StudioView) => void;
   onNew: () => void;
+  onExpand: () => void;
   onSoulChange: (id: string) => void;
 }) {
   const [soulMenuOpen, setSoulMenuOpen] = useState(false);
@@ -505,11 +522,22 @@ function Sidebar({
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-[252px] shrink-0 flex-col overflow-hidden border-r border-[#e3e4e0] bg-white transition-transform lg:static lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-[252px] shrink-0 flex-col overflow-hidden border-r border-[#e3e4e0] bg-white transition-[width,transform] duration-300 ease-out lg:static lg:translate-x-0 ${collapsed ? "lg:w-[72px]" : "lg:w-[252px]"} ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
-        <div className="flex h-16 items-center justify-between px-5">
-          <Link to="/" className="text-xl font-extrabold tracking-[-0.04em]">
-            Obseri<span className="text-[#74a83b]">.</span>
+        <div
+          className={`flex h-16 shrink-0 items-center justify-between px-5 transition-[padding] duration-300 ${collapsed ? "lg:px-4" : "lg:px-5"}`}
+        >
+          <Link
+            to="/"
+            className="overflow-hidden text-xl font-extrabold tracking-[-0.04em]"
+            aria-label="Obseri home"
+          >
+            <span className={collapsed ? "lg:hidden" : ""}>
+              Obseri<span className="text-[#74a83b]">.</span>
+            </span>
+            <span className={`hidden text-lg ${collapsed ? "lg:inline" : ""}`}>
+              O<span className="text-[#74a83b]">.</span>
+            </span>
           </Link>
           <button
             onClick={onClose}
@@ -529,14 +557,25 @@ function Sidebar({
           )}
           <div className="relative z-[60]">
             <button
-              onClick={() => setSoulMenuOpen((current) => !current)}
-              className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl border border-[#dedfdb] bg-white p-2 text-left shadow-sm transition hover:border-[#cfd2cb] hover:bg-[#fafbf9]"
+              onClick={() => {
+                if (collapsed && window.matchMedia("(min-width: 1024px)").matches) {
+                  onExpand();
+                  setSoulMenuOpen(true);
+                  return;
+                }
+                setSoulMenuOpen((current) => !current);
+              }}
+              className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-xl border border-[#dedfdb] bg-white p-2 text-left shadow-sm transition hover:border-[#cfd2cb] hover:bg-[#fafbf9] ${collapsed ? "lg:justify-center lg:p-1.5" : ""}`}
               aria-expanded={soulMenuOpen}
+              aria-label={collapsed ? `Open ${soul?.name || "website"} menu` : undefined}
+              title={collapsed ? soul?.name || "Choose a website" : undefined}
             >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#eaf4df] text-sm font-bold text-[#476d24]">
+              <span
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#eaf4df] text-sm font-bold text-[#476d24] ${collapsed ? "lg:h-8 lg:w-8" : ""}`}
+              >
                 {soul?.name.charAt(0) || "O"}
               </span>
-              <span className="min-w-0 flex-1">
+              <span className={`min-w-0 flex-1 ${collapsed ? "lg:hidden" : ""}`}>
                 <span className="block truncate text-sm font-semibold">
                   {soul?.name || "Website"}
                 </span>
@@ -545,7 +584,7 @@ function Sidebar({
                 </span>
               </span>
               <ChevronDown
-                className={`h-4 w-4 shrink-0 text-[#858982] transition ${soulMenuOpen ? "rotate-180" : ""}`}
+                className={`h-4 w-4 shrink-0 text-[#858982] transition ${soulMenuOpen ? "rotate-180" : ""} ${collapsed ? "lg:hidden" : ""}`}
               />
             </button>
           </div>
@@ -601,10 +640,13 @@ function Sidebar({
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${view === item.id ? "bg-[#efefed] text-[#171916]" : "text-[#666a64] hover:bg-[#f5f5f3] hover:text-[#171916]"}`}
+                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${collapsed ? "lg:justify-center lg:px-0" : ""} ${view === item.id ? "bg-[#efefed] text-[#171916]" : "text-[#666a64] hover:bg-[#f5f5f3] hover:text-[#171916]"}`}
+                aria-label={item.label}
+                aria-current={view === item.id ? "page" : undefined}
+                title={collapsed ? item.label : undefined}
               >
                 <span className="[&_svg]:h-[18px] [&_svg]:w-[18px]">{item.icon}</span>
-                {item.label}
+                <span className={collapsed ? "lg:hidden" : ""}>{item.label}</span>
               </button>
             ))}
           </div>
@@ -613,17 +655,21 @@ function Sidebar({
         <div className="border-t border-[#ecece9] p-3">
           <button
             onClick={() => onNavigate("settings")}
-            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${view === "settings" ? "bg-[#efefed] text-[#171916]" : "text-[#666a64] hover:bg-[#f5f5f3]"}`}
+            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${collapsed ? "lg:justify-center lg:px-0" : ""} ${view === "settings" ? "bg-[#efefed] text-[#171916]" : "text-[#666a64] hover:bg-[#f5f5f3]"}`}
+            aria-label="Settings"
+            title={collapsed ? "Settings" : undefined}
           >
             <Settings className="h-[18px] w-[18px]" />
-            Settings
+            <span className={collapsed ? "lg:hidden" : ""}>Settings</span>
           </button>
           <a
             href="mailto:hello@obseri.com"
-            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#666a64] hover:bg-[#f5f5f3]"
+            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#666a64] hover:bg-[#f5f5f3] ${collapsed ? "lg:justify-center lg:px-0" : ""}`}
+            aria-label="Help"
+            title={collapsed ? "Help" : undefined}
           >
             <CircleHelp className="h-[18px] w-[18px]" />
-            Help
+            <span className={collapsed ? "lg:hidden" : ""}>Help</span>
           </a>
         </div>
       </aside>
@@ -632,22 +678,26 @@ function Sidebar({
 }
 
 function Topbar({
-  meta,
+  workspace,
   soul,
+  sidebarCollapsed,
   profileOpen,
   onMenu,
+  onToggleSidebar,
   onProfile,
   onNavigate,
 }: {
-  meta: { title: string; description: string };
+  workspace: SoulWorkspace;
   soul: Soul | null;
+  sidebarCollapsed: boolean;
   profileOpen: boolean;
   onMenu: () => void;
+  onToggleSidebar: () => void;
   onProfile: () => void;
   onNavigate: (view: StudioView) => void;
 }) {
   return (
-    <header className="z-30 flex h-16 shrink-0 items-center justify-between border-b border-[#e3e4e0] bg-white/95 px-5 backdrop-blur sm:px-8 lg:px-10">
+    <header className="z-30 flex h-16 shrink-0 items-center justify-between border-b border-[#e3e4e0] bg-white/95 px-4 backdrop-blur sm:px-6 lg:px-8">
       <div className="flex min-w-0 items-center gap-3">
         <button
           onClick={onMenu}
@@ -655,9 +705,35 @@ function Topbar({
         >
           <Menu className="h-5 w-5" />
         </button>
+        <button
+          onClick={onToggleSidebar}
+          className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#626760] transition hover:bg-[#f1f2ef] hover:text-[#171916] lg:flex"
+          aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!sidebarCollapsed}
+          title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {sidebarCollapsed ? (
+            <PanelLeftOpen className="h-[18px] w-[18px]" />
+          ) : (
+            <PanelLeftClose className="h-[18px] w-[18px]" />
+          )}
+        </button>
         <div className="min-w-0">
-          <h1 className="truncate text-lg font-semibold tracking-[-0.02em]">{meta.title}</h1>
-          <p className="hidden truncate text-xs text-[#7a7e77] sm:block">{meta.description}</p>
+          <p className="truncate text-sm font-semibold tracking-[-0.01em]">{workspace.name}</p>
+          {soul ? (
+            <a
+              href={soul.siteUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-0.5 flex max-w-full items-center gap-1.5 truncate text-xs text-[#7a7e77] transition hover:text-[#4f792c]"
+              title={`Open ${safeHost(soul.siteUrl)}`}
+            >
+              <Globe2 className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{safeHost(soul.siteUrl)}</span>
+            </a>
+          ) : (
+            <p className="mt-0.5 text-xs text-[#7a7e77]">No website selected</p>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-2">
