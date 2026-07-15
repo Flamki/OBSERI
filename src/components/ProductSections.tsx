@@ -562,10 +562,10 @@ function Footer() {
           </a>
         </nav>
         <a
-          href="mailto:flamki@obseri.com"
+          href="mailto:9833ayush@gmail.com?subject=Obseri%20inquiry"
           className="inline-flex items-center gap-1.5 transition hover:text-black"
         >
-          flamki@obseri.com <ExternalLink className="h-3 w-3" />
+          Contact us <ExternalLink className="h-3 w-3" />
         </a>
       </div>
     </footer>

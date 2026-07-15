@@ -170,7 +170,7 @@ function Hero() {
       </div>
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,.08)_64%,#f4f4ef_100%)]" />
 
-      <header className="fixed left-1/2 top-5 z-50 flex h-[62px] w-[calc(100%-2rem)] max-w-[720px] -translate-x-1/2 items-center justify-between rounded-[1.65rem] border border-white/12 bg-[#111016]/48 px-3.5 shadow-[0_18px_55px_rgba(22,12,20,.18),inset_0_1px_0_rgba(255,255,255,.08)] backdrop-blur-2xl backdrop-saturate-150 sm:px-5">
+      <header className="fixed left-1/2 top-5 z-50 flex h-[62px] w-[calc(100%-2rem)] max-w-[860px] -translate-x-1/2 items-center justify-between rounded-[1.65rem] border border-white/12 bg-[#111016]/48 px-3.5 shadow-[0_18px_55px_rgba(22,12,20,.18),inset_0_1px_0_rgba(255,255,255,.08)] backdrop-blur-2xl backdrop-saturate-150 sm:px-5">
         <Link to="/" aria-label="Obseri home" className="inline-flex items-center">
           <img src="/obseri-logo-light.svg" alt="Obseri" className="h-6 w-auto sm:h-7" />
         </Link>
@@ -185,12 +185,20 @@ function Hero() {
             Trust
           </a>
         </nav>
-        <Link
-          to="/app"
-          className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#f8f6f2] px-4 text-[11px] font-semibold text-[#17171a] shadow-[0_8px_22px_rgba(0,0,0,.18),inset_0_1px_0_white] transition duration-200 hover:bg-white hover:shadow-[0_10px_28px_rgba(255,255,255,.16)] sm:px-5"
-        >
-          Open Studio <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
+        <div className="flex items-center gap-2">
+          <a
+            href="mailto:9833ayush@gmail.com?subject=Obseri%20inquiry"
+            className="hidden h-10 items-center rounded-xl border border-white/14 px-4 text-[11px] font-semibold text-white/68 transition duration-200 hover:border-white/28 hover:bg-white/8 hover:text-white sm:inline-flex"
+          >
+            Contact Us
+          </a>
+          <Link
+            to="/app"
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#f8f6f2] px-4 text-[11px] font-semibold text-[#17171a] shadow-[0_8px_22px_rgba(0,0,0,.18),inset_0_1px_0_white] transition duration-200 hover:bg-white hover:shadow-[0_10px_28px_rgba(255,255,255,.16)] sm:px-5"
+          >
+            Dashboard <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
       </header>
 
       <div className="relative z-10 mx-auto flex min-h-[820px] w-full min-w-0 max-w-[1500px] flex-col items-center justify-center px-6 pb-36 pt-24 text-center sm:min-h-[860px] sm:pb-40 lg:min-h-[900px] lg:px-10 lg:pb-48">
