@@ -13,6 +13,7 @@ import {
   Download,
   ExternalLink,
   FileText,
+  Fingerprint,
   Globe2,
   LoaderCircle,
   LogOut,
@@ -495,7 +496,7 @@ function Sidebar({
   const items: Array<{ id: StudioView; label: string; icon: ReactNode }> = [
     { id: "playground", label: "Agent", icon: <Monitor /> },
     { id: "knowledge", label: "Knowledge", icon: <BookOpen /> },
-    { id: "personality", label: "Personality", icon: <WandSparkles /> },
+    { id: "personality", label: "Personality", icon: <Fingerprint /> },
     { id: "voice", label: "Voice", icon: <Mic2 /> },
     { id: "deploy", label: "Integrate", icon: <Code2 /> },
     { id: "conversations", label: "Conversations", icon: <MessageCircle /> },
@@ -811,7 +812,7 @@ function getSetupSteps(soul: Soul): SetupStep[] {
     },
     {
       view: "personality",
-      icon: <WandSparkles />,
+      icon: <Fingerprint />,
       title: "Personality",
       detail: soul.personality.name
         ? `${soul.personality.name} · ${soul.personality.tone}`
