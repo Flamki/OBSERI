@@ -74,7 +74,14 @@ export const Route = createFileRoute("/app")({
 });
 
 type StudioView =
-  "knowledge" | "personality" | "voice" | "playground" | "deploy" | "conversations" | "settings";
+  | "knowledge"
+  | "personality"
+  | "voice"
+  | "playground"
+  | "deploy"
+  | "conversations"
+  | "settings"
+  | "help";
 
 const STORAGE_KEY = "obseri.soul-studio.v1";
 const SIDEBAR_STORAGE_KEY = "obseri.sidebar-collapsed.v1";
@@ -96,6 +103,7 @@ const PAGE_META: Record<StudioView, { title: string; description: string }> = {
     description: "Understand what visitors are asking for.",
   },
   settings: { title: "Settings", description: "Manage your profile, workspace, and data." },
+  help: { title: "Help", description: "Get support and find the right next step." },
 };
 
 function SoulStudio() {
@@ -396,7 +404,7 @@ function SoulStudio() {
             className={`mx-auto min-h-0 w-full flex-1 ${
               view === "playground"
                 ? "max-w-none overflow-hidden p-0"
-                : "max-w-[1240px] overflow-y-auto px-5 py-8 sm:px-8 lg:px-10 lg:py-10"
+                : "max-w-none overflow-y-auto bg-white p-0"
             }`}
           >
             {!soul ? (
@@ -427,7 +435,7 @@ function SoulStudio() {
               <DeployView soul={soul} onUpdate={updateSoul} onNotice={setNotice} />
             ) : view === "conversations" ? (
               <ConversationsView soul={soul} onTest={() => navigate("playground")} />
-            ) : (
+            ) : view === "settings" ? (
               <SettingsView
                 soul={soul}
                 workspace={workspace}
@@ -439,6 +447,8 @@ function SoulStudio() {
                   setView("knowledge");
                 }}
               />
+            ) : (
+              <HelpView />
             )}
           </main>
         </div>
@@ -652,15 +662,15 @@ function Sidebar({
             <Settings className="h-[18px] w-[18px]" />
             <span className={collapsed ? "lg:hidden" : ""}>Settings</span>
           </button>
-          <a
-            href="mailto:flamki@obseri.com"
-            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#666a64] hover:bg-[#f5f5f3] ${collapsed ? "lg:justify-center lg:px-0" : ""}`}
+          <button
+            onClick={() => onNavigate("help")}
+            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${collapsed ? "lg:justify-center lg:px-0" : ""} ${view === "help" ? "bg-[#efefed] text-[#171916]" : "text-[#666a64] hover:bg-[#f5f5f3]"}`}
             aria-label="Help"
             title={collapsed ? "Help" : undefined}
           >
             <CircleHelp className="h-[18px] w-[18px]" />
             <span className={collapsed ? "lg:hidden" : ""}>Help</span>
-          </a>
+          </button>
         </div>
       </aside>
     </>
@@ -1057,182 +1067,187 @@ function KnowledgeView({
       {(crawlEvents.length > 0 || soul.knowledge.status === "crawling") && (
         <CrawlProgressPanel events={crawlEvents} />
       )}
-      <Card className="overflow-hidden p-0">
-        <div className="flex flex-col gap-5 border-b border-[#e8eae5] px-5 py-5 sm:px-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h2 className="text-[15px] font-semibold">Knowledge library</h2>
-                <span className="rounded-full bg-[#edf4e6] px-2 py-0.5 text-[10px] font-semibold text-[#5e823a]">
-                  {knowledge.pages.filter((page) => page.enabled !== false).length} active
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-[#7c8179]">
-                {sources.length} {sources.length === 1 ? "source" : "sources"} · {blockCount}{" "}
-                searchable blocks
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={onRefresh}
-                disabled={knowledge.status === "crawling"}
-                className="secondary-button h-10 px-3.5 text-xs disabled:opacity-50"
-              >
-                {knowledge.status === "crawling" ? (
-                  <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-3.5 w-3.5" />
-                )}
-                Refresh all
-              </button>
-              <button onClick={() => setAddOpen(true)} className="primary-button h-10 px-4 text-xs">
-                <Plus className="h-3.5 w-3.5" /> Add source
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="flex flex-col gap-3 border-b border-[#e8eae5] px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div className="relative w-full sm:max-w-[380px]">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#92968f]" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search titles, URLs, and content"
-              className="h-9 w-full rounded-lg border border-[#dfe1dc] bg-white pl-9 pr-3 text-xs outline-none focus:border-[#9fbb83]"
-            />
-          </div>
-          <p className="text-[11px] text-[#7d827a]">{pages.length} documents</p>
-        </div>
-        {!pages.length && soul.knowledge.status === "crawling" ? (
-          <div className="flex items-center gap-3 px-6 py-8 text-sm text-[#666a63]">
-            <LoaderCircle className="h-4 w-4 animate-spin text-[#709c43]" />
-            Pages will appear here when they are ready.
-          </div>
-        ) : pages.length ? (
-          <div className="divide-y divide-[#ecece9]">
-            {pages.map((page) => (
-              <button
-                key={page.id}
-                onClick={() => setSelectedPageId(page.id)}
-                className="flex w-full items-center gap-3.5 px-5 py-3.5 text-left transition hover:bg-[#fafbf9] sm:px-6"
-              >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#e5e8e1] bg-[#f5f7f3] text-[#687165]">
-                  <FileText className="h-[15px] w-[15px]" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-semibold text-[#252824]">
-                    {page.title || safeHost(page.url)}
-                  </p>
-                  <p className="mt-1 truncate text-[11px] text-[#858a82]">
-                    {knowledgePagePath(page.url)}
-                  </p>
-                </div>
-                <span
-                  className={`hidden rounded-full px-2 py-1 text-[10px] font-medium sm:block ${page.enabled === false ? "bg-[#f0f1ee] text-[#8b8f88]" : page.changeType === "changed" || page.changeType === "new" ? "bg-[#edf4e6] text-[#5b8037]" : "bg-[#f3f4f1] text-[#747970]"}`}
-                >
-                  {page.enabled === false
-                    ? "Excluded"
-                    : page.changeType === "new"
-                      ? "New"
-                      : page.changeType === "changed"
-                        ? "Updated"
-                        : `${page.chunks.length} blocks`}
-                </span>
-                <span className="hidden text-[10px] text-[#8b8f88] md:block">
-                  {formatBytes(page.sizeBytes ?? 0)}
-                </span>
-                <ChevronRight className="h-3.5 w-3.5 text-[#9a9e97]" />
-              </button>
-            ))}
-          </div>
-        ) : (
-          <EmptyPanel
-            icon={<BookOpen />}
-            title="No pages found"
-            detail={
-              query ? "Try a different search." : "Add a website to start building knowledge."
-            }
-            action={
-              !query ? (
-                <button onClick={() => setAddOpen(true)} className="primary-button">
-                  <Plus className="h-4 w-4" />
-                  Add website
-                </button>
-              ) : undefined
-            }
-          />
-        )}
-      </Card>
-      <Card className="p-0">
-        <details>
-          <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 sm:px-6">
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#f0f4ec] text-[#5e823a]">
-                <Sparkles className="h-4 w-4" />
-              </span>
+      <div className="grid min-h-[calc(100vh-140px)] xl:grid-cols-[minmax(0,1fr)_420px]">
+        <Card className="h-full overflow-hidden border-b-0 p-0 xl:border-r">
+          <div className="flex flex-col gap-5 border-b border-[#e8eae5] px-5 py-5 sm:px-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h3 className="text-sm font-semibold">Retrieval lab</h3>
-                <p className="mt-0.5 text-[11px] text-[#7e837b]">
-                  See exactly what the assistant will retrieve before it answers.
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-[15px] font-semibold">Knowledge library</h2>
+                  <span className="rounded-full bg-[#edf4e6] px-2 py-0.5 text-[10px] font-semibold text-[#5e823a]">
+                    {knowledge.pages.filter((page) => page.enabled !== false).length} active
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-[#7c8179]">
+                  {sources.length} {sources.length === 1 ? "source" : "sources"} · {blockCount}{" "}
+                  searchable blocks
                 </p>
               </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={onRefresh}
+                  disabled={knowledge.status === "crawling"}
+                  className="secondary-button h-10 px-3.5 text-xs disabled:opacity-50"
+                >
+                  {knowledge.status === "crawling" ? (
+                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  )}
+                  Refresh all
+                </button>
+                <button
+                  onClick={() => setAddOpen(true)}
+                  className="primary-button h-10 px-4 text-xs"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add source
+                </button>
+              </div>
             </div>
-            <ChevronDown className="h-4 w-4 text-[#8c9189]" />
-          </summary>
-          <div className="border-t border-[#e8eae5] px-5 py-5 sm:px-6">
-            <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8e938b]" />
+          </div>
+          <div className="flex flex-col gap-3 border-b border-[#e8eae5] px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div className="relative w-full sm:max-w-[380px]">
+              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#92968f]" />
               <input
-                value={testQuery}
-                onChange={(event) => setTestQuery(event.target.value)}
-                placeholder="Try a real visitor question, e.g. What does the Pro plan include?"
-                className="clean-input pl-10"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search titles, URLs, and content"
+                className="h-9 w-full rounded-lg border border-[#dfe1dc] bg-white pl-9 pr-3 text-xs outline-none focus:border-[#9fbb83]"
               />
             </div>
-            {testQuery.trim() && (
-              <div className="mt-4 space-y-2">
-                {retrievalHits.length ? (
-                  retrievalHits.map((hit, index) => (
-                    <button
-                      key={hit.id}
-                      onClick={() =>
-                        setSelectedPageId(
-                          knowledge.pages.find((page) => page.url === hit.pageUrl)?.id ?? null,
-                        )
-                      }
-                      className="flex w-full gap-3 rounded-xl border border-[#e5e7e2] p-3 text-left hover:bg-[#fafbf9]"
-                    >
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#eef4e8] text-[10px] font-bold text-[#5b8037]">
-                        {index + 1}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center justify-between gap-3">
-                          <span className="truncate text-xs font-semibold">{hit.pageTitle}</span>
-                          <span className="shrink-0 text-[10px] text-[#6d736a]">
-                            score {hit.score.toFixed(2)}
+            <p className="text-[11px] text-[#7d827a]">{pages.length} documents</p>
+          </div>
+          {!pages.length && soul.knowledge.status === "crawling" ? (
+            <div className="flex items-center gap-3 px-6 py-8 text-sm text-[#666a63]">
+              <LoaderCircle className="h-4 w-4 animate-spin text-[#709c43]" />
+              Pages will appear here when they are ready.
+            </div>
+          ) : pages.length ? (
+            <div className="divide-y divide-[#ecece9]">
+              {pages.map((page) => (
+                <button
+                  key={page.id}
+                  onClick={() => setSelectedPageId(page.id)}
+                  className="flex w-full items-center gap-3.5 px-5 py-3.5 text-left transition hover:bg-[#fafbf9] sm:px-6"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#e5e8e1] bg-[#f5f7f3] text-[#687165]">
+                    <FileText className="h-[15px] w-[15px]" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-semibold text-[#252824]">
+                      {page.title || safeHost(page.url)}
+                    </p>
+                    <p className="mt-1 truncate text-[11px] text-[#858a82]">
+                      {knowledgePagePath(page.url)}
+                    </p>
+                  </div>
+                  <span
+                    className={`hidden rounded-full px-2 py-1 text-[10px] font-medium sm:block ${page.enabled === false ? "bg-[#f0f1ee] text-[#8b8f88]" : page.changeType === "changed" || page.changeType === "new" ? "bg-[#edf4e6] text-[#5b8037]" : "bg-[#f3f4f1] text-[#747970]"}`}
+                  >
+                    {page.enabled === false
+                      ? "Excluded"
+                      : page.changeType === "new"
+                        ? "New"
+                        : page.changeType === "changed"
+                          ? "Updated"
+                          : `${page.chunks.length} blocks`}
+                  </span>
+                  <span className="hidden text-[10px] text-[#8b8f88] md:block">
+                    {formatBytes(page.sizeBytes ?? 0)}
+                  </span>
+                  <ChevronRight className="h-3.5 w-3.5 text-[#9a9e97]" />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <EmptyPanel
+              icon={<BookOpen />}
+              title="No pages found"
+              detail={
+                query ? "Try a different search." : "Add a website to start building knowledge."
+              }
+              action={
+                !query ? (
+                  <button onClick={() => setAddOpen(true)} className="primary-button">
+                    <Plus className="h-4 w-4" />
+                    Add website
+                  </button>
+                ) : undefined
+              }
+            />
+          )}
+        </Card>
+        <Card className="h-full border-b-0 p-0">
+          <details open className="h-full">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 sm:px-6">
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#f0f4ec] text-[#5e823a]">
+                  <Sparkles className="h-4 w-4" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-semibold">Retrieval lab</h3>
+                  <p className="mt-0.5 text-[11px] text-[#7e837b]">
+                    See exactly what the assistant will retrieve before it answers.
+                  </p>
+                </div>
+              </div>
+              <ChevronDown className="h-4 w-4 text-[#8c9189]" />
+            </summary>
+            <div className="border-t border-[#e8eae5] px-5 py-5 sm:px-6">
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8e938b]" />
+                <input
+                  value={testQuery}
+                  onChange={(event) => setTestQuery(event.target.value)}
+                  placeholder="Try a real visitor question, e.g. What does the Pro plan include?"
+                  className="clean-input pl-10"
+                />
+              </div>
+              {testQuery.trim() && (
+                <div className="mt-4 space-y-2">
+                  {retrievalHits.length ? (
+                    retrievalHits.map((hit, index) => (
+                      <button
+                        key={hit.id}
+                        onClick={() =>
+                          setSelectedPageId(
+                            knowledge.pages.find((page) => page.url === hit.pageUrl)?.id ?? null,
+                          )
+                        }
+                        className="flex w-full gap-3 rounded-xl border border-[#e5e7e2] p-3 text-left hover:bg-[#fafbf9]"
+                      >
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#eef4e8] text-[10px] font-bold text-[#5b8037]">
+                          {index + 1}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center justify-between gap-3">
+                            <span className="truncate text-xs font-semibold">{hit.pageTitle}</span>
+                            <span className="shrink-0 text-[10px] text-[#6d736a]">
+                              score {hit.score.toFixed(2)}
+                            </span>
+                          </span>
+                          <span className="mt-1 line-clamp-2 block text-[11px] leading-5 text-[#747970]">
+                            {hit.text}
+                          </span>
+                          <span className="mt-1.5 block text-[10px] text-[#8b8f88]">
+                            Matched {hit.matchedTerms.join(", ")}
+                            {hit.phraseMatch ? " · exact phrase" : ""}
                           </span>
                         </span>
-                        <span className="mt-1 line-clamp-2 block text-[11px] leading-5 text-[#747970]">
-                          {hit.text}
-                        </span>
-                        <span className="mt-1.5 block text-[10px] text-[#8b8f88]">
-                          Matched {hit.matchedTerms.join(", ")}
-                          {hit.phraseMatch ? " · exact phrase" : ""}
-                        </span>
-                      </span>
-                    </button>
-                  ))
-                ) : (
-                  <p className="rounded-xl bg-[#f7f8f5] p-4 text-xs text-[#777c74]">
-                    No grounded evidence matched. The assistant will use the configured “I don’t
-                    know” response.
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        </details>
-      </Card>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="rounded-xl bg-[#f7f8f5] p-4 text-xs text-[#777c74]">
+                      No grounded evidence matched. The assistant will use the configured “I don’t
+                      know” response.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </details>
+        </Card>
+      </div>
       {!!soul.knowledge.errors.length && (
         <div className="rounded-2xl border border-[#efd7cf] bg-[#fff8f5] p-5">
           <h3 className="text-sm font-semibold text-[#8f4938]">Some pages could not be read</h3>
@@ -2004,8 +2019,8 @@ function PersonalityView({
       title="Shape the personality"
       description="Keep it recognizable, useful, and true to the website."
     >
-      <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
-        <div className="space-y-5">
+      <div className="grid min-h-[calc(100vh-140px)] xl:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="min-w-0 xl:border-r xl:border-[#e5e6e2]">
           <Card>
             <SectionHeading title="Identity" description="What should visitors call it?" />
             <div className="mt-6 grid gap-5 sm:grid-cols-2">
@@ -2094,8 +2109,8 @@ function PersonalityView({
             </Field>
           </Card>
         </div>
-        <div className="xl:sticky xl:top-24 xl:h-fit">
-          <Card>
+        <div className="min-w-0 bg-[#fafaf8]">
+          <Card className="h-full border-b-0 bg-[#fafaf8]">
             <p className="text-xs font-semibold uppercase tracking-[.12em] text-[#7a7e77]">
               Preview
             </p>
@@ -2559,9 +2574,9 @@ function VoiceView({
 
   return (
     <Page title="Choose a voice" description="Explore, preview, and shape how your website sounds.">
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_430px]">
-        <div className="min-w-0 space-y-5">
-          <section className="overflow-hidden rounded-2xl border border-[#dedfdb] bg-white shadow-sm">
+      <div className="grid min-h-[calc(100vh-140px)] items-start xl:grid-cols-[minmax(0,1fr)_440px]">
+        <div className="min-w-0 xl:border-r xl:border-[#e5e6e2]">
+          <section className="overflow-hidden border-b border-[#e5e6e2] bg-white">
             <div className="relative overflow-hidden bg-[#11130f] p-6 text-white sm:p-7">
               <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_10%,rgba(183,247,116,.15),transparent_34%),radial-gradient(circle_at_8%_100%,rgba(116,150,247,.13),transparent_38%)]" />
               <div className="relative flex items-center justify-between gap-4">
@@ -2707,7 +2722,7 @@ function VoiceView({
           </Card>
         </div>
 
-        <section className="flex h-[calc(100vh-190px)] min-h-[590px] max-h-[730px] min-w-0 flex-col overflow-hidden rounded-2xl border border-[#dedfdb] bg-white shadow-sm xl:sticky xl:top-0">
+        <section className="flex h-[calc(100vh-140px)] min-h-[590px] min-w-0 flex-col overflow-hidden bg-white xl:sticky xl:top-0">
           <div className="border-b border-[#ecece9] px-5 pt-5">
             <div className="flex items-center justify-between gap-4">
               <div>
@@ -3390,23 +3405,23 @@ function DeployView({
         </button>
       }
     >
-      <div className="inline-flex rounded-xl border border-[#dfe0dc] bg-white p-1">
+      <div className="flex h-12 items-end gap-6 border-b border-[#e5e6e2] bg-[#fafaf8] px-6 sm:px-8">
         <button
           onClick={() => setTab("widget")}
-          className={`rounded-lg px-4 py-2 text-sm font-medium ${tab === "widget" ? "bg-[#efefed] text-[#171916]" : "text-[#70746d]"}`}
+          className={`h-full border-b-2 px-1 text-sm font-medium ${tab === "widget" ? "border-[#1d201c] text-[#171916]" : "border-transparent text-[#70746d]"}`}
         >
           Website widget
         </button>
         <button
           onClick={() => setTab("webhook")}
-          className={`rounded-lg px-4 py-2 text-sm font-medium ${tab === "webhook" ? "bg-[#efefed] text-[#171916]" : "text-[#70746d]"}`}
+          className={`h-full border-b-2 px-1 text-sm font-medium ${tab === "webhook" ? "border-[#1d201c] text-[#171916]" : "border-transparent text-[#70746d]"}`}
         >
           Webhooks
         </button>
       </div>
       {tab === "widget" ? (
-        <div className="grid gap-6 xl:grid-cols-[1fr_410px]">
-          <div className="space-y-5">
+        <div className="grid min-h-[calc(100vh-188px)] xl:grid-cols-[minmax(0,1fr)_440px]">
+          <div className="min-w-0 xl:border-r xl:border-[#e5e6e2]">
             <Card>
               <SectionHeading
                 title="Install the widget"
@@ -3482,9 +3497,9 @@ function DeployView({
               </div>
             </Card>
           </div>
-          <div className="xl:sticky xl:top-24 xl:h-fit">
-            <div className="rounded-2xl border border-[#dedfdb] bg-[#ecece7] p-4">
-              <div className="relative min-h-[610px] overflow-hidden rounded-xl bg-white">
+          <div className="bg-[#f2f2ee] p-5 xl:sticky xl:top-0 xl:h-[calc(100vh-188px)]">
+            <div className="h-full bg-[#ecece7] p-3">
+              <div className="relative h-full min-h-[610px] overflow-hidden bg-white">
                 <div className="border-b border-[#ecece9] p-4">
                   <div className="h-3 w-24 rounded-full bg-[#e8e9e5]" />
                 </div>
@@ -3524,11 +3539,11 @@ function DeployView({
                 )}
               </div>
             </div>
-            <p className="mt-3 text-center text-xs text-[#858981]">Live widget preview</p>
+            <p className="mt-2 text-center text-xs text-[#858981]">Live widget preview</p>
           </div>
         </div>
       ) : (
-        <div className="max-w-3xl">
+        <div className="min-h-[calc(100vh-188px)]">
           <Card>
             <div className="flex items-start justify-between gap-4">
               <SectionHeading
@@ -3592,7 +3607,7 @@ function ConversationsView({ soul, onTest }: { soul: Soul; onTest: () => void })
       description="Review questions, answer quality, and buying intent."
     >
       {soul.conversations.length ? (
-        <div className="grid overflow-hidden rounded-2xl border border-[#dedfdb] bg-white lg:grid-cols-[330px_1fr]">
+        <div className="grid min-h-[calc(100vh-140px)] overflow-hidden bg-white lg:grid-cols-[340px_1fr]">
           <div className="border-b border-[#e7e8e4] lg:border-b-0 lg:border-r">
             <div className="border-b border-[#ecece9] p-4">
               <div className="relative">
@@ -3616,7 +3631,7 @@ function ConversationsView({ soul, onTest }: { soul: Soul; onTest: () => void })
               </button>
             ))}
           </div>
-          <div className="min-h-[560px] p-6">
+          <div className="min-h-[560px] p-6 lg:p-8">
             <div className="flex items-center justify-between border-b border-[#ecece9] pb-5">
               <div>
                 <h3 className="font-semibold">{conversation?.visitorLabel}</h3>
@@ -3643,7 +3658,7 @@ function ConversationsView({ soul, onTest }: { soul: Soul; onTest: () => void })
           </div>
         </div>
       ) : (
-        <Card>
+        <Card className="flex min-h-[calc(100vh-140px)] items-center justify-center border-b-0">
           <EmptyPanel
             icon={<MessageCircle />}
             title="No conversations yet"
@@ -3660,6 +3675,71 @@ function ConversationsView({ soul, onTest }: { soul: Soul; onTest: () => void })
   );
 }
 
+function HelpView() {
+  return (
+    <Page title="Help" description="Get a direct answer from the Obseri team.">
+      <div className="grid min-h-[calc(100vh-140px)] lg:grid-cols-[minmax(0,1fr)_400px]">
+        <section className="flex flex-col justify-between border-b border-[#e5e6e2] p-6 sm:p-8 lg:border-b-0 lg:border-r lg:p-10">
+          <div>
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#edf4e6] text-[#5c8336]">
+              <MessageCircle className="h-5 w-5" />
+            </span>
+            <h2 className="mt-7 max-w-xl text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
+              Talk to a real person.
+            </h2>
+            <p className="mt-4 max-w-xl text-sm leading-7 text-[#737870]">
+              Send us the website name, the page you were working on, and what you expected to
+              happen. Screenshots and exact error text help us resolve issues faster.
+            </p>
+            <a
+              href="mailto:flamki@obseri.com?subject=Obseri%20support"
+              className="primary-button mt-7 inline-flex"
+            >
+              Email flamki@obseri.com
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </div>
+          <p className="mt-12 text-xs text-[#8a8e87]">
+            Founder-led support during the private pilot.
+          </p>
+        </section>
+
+        <div className="bg-[#fafaf8]">
+          <section className="border-b border-[#e5e6e2] p-6 sm:p-8">
+            <div className="flex items-start gap-4">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#62675f] shadow-sm">
+                <BookOpen className="h-4 w-4" />
+              </span>
+              <div>
+                <h3 className="text-sm font-semibold">Before you email</h3>
+                <ul className="mt-3 space-y-2 text-sm leading-6 text-[#747970]">
+                  <li>Confirm the correct website is selected.</li>
+                  <li>Refresh Knowledge after changing website content.</li>
+                  <li>Use Agent to reproduce the visitor experience.</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+          <section className="p-6 sm:p-8">
+            <div className="flex items-start gap-4">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#5e8439] shadow-sm">
+                <ShieldCheck className="h-4 w-4" />
+              </span>
+              <div>
+                <h3 className="text-sm font-semibold">Security reports</h3>
+                <p className="mt-3 text-sm leading-6 text-[#747970]">
+                  Do not include passwords, API keys, voice samples, or private customer data in a
+                  support email. Describe the issue and we will arrange a secure transfer if needed.
+                </p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </Page>
+  );
+}
+
 function SettingsView({
   soul,
   workspace,
@@ -3671,8 +3751,8 @@ function SettingsView({
 }) {
   return (
     <Page title="Profile and workspace" description="Local founder settings for this build.">
-      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-        <div className="space-y-5">
+      <div className="grid min-h-[calc(100vh-140px)] lg:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="min-w-0 lg:border-r lg:border-[#e5e6e2]">
           <Card>
             <SectionHeading
               title="Profile"
@@ -3715,7 +3795,7 @@ function SettingsView({
             </div>
           </Card>
         </div>
-        <div className="space-y-5">
+        <div className="min-w-0 bg-[#fafaf8]">
           <Card>
             <h3 className="font-semibold">Your data</h3>
             <p className="mt-2 text-sm leading-6 text-[#747870]">
@@ -3946,6 +4026,8 @@ function CloneVoiceDialog({
 }
 
 function Page({
+  title,
+  description,
   action,
   children,
 }: {
@@ -3955,17 +4037,21 @@ function Page({
   children: ReactNode;
 }) {
   return (
-    <div className="space-y-6">
-      {action && <div className="flex justify-end">{action}</div>}
-      {children}
+    <div className="flex min-h-full w-full flex-col bg-white">
+      <div className="flex min-h-[76px] shrink-0 items-center justify-between gap-5 border-b border-[#e5e6e2] px-5 py-4 sm:px-7 lg:px-8">
+        <div className="min-w-0">
+          <h1 className="text-[17px] font-semibold tracking-[-0.015em] text-[#1d201c]">{title}</h1>
+          <p className="mt-1 truncate text-xs text-[#7d827a]">{description}</p>
+        </div>
+        {action && <div className="shrink-0">{action}</div>}
+      </div>
+      <div className="min-h-0 flex-1">{children}</div>
     </div>
   );
 }
 function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <section
-      className={`rounded-2xl border border-[#dedfdb] bg-white p-5 shadow-sm sm:p-6 ${className}`}
-    >
+    <section className={`border-b border-[#e5e6e2] bg-white p-5 sm:p-6 lg:p-7 ${className}`}>
       {children}
     </section>
   );

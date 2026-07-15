@@ -165,6 +165,42 @@ calls, Qwen voices, and scalable cloning.
 Until that worker exists, production intentionally exposes browser voices instead of advertising a
 Voicebox catalogue that cannot generate audio.
 
+## Voice platform decision
+
+**Decision: launch provider-first, retain a self-hosted path, and do not train a foundation voice
+model.**
+
+Obseri's product advantage is website understanding, retrieval quality, citations, personality,
+page awareness, integrations, and the unified voice/text experience. Speech models are a
+replaceable infrastructure layer. Training a competitive foundation model would consume capital
+and research time without improving the core customer outcome today.
+
+The production routing target is:
+
+- **Sarvam** for Indian languages, Indian English, and code-switched conversations
+- **ElevenLabs** for premium global voices, low-latency English, and managed voice cloning
+- **Browser speech** as the instant, zero-infrastructure demo and availability fallback
+- **Self-hosted open models through Voicebox** for private deployments, experiments, batch work,
+  and a future cost-control path
+
+All speech providers must sit behind Obseri-owned STT and TTS interfaces so a Soul is never locked
+to one vendor. Live calls should use persistent WebSockets, streaming transcription, interruption
+handling, streamed LLM tokens, and streamed audio playback. Provider selection should be measured
+per language using time-to-first-audio, interruption recovery, quality, error rate, and cost.
+
+Do not buy permanent GPU capacity until production traffic demonstrates that provider spend is
+consistently higher than the complete self-hosted cost. That calculation must include idle time,
+replicas, regional capacity, autoscaling, monitoring, engineering, and failure recovery—not only
+the hourly GPU price. A Voicebox desktop worker is not itself a multi-tenant inference platform;
+self-hosting at scale requires a separate autoscaled serving layer.
+
+Revisit this decision when one or more of these conditions is true:
+
+- sustained usage can keep GPU workers efficiently utilized;
+- provider cost materially exceeds GPU infrastructure and operations;
+- enterprise customers require VPC, on-premises, or private voice processing;
+- self-hosted quality and latency pass controlled comparisons against the managed providers.
+
 ## Paid-production boundary
 
 Two external infrastructure items block paid self-serve launch:
@@ -173,9 +209,10 @@ Two external infrastructure items block paid self-serve launch:
    connect authentication and RLS-backed persistence, migrate Studio state out of `localStorage`,
    and load published Soul revisions from durable storage. The current Supabase organization has
    reached its two-active-free-project limit, so it needs another project slot or plan upgrade.
-2. **Public real-time voice.** Deploy the validated Voicebox branch on a public GPU worker, store
-   generated previews in object storage/CDN, keep workers warm for live calls, and enforce consent,
-   quotas, cancellation, and private sample storage.
+2. **Public real-time voice.** Connect managed streaming STT/TTS providers behind Obseri-owned
+   adapters, beginning with Sarvam for Indian languages and ElevenLabs for premium global voices.
+   Enforce consent, quotas, cancellation, private sample storage, and provider-level failover. Keep
+   Voicebox as the self-hosted/private path until measured demand justifies GPU infrastructure.
 
 Before charging customers, also complete:
 
@@ -193,8 +230,8 @@ Before charging customers, also complete:
 
 1. Add a dedicated Supabase project and apply `supabase/migrations`.
 2. Replace browser-local workspace persistence with authenticated Supabase persistence.
-3. Deploy Voicebox to a GPU host and configure `OBSERI_VOICEBOX_URL` in Vercel.
-4. Pre-generate the public voice catalogue and serve previews from object storage/CDN.
+3. Add Sarvam and ElevenLabs streaming adapters with provider routing and browser fallback.
+4. Cache public voice previews in object storage/CDN and benchmark full call latency by region.
 5. Add API ownership, rate limits, domain verification, durable queues, and observability.
 6. Run a private pilot before enabling Stripe and self-serve onboarding.
 
