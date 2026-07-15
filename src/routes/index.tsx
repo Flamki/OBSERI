@@ -118,7 +118,7 @@ function Hero() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_30%,rgba(255,220,207,.32),transparent_24%),radial-gradient(circle_at_82%_40%,rgba(163,150,210,.18),transparent_25%),radial-gradient(circle_at_50%_32%,rgba(255,247,242,.2),transparent_35%),linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.16)_62%,#f4f4ef_100%)]" />
       <div className="pointer-events-none absolute left-1/2 top-[44%] h-[420px] w-[760px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/10 blur-[90px]" />
 
-      <header className="absolute left-1/2 top-5 z-20 flex h-[62px] w-[calc(100%-2rem)] max-w-[720px] -translate-x-1/2 items-center justify-between rounded-[1.65rem] border border-white/[0.075] bg-[#111016]/90 px-3.5 shadow-[0_22px_60px_rgba(22,12,20,.24),inset_0_1px_0_rgba(255,255,255,.055)] backdrop-blur-2xl sm:px-5">
+      <header className="fixed left-1/2 top-5 z-50 flex h-[62px] w-[calc(100%-2rem)] max-w-[720px] -translate-x-1/2 items-center justify-between rounded-[1.65rem] border border-white/12 bg-[#111016]/48 px-3.5 shadow-[0_18px_55px_rgba(22,12,20,.18),inset_0_1px_0_rgba(255,255,255,.08)] backdrop-blur-2xl backdrop-saturate-150 sm:px-5">
         <Link to="/" aria-label="Obseri home" className="inline-flex items-center">
           <img src="/obseri-logo-light.svg" alt="Obseri" className="h-6 w-auto sm:h-7" />
         </Link>
