@@ -116,6 +116,58 @@ function Hero() {
         />
       </div>
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_74%_62%_at_50%_-10%,rgba(255,85,107,.48)_0%,rgba(255,135,119,.31)_43%,rgba(255,206,194,.09)_69%,transparent_84%),radial-gradient(ellipse_42%_30%_at_50%_27%,rgba(255,244,238,.28),transparent_74%),radial-gradient(circle_at_20%_31%,rgba(255,218,208,.24),transparent_28%),radial-gradient(circle_at_82%_36%,rgba(143,128,190,.15),transparent_28%)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-[15.5rem] h-[22rem] opacity-50 sm:top-[16.5rem] lg:top-[17rem]">
+        <svg
+          viewBox="0 0 1600 360"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+          className="h-full w-full"
+        >
+          <defs>
+            <linearGradient id="obseri-conversation-signal" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stopColor="#ff5c7a" stopOpacity="0" />
+              <stop offset="0.22" stopColor="#ff5c7a" stopOpacity="0.48" />
+              <stop offset="0.5" stopColor="#fff7f2" stopOpacity="0.84" />
+              <stop offset="0.78" stopColor="#8e7bbb" stopOpacity="0.42" />
+              <stop offset="1" stopColor="#8e7bbb" stopOpacity="0" />
+            </linearGradient>
+            <filter id="obseri-conversation-glow" x="-10%" y="-60%" width="120%" height="220%">
+              <feGaussianBlur stdDeviation="10" />
+            </filter>
+          </defs>
+          <path
+            d="M0 181 C120 181 176 181 230 181 C276 181 286 134 322 134 C360 134 365 230 408 230 C450 230 464 72 522 72 C584 72 592 282 655 282 C716 282 732 118 790 118 C850 118 868 214 925 214 C980 214 1002 151 1060 151 C1118 151 1140 190 1202 190 C1270 190 1322 181 1600 181"
+            fill="none"
+            stroke="url(#obseri-conversation-signal)"
+            strokeWidth="20"
+            opacity="0.22"
+            filter="url(#obseri-conversation-glow)"
+          />
+          <path
+            d="M0 181 C120 181 176 181 230 181 C276 181 286 134 322 134 C360 134 365 230 408 230 C450 230 464 72 522 72 C584 72 592 282 655 282 C716 282 732 118 790 118 C850 118 868 214 925 214 C980 214 1002 151 1060 151 C1118 151 1140 190 1202 190 C1270 190 1322 181 1600 181"
+            fill="none"
+            stroke="url(#obseri-conversation-signal)"
+            strokeWidth="1.5"
+            vectorEffect="non-scaling-stroke"
+          />
+          <path
+            d="M0 181 H1600"
+            fill="none"
+            stroke="url(#obseri-conversation-signal)"
+            strokeWidth="1"
+            strokeDasharray="3 13"
+            opacity="0.38"
+          >
+            <animate
+              attributeName="stroke-dashoffset"
+              from="0"
+              to="-160"
+              dur="16s"
+              repeatCount="indefinite"
+            />
+          </path>
+        </svg>
+      </div>
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,.08)_64%,#f4f4ef_100%)]" />
 
       <header className="fixed left-1/2 top-5 z-50 flex h-[62px] w-[calc(100%-2rem)] max-w-[720px] -translate-x-1/2 items-center justify-between rounded-[1.65rem] border border-white/12 bg-[#111016]/48 px-3.5 shadow-[0_18px_55px_rgba(22,12,20,.18),inset_0_1px_0_rgba(255,255,255,.08)] backdrop-blur-2xl backdrop-saturate-150 sm:px-5">
@@ -142,7 +194,13 @@ function Hero() {
       </header>
 
       <div className="relative z-10 mx-auto flex min-h-[820px] w-full min-w-0 max-w-[1500px] flex-col items-center justify-center px-6 pb-36 pt-24 text-center sm:min-h-[860px] sm:pb-40 lg:min-h-[900px] lg:px-10 lg:pb-48">
-        <img src="/obseri-pulse-mark.svg" alt="" className="mb-7 h-10 w-10" />
+        <div className="mb-7 inline-flex items-center gap-2.5 rounded-full border border-black/[0.07] bg-white/25 py-2 pl-2.5 pr-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,.35)] backdrop-blur-md">
+          <img src="/obseri-pulse-mark.svg" alt="" className="h-5 w-5" />
+          <span className="text-[9px] font-semibold uppercase tracking-[0.19em] text-black/52">
+            Voice + chat for your website
+          </span>
+          <span className="h-1.5 w-1.5 rounded-full bg-[#ff5c7a] shadow-[0_0_12px_rgba(255,92,122,.75)]" />
+        </div>
         <h1 className="w-full min-w-0 max-w-[1100px] [font-family:Baskerville,'Iowan_Old_Style','Palatino_Linotype','Times_New_Roman',serif] text-[clamp(2.85rem,4.4vw,4.65rem)] font-normal leading-[0.98] tracking-[-0.045em]">
           Make every visit a <span className="text-[#a4314a]">LEAD.</span>
         </h1>
