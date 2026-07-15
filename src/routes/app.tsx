@@ -1063,11 +1063,11 @@ function KnowledgeView({
   }
 
   return (
-    <Page title="Knowledge" description="The pages and facts your soul can use.">
+    <Page title="Knowledge" description="The pages and facts your soul can use." hideHeader>
       {(crawlEvents.length > 0 || soul.knowledge.status === "crawling") && (
         <CrawlProgressPanel events={crawlEvents} />
       )}
-      <div className="grid min-h-[calc(100vh-140px)] xl:grid-cols-[minmax(0,1fr)_420px]">
+      <div className="grid min-h-[calc(100vh-64px)] xl:grid-cols-[minmax(0,1fr)_420px]">
         <Card className="h-full overflow-hidden border-b-0 p-0 xl:border-r">
           <div className="flex flex-col gap-5 border-b border-[#e8eae5] px-5 py-5 sm:px-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -4029,22 +4029,28 @@ function Page({
   title,
   description,
   action,
+  hideHeader = false,
   children,
 }: {
   title: string;
   description: string;
   action?: ReactNode;
+  hideHeader?: boolean;
   children: ReactNode;
 }) {
   return (
     <div className="flex min-h-full w-full flex-col bg-white">
-      <div className="flex min-h-[76px] shrink-0 items-center justify-between gap-5 border-b border-[#e5e6e2] px-5 py-4 sm:px-7 lg:px-8">
-        <div className="min-w-0">
-          <h1 className="text-[17px] font-semibold tracking-[-0.015em] text-[#1d201c]">{title}</h1>
-          <p className="mt-1 truncate text-xs text-[#7d827a]">{description}</p>
+      {!hideHeader && (
+        <div className="flex min-h-[76px] shrink-0 items-center justify-between gap-5 border-b border-[#e5e6e2] px-5 py-4 sm:px-7 lg:px-8">
+          <div className="min-w-0">
+            <h1 className="text-[17px] font-semibold tracking-[-0.015em] text-[#1d201c]">
+              {title}
+            </h1>
+            <p className="mt-1 truncate text-xs text-[#7d827a]">{description}</p>
+          </div>
+          {action && <div className="shrink-0">{action}</div>}
         </div>
-        {action && <div className="shrink-0">{action}</div>}
-      </div>
+      )}
       <div className="min-h-0 flex-1">{children}</div>
     </div>
   );
