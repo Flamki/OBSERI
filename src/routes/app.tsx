@@ -85,7 +85,7 @@ const PAGE_META: Record<StudioView, { title: string; description: string }> = {
   },
   voice: { title: "Voice", description: "Choose how your website sounds." },
   playground: {
-    title: "Test",
+    title: "Agent",
     description: "Experience your website and its soul exactly as a visitor will.",
   },
   deploy: { title: "Integrate", description: "Publish the widget and connect your systems." },
@@ -98,7 +98,7 @@ const PAGE_META: Record<StudioView, { title: string; description: string }> = {
 
 function SoulStudio() {
   const [workspace, setWorkspace] = useState<SoulWorkspace>(DEMO_WORKSPACE);
-  const [view, setView] = useState<StudioView>("knowledge");
+  const [view, setView] = useState<StudioView>("playground");
   const [hydrated, setHydrated] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -493,10 +493,10 @@ function Sidebar({
 }) {
   const [soulMenuOpen, setSoulMenuOpen] = useState(false);
   const items: Array<{ id: StudioView; label: string; icon: ReactNode }> = [
+    { id: "playground", label: "Agent", icon: <Sparkles /> },
     { id: "knowledge", label: "Knowledge", icon: <BookOpen /> },
     { id: "personality", label: "Personality", icon: <WandSparkles /> },
     { id: "voice", label: "Voice", icon: <Mic2 /> },
-    { id: "playground", label: "Test", icon: <Play /> },
     { id: "deploy", label: "Integrate", icon: <Code2 /> },
     { id: "conversations", label: "Conversations", icon: <MessageCircle /> },
   ];
@@ -3638,10 +3638,10 @@ function ConversationsView({ soul, onTest }: { soul: Soul; onTest: () => void })
           <EmptyPanel
             icon={<MessageCircle />}
             title="No conversations yet"
-            detail="Test your soul or publish the widget. Conversations will appear here."
+            detail="Preview your agent or publish the widget. Conversations will appear here."
             action={
               <button onClick={onTest} className="primary-button">
-                Start testing
+                Open Agent
               </button>
             }
           />
