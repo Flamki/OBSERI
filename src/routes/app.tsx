@@ -4368,7 +4368,7 @@ const DEMO_SOUL: Soul = {
     unknownResponse:
       "I don’t have that in my knowledge yet, but I can point you to the closest source.",
     leadCapture: true,
-    escalationEmail: "hello@obseri.com",
+    escalationEmail: "flamki@obseri.com",
   },
   voice: {
     enabled: true,

@@ -187,7 +187,7 @@ function Hero() {
         </nav>
         <div className="flex items-center gap-2">
           <a
-            href="mailto:9833ayush@gmail.com?subject=Obseri%20inquiry"
+            href="mailto:flamki@obseri.com?subject=Obseri%20inquiry"
             className="hidden h-10 items-center rounded-xl border border-white/14 px-4 text-[11px] font-semibold text-white/68 transition duration-200 hover:border-white/28 hover:bg-white/8 hover:text-white sm:inline-flex"
           >
             Contact Us
