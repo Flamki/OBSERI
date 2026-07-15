@@ -31,13 +31,13 @@ export default function ProductSections() {
 function SignalLine() {
   const signals = ["Deep crawl", "Living knowledge", "Designed personality", "Natural voice"];
   return (
-    <section className="border-b border-white/8 bg-[#090b09] px-6">
-      <div className="mx-auto flex max-w-[1320px] flex-wrap items-center justify-between gap-x-8 gap-y-4 py-7 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/40">
-        <span className="text-white/80">One URL. A complete website soul.</span>
+    <section className="border-b border-black/7 bg-[#f4f4ef] px-6">
+      <div className="mx-auto flex max-w-[1320px] flex-wrap items-center justify-between gap-x-8 gap-y-4 py-7 text-[10px] font-semibold uppercase tracking-[0.2em] text-black/38">
+        <span className="text-black/72">One URL. A complete website soul.</span>
         <div className="flex flex-wrap gap-x-8 gap-y-3">
           {signals.map((signal) => (
             <span key={signal} className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#78a94b]" /> {signal}
+              <span className="h-1.5 w-1.5 rounded-full bg-[#ff5c7a]" /> {signal}
             </span>
           ))}
         </div>
@@ -94,7 +94,7 @@ function HowItWorks() {
             >
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-black/24">{step.number}</span>
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#ebf5e2] text-[#5e8538] [&_svg]:h-4 [&_svg]:w-4">
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f8dfdf] text-[#b7445a] [&_svg]:h-4 [&_svg]:w-4">
                   {step.icon}
                 </span>
               </div>
@@ -116,7 +116,7 @@ function StudioSection() {
       id="studio"
       className="px-3 py-8 [contain-intrinsic-size:auto_700px] [content-visibility:auto] sm:px-5 lg:py-14"
     >
-      <div className="relative mx-auto min-h-[610px] max-w-[1500px] overflow-hidden rounded-[2rem] border border-white/10 bg-[#101110] text-white sm:rounded-[2.5rem]">
+      <div className="relative mx-auto min-h-[610px] max-w-[1500px] overflow-hidden rounded-[2rem] border border-white/10 bg-[#151518] text-white sm:rounded-[2.5rem]">
         <div className="grid min-h-[610px] items-center px-7 py-16 sm:px-12 lg:grid-cols-[0.72fr_1.28fr] lg:px-20">
           <div className="relative z-20 max-w-[430px] pb-[440px] lg:pb-0">
             <h2 className="text-4xl font-semibold leading-[0.98] tracking-[-0.05em] sm:text-5xl">
@@ -127,7 +127,7 @@ function StudioSection() {
             </p>
             <Link
               to="/app"
-              className="mt-8 inline-flex items-center gap-2 text-[12px] font-semibold text-[#b7f774] transition hover:text-white"
+              className="mt-8 inline-flex items-center gap-2 text-[12px] font-semibold text-[#ff8399] transition hover:text-white"
             >
               Explore Soul Studio <ArrowRight className="h-4 w-4" />
             </Link>
@@ -165,15 +165,15 @@ function StudioVisualCard({
 }) {
   const backgrounds = {
     crawl:
-      "bg-[radial-gradient(circle_at_17%_72%,rgba(183,247,116,.22),transparent_20%),radial-gradient(ellipse_at_73%_48%,rgba(255,255,255,.13),transparent_34%),linear-gradient(145deg,#070807_5%,#141714_48%,#050605_100%)]",
+      "bg-[radial-gradient(circle_at_17%_72%,rgba(255,92,122,.24),transparent_20%),radial-gradient(ellipse_at_73%_48%,rgba(255,255,255,.13),transparent_34%),linear-gradient(145deg,#0b0b0d_5%,#19171b_48%,#08080a_100%)]",
     knowledge:
-      "bg-[radial-gradient(ellipse_at_22%_28%,rgba(111,198,207,.24),transparent_27%),radial-gradient(circle_at_77%_74%,rgba(183,247,116,.16),transparent_23%),linear-gradient(155deg,#050605,#171817_48%,#070807)]",
+      "bg-[radial-gradient(ellipse_at_22%_28%,rgba(158,145,201,.26),transparent_27%),radial-gradient(circle_at_77%_74%,rgba(255,92,122,.18),transparent_23%),linear-gradient(155deg,#08080a,#1b181d_48%,#09090b)]",
     retrieval:
       "bg-[radial-gradient(ellipse_at_76%_24%,rgba(196,151,255,.18),transparent_26%),radial-gradient(ellipse_at_25%_78%,rgba(255,255,255,.14),transparent_30%),linear-gradient(135deg,#080808,#171717_48%,#050505)]",
   };
 
   return (
-    <Card className="cursor-pointer border border-white/55 bg-[#080908] text-white shadow-[0_30px_80px_rgba(0,0,0,.52)]">
+    <Card className="cursor-pointer border border-white/55 bg-[#0b0b0d] text-white shadow-[0_30px_80px_rgba(0,0,0,.52)]">
       <div className="flex h-16 items-center gap-3 border-b border-white/35 bg-gradient-to-b from-white/[0.055] to-transparent px-5">
         <span className="h-2.5 w-2.5 rounded-full bg-white" />
         <span className="text-[15px] font-medium tracking-[-0.02em]">{title}</span>
@@ -193,8 +193,8 @@ function CrawlData() {
     <div className="relative z-10 flex h-full flex-col p-8">
       <div className="flex items-center justify-between text-[10px] text-white/38">
         <span>obseri.com</span>
-        <span className="flex items-center gap-2 text-[#b7f774]">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#b7f774]" /> Live crawl
+        <span className="flex items-center gap-2 text-[#ff8399]">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#ff5c7a]" /> Live crawl
         </span>
       </div>
       <div className="mt-auto">
@@ -206,7 +206,7 @@ function CrawlData() {
           <p className="pb-1 text-[10px] text-white/30">12 updated · 0 blocked</p>
         </div>
         <div className="mt-6 h-1 overflow-hidden rounded-full bg-white/10">
-          <div className="h-full w-[86%] rounded-full bg-gradient-to-r from-[#b7f774] to-[#6fc6cf]" />
+          <div className="h-full w-[86%] rounded-full bg-gradient-to-r from-[#ff5c7a] to-[#9e91c9]" />
         </div>
         <div className="mt-3 flex justify-between text-[9px] text-white/25">
           <span>Discovery</span>
@@ -238,7 +238,7 @@ function KnowledgeData() {
           {label}
         </span>
       ))}
-      <span className="absolute left-1/2 top-[61%] h-3 w-3 -translate-x-1/2 rounded-full bg-[#b7f774] shadow-[0_0_28px_rgba(183,247,116,.7)]" />
+      <span className="absolute left-1/2 top-[61%] h-3 w-3 -translate-x-1/2 rounded-full bg-[#ff5c7a] shadow-[0_0_28px_rgba(255,92,122,.65)]" />
     </div>
   );
 }
@@ -270,8 +270,8 @@ function RetrievalData() {
           </div>
         ))}
       </div>
-      <p className="absolute bottom-7 left-8 flex items-center gap-2 text-[9px] text-[#b7f774]">
-        <span className="h-1.5 w-1.5 rounded-full bg-[#b7f774]" /> Answer ready with 3 citations
+      <p className="absolute bottom-7 left-8 flex items-center gap-2 text-[9px] text-[#ff8399]">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#ff5c7a]" /> Answer ready with 3 citations
       </p>
     </div>
   );
@@ -288,8 +288,8 @@ function IdentitySection() {
           </h2>
         </div>
         <div className="mt-16 grid gap-4 lg:grid-cols-2">
-          <article className="relative min-h-[480px] overflow-hidden rounded-[2rem] bg-[#dff3cf] p-8 sm:p-10">
-            <Fingerprint className="h-5 w-5 text-[#50752e]" />
+          <article className="relative min-h-[480px] overflow-hidden rounded-[2rem] bg-[#f4dedb] p-8 sm:p-10">
+            <Fingerprint className="h-5 w-5 text-[#a84155]" />
             <h3 className="mt-8 max-w-md text-3xl font-semibold tracking-[-0.045em] sm:text-4xl">
               A personality designed for your brand.
             </h3>
@@ -303,7 +303,7 @@ function IdentitySection() {
                   <p className="text-[11px] font-semibold">Ona</p>
                   <p className="mt-1 text-[9px] text-black/38">Warm · clear · quietly bold</p>
                 </div>
-                <span className="rounded-full bg-[#5d8438] px-2.5 py-1 text-[8px] font-semibold text-white">
+                <span className="rounded-full bg-[#a84155] px-2.5 py-1 text-[8px] font-semibold text-white">
                   Active
                 </span>
               </div>
@@ -312,8 +312,8 @@ function IdentitySection() {
               </p>
             </div>
           </article>
-          <article className="relative min-h-[480px] overflow-hidden rounded-[2rem] bg-[#dbeae6] p-8 sm:p-10">
-            <Volume2 className="h-5 w-5 text-[#316f61]" />
+          <article className="relative min-h-[480px] overflow-hidden rounded-[2rem] bg-[#e4e1f4] p-8 sm:p-10">
+            <Volume2 className="h-5 w-5 text-[#6f5d9c]" />
             <h3 className="mt-8 max-w-md text-3xl font-semibold tracking-[-0.045em] sm:text-4xl">
               A voice that feels like it belongs.
             </h3>
@@ -321,9 +321,9 @@ function IdentitySection() {
               Start instantly with browser speech, connect managed voice profiles, or create an
               authorized clone with explicit consent attached.
             </p>
-            <div className="absolute inset-x-8 bottom-8 rounded-2xl border border-black/8 bg-[#0e1714] p-5 text-white shadow-2xl sm:inset-x-10">
+            <div className="absolute inset-x-8 bottom-8 rounded-2xl border border-black/8 bg-[#17151c] p-5 text-white shadow-2xl sm:inset-x-10">
               <div className="flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#a8ebd7] text-[#10211b]">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#ff9caf] text-[#3c1520]">
                   <Mic2 className="h-4 w-4" />
                 </span>
                 <div>
@@ -336,7 +336,7 @@ function IdentitySection() {
                   (height, index) => (
                     <span
                       key={index}
-                      className="w-1 flex-1 rounded-full bg-[#a8ebd7]/65"
+                      className="w-1 flex-1 rounded-full bg-[#ff9caf]/65"
                       style={{ height }}
                     />
                   ),
@@ -392,7 +392,7 @@ function TrustSection() {
               key={promise.title}
               className="rounded-[1.5rem] border border-black/8 bg-[#f7f7f2] p-7 sm:p-8"
             >
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#5c8238] shadow-sm [&_svg]:h-4 [&_svg]:w-4">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#b7445a] shadow-sm [&_svg]:h-4 [&_svg]:w-4">
                 {promise.icon}
               </span>
               <h3 className="mt-16 text-lg font-semibold tracking-[-0.025em]">{promise.title}</h3>
@@ -408,11 +408,11 @@ function TrustSection() {
 function FinalCta() {
   return (
     <section className="px-4 py-4 [contain-intrinsic-size:auto_600px] [content-visibility:auto] sm:px-6 lg:px-10">
-      <div className="relative mx-auto flex min-h-[560px] max-w-[1360px] items-center justify-center overflow-hidden rounded-[2.6rem] bg-[#080b08] px-6 py-24 text-center text-white">
-        <div className="absolute left-1/2 top-1/2 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#b7f774]/10 blur-[120px]" />
-        <div className="absolute inset-0 opacity-25 [background-image:radial-gradient(rgba(183,247,116,.25)_1px,transparent_1px)] [background-size:28px_28px] [mask-image:radial-gradient(circle,black,transparent_70%)]" />
+      <div className="relative mx-auto flex min-h-[560px] max-w-[1360px] items-center justify-center overflow-hidden rounded-[2.6rem] bg-[#0b0b0d] px-6 py-24 text-center text-white">
+        <div className="absolute left-1/2 top-1/2 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#ff5c7a]/12 blur-[120px]" />
+        <div className="absolute inset-0 opacity-25 [background-image:radial-gradient(rgba(255,92,122,.25)_1px,transparent_1px)] [background-size:28px_28px] [mask-image:radial-gradient(circle,black,transparent_70%)]" />
         <div className="relative max-w-4xl">
-          <MessageCircle className="mx-auto h-6 w-6 text-[#b7f774]" />
+          <MessageCircle className="mx-auto h-6 w-6 text-[#ff5c7a]" />
           <h2 className="mt-8 text-5xl font-semibold leading-[0.9] tracking-[-0.065em] sm:text-7xl lg:text-8xl">
             Build an AI assistant your visitors can talk to.
           </h2>
@@ -422,7 +422,7 @@ function FinalCta() {
           </p>
           <Link
             to="/app"
-            className="mt-10 inline-flex h-12 items-center gap-2 rounded-full bg-[#b7f774] px-6 text-[12px] font-bold text-black transition hover:scale-[1.02] hover:bg-white"
+            className="mt-10 inline-flex h-12 items-center gap-2 rounded-full bg-[#ff5c7a] px-6 text-[12px] font-bold text-white transition hover:scale-[1.02] hover:bg-white hover:text-black"
           >
             Build your website soul <ArrowRight className="h-4 w-4" />
           </Link>
@@ -461,9 +461,9 @@ function Footer() {
 function Eyebrow({ children, dark = false }: { children: React.ReactNode; dark?: boolean }) {
   return (
     <p
-      className={`flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.22em] ${dark ? "text-[#b7f774]" : "text-[#62883e]"}`}
+      className={`flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.22em] ${dark ? "text-[#ff8399]" : "text-[#a84155]"}`}
     >
-      <span className={`h-px w-7 ${dark ? "bg-[#b7f774]/55" : "bg-[#62883e]/45"}`} />
+      <span className={`h-px w-7 ${dark ? "bg-[#ff5c7a]/55" : "bg-[#a84155]/45"}`} />
       {children}
     </p>
   );

@@ -92,7 +92,7 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#f4f4ef] font-sans text-[#171a17]">
+    <div className="min-h-screen overflow-x-hidden bg-[#f4f4ef] font-sans text-[#17171a]">
       <Hero />
       <ProductSections />
     </div>
@@ -101,70 +101,76 @@ function Index() {
 
 function Hero() {
   return (
-    <section className="relative w-full min-w-0 min-h-[900px] overflow-hidden bg-[#090a09] text-white">
-      <div className="absolute inset-0">
+    <section className="relative min-h-[900px] w-full min-w-0 overflow-hidden bg-[#f4f4ef] text-[#151518]">
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,#ff8d78_0%,#f5a18f_24%,#dedcf0_57%,#f4f4ef_92%)]" />
+      <div className="absolute inset-0 opacity-[0.14] mix-blend-soft-light">
         <PrismaticBurst
           animationType="rotate3d"
-          intensity={2.1}
-          speed={0.32}
-          distort={0.7}
+          intensity={1.15}
+          speed={0.16}
+          distort={0.42}
           offset={{ x: 0, y: 0 }}
-          hoverDampness={0.2}
-          rayCount={20}
-          colors={["#f26f45", "#3468d4", "#e9c46a", "#6fc6cf", "#9b78c9", "#d5e5c3"]}
+          hoverDampness={0.35}
+          rayCount={12}
+          colors={["#ff5c7a", "#ff9c89", "#ffd1c7", "#9e91c9", "#f7f5f2"]}
         />
       </div>
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_47%,rgba(5,6,5,.24)_0%,rgba(5,6,5,.58)_30%,rgba(5,6,5,.08)_58%,rgba(5,6,5,.18)_100%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-black/40" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_34%,rgba(255,245,239,.22),transparent_35%),linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.18)_62%,#f4f4ef_100%)]" />
 
-      <header className="absolute inset-x-0 top-0 z-20 mx-auto flex h-24 w-full max-w-[1500px] items-center justify-between px-6 lg:px-10">
+      <header className="absolute inset-x-4 top-4 z-20 mx-auto flex h-[72px] max-w-[1460px] items-center justify-between rounded-full border border-white/65 bg-[#fff8f0]/80 px-5 shadow-[0_16px_50px_rgba(72,31,38,.08),inset_0_1px_0_rgba(255,255,255,.9)] backdrop-blur-2xl sm:inset-x-6 sm:px-7 lg:top-5 lg:px-9">
         <Link to="/" aria-label="Obseri home" className="inline-flex items-center">
-          <img src="/obseri-logo-light.svg" alt="Obseri" className="h-8 w-auto" />
+          <img src="/obseri-logo-dark.svg" alt="Obseri" className="h-7 w-auto sm:h-8" />
         </Link>
-        <nav className="hidden items-center gap-8 text-[12px] font-medium text-white/55 md:flex">
-          <a href="#how" className="transition hover:text-white">
+        <nav className="hidden items-center gap-8 text-[11px] font-semibold text-black/55 md:flex lg:gap-10">
+          <a href="#how" className="transition hover:text-black">
             How it works
           </a>
-          <a href="#studio" className="transition hover:text-white">
-            Studio
+          <a href="#studio" className="transition hover:text-black">
+            Soul Studio
           </a>
-          <a href="#trust" className="transition hover:text-white">
+          <a href="#trust" className="transition hover:text-black">
             Trust
           </a>
         </nav>
         <Link
           to="/app"
-          className="inline-flex h-10 items-center gap-2 rounded-full border border-white/14 bg-white/8 px-4 text-[12px] font-semibold backdrop-blur-xl transition hover:bg-white hover:text-black"
+          className="inline-flex h-10 items-center gap-2 rounded-full bg-[#17171a] px-4 text-[11px] font-semibold text-white shadow-[0_8px_24px_rgba(21,21,24,.14)] transition hover:bg-[#ff5c7a] sm:px-5"
         >
           Open Studio <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </header>
 
-      <div className="relative z-10 mx-auto flex min-h-[900px] w-full min-w-0 max-w-[1500px] flex-col items-center justify-center px-6 pb-20 pt-28 text-center lg:px-10">
-        <h1 className="w-full min-w-0 max-w-[1100px] text-[clamp(3.2rem,7.9vw,7.75rem)] font-semibold leading-[0.88] tracking-[-0.078em]">
-          <span className="block text-white/95 sm:whitespace-nowrap">Give your website</span>
-          <span className="mt-1 block bg-[linear-gradient(100deg,#e7ffd0_8%,#b7f774_50%,#d9ffb8_92%)] bg-clip-text pb-[0.08em] text-transparent drop-shadow-[0_0_34px_rgba(183,247,116,.12)]">
-            a soul.
-          </span>
+      <div className="relative z-10 mx-auto flex min-h-[900px] w-full min-w-0 max-w-[1500px] flex-col items-center justify-center px-6 pb-24 pt-36 text-center lg:px-10">
+        <div className="mb-8 flex items-center gap-4 sm:gap-5">
+          <span className="h-px w-10 bg-[#8e4a57]/25 sm:w-16" />
+          <img src="/obseri-pulse-mark.svg" alt="" className="h-9 w-9" />
+          <span className="h-px w-10 bg-[#8e4a57]/25 sm:w-16" />
+        </div>
+        <p className="mb-7 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#6c3942]/80">
+          Website intelligence that can speak
+        </p>
+        <h1 className="w-full min-w-0 max-w-[1120px] [font-family:Georgia,'Times_New_Roman',serif] text-[clamp(3.7rem,7.7vw,7.6rem)] font-normal leading-[0.91] tracking-[-0.065em]">
+          <span className="block sm:whitespace-nowrap">Your website,</span>
+          <span className="block text-[#8e3145]">ready to talk.</span>
         </h1>
-        <p className="mt-6 w-full min-w-0 max-w-[650px] text-[15px] leading-7 text-white/60 sm:text-[17px] sm:leading-8">
-          Deep website knowledge, a personality you shape, and a natural voice—built into one living
-          interface.
+        <p className="mt-7 w-full min-w-0 max-w-[650px] text-[14px] leading-7 text-black/58 sm:text-[16px] sm:leading-8">
+          Obseri learns every page, takes on your personality, and helps visitors by voice or
+          text&mdash;grounded in the sources you control.
         </p>
 
         <form
           action="/app"
           method="get"
-          className="group relative mt-9 flex w-full min-w-0 max-w-[720px] flex-col gap-2 overflow-hidden rounded-[1.65rem] border border-white/14 bg-[linear-gradient(180deg,rgba(255,255,255,.09),rgba(255,255,255,.035))] p-1.5 shadow-[0_28px_90px_rgba(0,0,0,.42),inset_0_1px_0_rgba(255,255,255,.08)] backdrop-blur-2xl transition duration-300 focus-within:border-white/28 sm:flex-row sm:rounded-full"
+          className="group relative mt-10 flex w-full min-w-0 max-w-[740px] flex-col gap-2 overflow-hidden rounded-[1.65rem] border border-white/80 bg-[#fffaf4]/78 p-1.5 shadow-[0_24px_80px_rgba(94,43,53,.13),inset_0_1px_0_rgba(255,255,255,.94)] backdrop-blur-2xl transition duration-300 focus-within:border-[#ff5c7a]/35 sm:flex-row sm:rounded-full"
         >
           <div className="flex min-w-0 flex-1 items-center gap-3 px-3 py-1 sm:px-4 sm:py-0">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-black/20 text-white/45 transition group-focus-within:border-[#b7f774]/35 group-focus-within:text-[#b7f774]">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/7 bg-white/55 text-black/38 transition group-focus-within:border-[#ff5c7a]/30 group-focus-within:text-[#d94763]">
               <Globe2 className="h-4 w-4" />
             </span>
             <div className="min-w-0 flex-1 text-left">
               <label
                 htmlFor="quick-start-url"
-                className="block text-[9px] font-semibold uppercase tracking-[0.16em] text-white/38"
+                className="block text-[9px] font-semibold uppercase tracking-[0.16em] text-black/38"
               >
                 Your website URL
               </label>
@@ -175,32 +181,32 @@ function Hero() {
                 required
                 autoComplete="url"
                 placeholder="https://yourwebsite.com"
-                className="h-6 w-full min-w-0 bg-transparent text-[14px] text-white outline-none placeholder:text-white/35"
+                className="h-6 w-full min-w-0 bg-transparent text-[14px] text-[#17171a] outline-none placeholder:text-black/35"
               />
             </div>
           </div>
           <button
             type="submit"
-            className="inline-flex h-14 shrink-0 items-center justify-center gap-3 rounded-[1.25rem] bg-[#b7f774] px-7 text-[12px] font-bold text-[#111410] shadow-[0_8px_28px_rgba(183,247,116,.16)] transition duration-300 hover:bg-[#caff91] sm:rounded-full"
+            className="inline-flex h-14 shrink-0 items-center justify-center gap-3 rounded-[1.25rem] bg-[#17171a] px-7 text-[12px] font-bold text-white shadow-[0_10px_30px_rgba(21,21,24,.16)] transition duration-300 hover:bg-[#ff5c7a] sm:rounded-full"
           >
             Build its soul
             <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
           </button>
         </form>
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[10px] font-medium text-white/38">
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[10px] font-medium text-black/40">
           <span className="inline-flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#b7f774] shadow-[0_0_12px_rgba(183,247,116,.7)]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-[#ff5c7a] shadow-[0_0_12px_rgba(255,92,122,.45)]" />
             Start from one URL
           </span>
           <a
             href="#how"
-            className="inline-flex items-center gap-1.5 transition hover:text-white/75"
+            className="inline-flex items-center gap-1.5 transition hover:text-black/75"
           >
             See how it works <ArrowRight className="h-3 w-3" />
           </a>
         </div>
       </div>
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[12] h-24 bg-[linear-gradient(to_bottom,transparent_0%,rgba(9,11,9,.58)_62%,#090b09_100%)]" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[12] h-28 bg-[linear-gradient(to_bottom,transparent,#f4f4ef)]" />
     </section>
   );
 }
