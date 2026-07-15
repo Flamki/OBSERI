@@ -143,12 +143,11 @@ function Hero() {
 
       <div className="relative z-10 mx-auto flex min-h-[820px] w-full min-w-0 max-w-[1500px] flex-col items-center justify-center px-6 pb-16 pt-28 text-center sm:min-h-[860px] lg:min-h-[900px] lg:px-10">
         <img src="/obseri-pulse-mark.svg" alt="" className="mb-7 h-10 w-10" />
-        <h1 className="w-full min-w-0 max-w-[1040px] [font-family:'Avenir_Next','Segoe_UI',ui-sans-serif,sans-serif] text-[clamp(3.35rem,6.8vw,6.9rem)] font-medium leading-[0.9] tracking-[-0.068em]">
-          <span className="block sm:whitespace-nowrap">Your website.</span>
-          <span className="block text-[#8e3145]">Ready to talk.</span>
+        <h1 className="w-full min-w-0 max-w-[1180px] [font-family:Baskerville,'Iowan_Old_Style','Palatino_Linotype','Times_New_Roman',serif] text-[clamp(3.25rem,5.2vw,5.6rem)] font-normal leading-[0.96] tracking-[-0.055em]">
+          Let your website make sales for you.
         </h1>
-        <p className="mt-6 w-full min-w-0 max-w-[560px] text-[14px] leading-7 text-black/52 sm:text-[16px]">
-          One URL. A voice and chat agent that knows your website.
+        <p className="mt-5 w-full min-w-0 max-w-[620px] text-[14px] leading-7 text-black/52 sm:text-[17px]">
+          Trained on your content. Built to answer, qualify, and convert.
         </p>
 
         <form
@@ -161,7 +160,10 @@ function Hero() {
               <Globe2 className="h-4 w-4" />
             </span>
             <div className="min-w-0 flex-1 text-left">
-              <label htmlFor="quick-start-url" className="sr-only">
+              <label
+                htmlFor="quick-start-url"
+                className="block text-[9px] font-semibold uppercase tracking-[0.16em] text-black/38"
+              >
                 Your website URL
               </label>
               <input
@@ -171,7 +173,7 @@ function Hero() {
                 required
                 autoComplete="url"
                 placeholder="Enter your website URL"
-                className="h-8 w-full min-w-0 bg-transparent text-[14px] text-[#17171a] outline-none selection:bg-[#ff5c7a]/25 placeholder:text-black/35"
+                className="h-6 w-full min-w-0 bg-transparent text-[14px] text-[#17171a] outline-none selection:bg-[#ff5c7a]/25 placeholder:text-black/35"
               />
             </div>
           </div>
