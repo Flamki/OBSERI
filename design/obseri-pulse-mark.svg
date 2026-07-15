@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Obseri Pulse mark</title>
+  <desc id="desc">A five-lobed pulse ring representing knowledge, personality, voice, action, and outcomes.</desc>
+  <defs>
+    <mask id="pulse-hole" maskUnits="userSpaceOnUse" x="0" y="0" width="128" height="128">
+      <rect width="128" height="128" fill="white"/>
+      <circle cx="64" cy="64" r="28" fill="black"/>
+    </mask>
+  </defs>
+  <g fill="#ff5c7a" mask="url(#pulse-hole)">
+    <circle cx="64" cy="40" r="31.5"/>
+    <circle cx="86.83" cy="56.58" r="31.5"/>
+    <circle cx="78.11" cy="83.42" r="31.5"/>
+    <circle cx="49.89" cy="83.42" r="31.5"/>
+    <circle cx="41.17" cy="56.58" r="31.5"/>
+  </g>
+</svg>

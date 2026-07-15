@@ -529,15 +529,19 @@ function Sidebar({
         >
           <Link
             to="/"
-            className="overflow-hidden text-xl font-extrabold tracking-[-0.04em]"
+            className="inline-flex min-w-0 items-center overflow-hidden"
             aria-label="Obseri home"
           >
-            <span className={collapsed ? "lg:hidden" : ""}>
-              Obseri<span className="text-[#74a83b]">.</span>
-            </span>
-            <span className={`hidden text-lg ${collapsed ? "lg:inline" : ""}`}>
-              O<span className="text-[#74a83b]">.</span>
-            </span>
+            <img
+              src="/obseri-logo-dark.svg"
+              alt=""
+              className={`h-7 w-auto ${collapsed ? "lg:hidden" : ""}`}
+            />
+            <img
+              src="/obseri-pulse-mark.svg"
+              alt=""
+              className={`hidden h-8 w-8 ${collapsed ? "lg:block" : ""}`}
+            />
           </Link>
           <button
             onClick={onClose}
@@ -744,7 +748,7 @@ function Topbar({
             aria-expanded={setupOpen}
             title={`${completeSteps} of ${setupSteps.length} setup steps complete`}
           >
-            O<span className="text-[#76aa41]">.</span>
+            <img src="/obseri-pulse-mark.svg" alt="" className="h-5 w-5" />
             <span
               className={`absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-white px-0.5 text-[8px] font-bold tracking-normal text-white ${completeSteps === setupSteps.length && setupSteps.length ? "bg-[#65953a]" : "bg-[#20231f]"}`}
             >

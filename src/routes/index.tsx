@@ -51,8 +51,8 @@ function Hero() {
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-black/40" />
 
       <header className="absolute inset-x-0 top-0 z-20 mx-auto flex h-24 w-full max-w-[1500px] items-center justify-between px-6 lg:px-10">
-        <Link to="/" className="text-xl font-extrabold tracking-[-0.05em]">
-          Obseri<span className="text-[#b7f774]">.</span>
+        <Link to="/" aria-label="Obseri home" className="inline-flex items-center">
+          <img src="/obseri-logo-light.svg" alt="Obseri" className="h-8 w-auto" />
         </Link>
         <nav className="hidden items-center gap-8 text-[12px] font-medium text-white/55 md:flex">
           <a href="#how" className="transition hover:text-white">

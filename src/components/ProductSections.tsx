@@ -436,9 +436,7 @@ function Footer() {
   return (
     <footer className="px-6 py-10 lg:px-10">
       <div className="mx-auto flex max-w-[1320px] flex-col gap-6 border-t border-black/8 pt-8 text-[10px] text-black/35 sm:flex-row sm:items-center sm:justify-between">
-        <span className="text-lg font-extrabold tracking-[-0.05em] text-[#181b18]">
-          Obseri<span className="text-[#73a646]">.</span>
-        </span>
+        <img src="/obseri-logo-dark.svg" alt="Obseri" className="h-7 w-auto" />
         <span>Knowledge · Personality · Voice · Presence</span>
         <a
           href="https://github.com/jamiepine/voicebox"

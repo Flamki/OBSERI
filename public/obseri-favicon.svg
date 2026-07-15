@@ -1,13 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Obseri">
-  <rect width="64" height="64" rx="14" fill="#081104"/>
-  <circle cx="46" cy="45" r="7" fill="#b6ff1a"/>
-  <text
-    x="10"
-    y="41"
-    fill="#fffbea"
-    font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-    font-size="34"
-    font-weight="900"
-    letter-spacing="-1"
-  >O</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">Obseri</title>
+  <rect width="128" height="128" rx="30" fill="#0b0b0d"/>
+  <defs>
+    <mask id="favicon-hole" maskUnits="userSpaceOnUse" x="0" y="0" width="128" height="128">
+      <rect width="128" height="128" fill="white"/>
+      <circle cx="64" cy="64" r="22" fill="black"/>
+    </mask>
+  </defs>
+  <g fill="#ff5c7a" mask="url(#favicon-hole)">
+    <circle cx="64" cy="45.1" r="25"/>
+    <circle cx="81.98" cy="58.1" r="25"/>
+    <circle cx="75.11" cy="79.9" r="25"/>
+    <circle cx="52.89" cy="79.9" r="25"/>
+    <circle cx="46.02" cy="58.1" r="25"/>
+  </g>
 </svg>
