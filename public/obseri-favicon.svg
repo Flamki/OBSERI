@@ -2,16 +2,19 @@
   <title id="title">Obseri</title>
   <rect width="128" height="128" rx="30" fill="#0b0b0d"/>
   <defs>
-    <mask id="favicon-hole" maskUnits="userSpaceOnUse" x="0" y="0" width="128" height="128">
-      <rect width="128" height="128" fill="white"/>
-      <circle cx="64" cy="64" r="22" fill="black"/>
+    <ellipse id="favicon-loop" cx="64" cy="38.2" rx="12.04" ry="23.22"/>
+    <mask id="favicon-weave" maskUnits="userSpaceOnUse" x="0" y="0" width="128" height="128">
+      <rect width="128" height="128" fill="black"/>
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <use href="#favicon-loop" stroke="white" stroke-width="7"/>
+        <g transform="rotate(51.4286 64 64)"><use href="#favicon-loop" stroke="black" stroke-width="12"/><use href="#favicon-loop" stroke="white" stroke-width="7"/></g>
+        <g transform="rotate(102.8571 64 64)"><use href="#favicon-loop" stroke="black" stroke-width="12"/><use href="#favicon-loop" stroke="white" stroke-width="7"/></g>
+        <g transform="rotate(154.2857 64 64)"><use href="#favicon-loop" stroke="black" stroke-width="12"/><use href="#favicon-loop" stroke="white" stroke-width="7"/></g>
+        <g transform="rotate(205.7143 64 64)"><use href="#favicon-loop" stroke="black" stroke-width="12"/><use href="#favicon-loop" stroke="white" stroke-width="7"/></g>
+        <g transform="rotate(257.1429 64 64)"><use href="#favicon-loop" stroke="black" stroke-width="12"/><use href="#favicon-loop" stroke="white" stroke-width="7"/></g>
+        <g transform="rotate(308.5714 64 64)"><use href="#favicon-loop" stroke="black" stroke-width="12"/><use href="#favicon-loop" stroke="white" stroke-width="7"/></g>
+      </g>
     </mask>
   </defs>
-  <g fill="#ff5c7a" mask="url(#favicon-hole)">
-    <circle cx="64" cy="45.1" r="25"/>
-    <circle cx="81.98" cy="58.1" r="25"/>
-    <circle cx="75.11" cy="79.9" r="25"/>
-    <circle cx="52.89" cy="79.9" r="25"/>
-    <circle cx="46.02" cy="58.1" r="25"/>
-  </g>
+  <rect width="128" height="128" fill="#ff5c7a" mask="url(#favicon-weave)"/>
 </svg>

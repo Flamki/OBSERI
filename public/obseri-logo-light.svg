@@ -1,19 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 128" role="img" aria-labelledby="title desc">
   <title id="title">Obseri</title>
-  <desc id="desc">Obseri Pulse mark and light wordmark.</desc>
+  <desc id="desc">Obseri woven pulse mark and light wordmark.</desc>
   <defs>
-    <mask id="logo-pulse-hole" maskUnits="userSpaceOnUse" x="0" y="0" width="128" height="128">
-      <rect width="128" height="128" fill="white"/>
-      <circle cx="64" cy="64" r="28" fill="black"/>
+    <ellipse id="logo-pulse-loop" cx="64" cy="34" rx="14" ry="27"/>
+    <mask id="logo-woven-pulse" maskUnits="userSpaceOnUse" x="0" y="0" width="128" height="128">
+      <rect width="128" height="128" fill="black"/>
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <use href="#logo-pulse-loop" stroke="white" stroke-width="7"/>
+        <g transform="rotate(51.4286 64 64)"><use href="#logo-pulse-loop" stroke="black" stroke-width="13"/><use href="#logo-pulse-loop" stroke="white" stroke-width="7"/></g>
+        <g transform="rotate(102.8571 64 64)"><use href="#logo-pulse-loop" stroke="black" stroke-width="13"/><use href="#logo-pulse-loop" stroke="white" stroke-width="7"/></g>
+        <g transform="rotate(154.2857 64 64)"><use href="#logo-pulse-loop" stroke="black" stroke-width="13"/><use href="#logo-pulse-loop" stroke="white" stroke-width="7"/></g>
+        <g transform="rotate(205.7143 64 64)"><use href="#logo-pulse-loop" stroke="black" stroke-width="13"/><use href="#logo-pulse-loop" stroke="white" stroke-width="7"/></g>
+        <g transform="rotate(257.1429 64 64)"><use href="#logo-pulse-loop" stroke="black" stroke-width="13"/><use href="#logo-pulse-loop" stroke="white" stroke-width="7"/></g>
+        <g transform="rotate(308.5714 64 64)"><use href="#logo-pulse-loop" stroke="black" stroke-width="13"/><use href="#logo-pulse-loop" stroke="white" stroke-width="7"/></g>
+      </g>
     </mask>
   </defs>
-  <g fill="#ff5c7a" mask="url(#logo-pulse-hole)">
-    <circle cx="64" cy="40" r="31.5"/>
-    <circle cx="86.83" cy="56.58" r="31.5"/>
-    <circle cx="78.11" cy="83.42" r="31.5"/>
-    <circle cx="49.89" cy="83.42" r="31.5"/>
-    <circle cx="41.17" cy="56.58" r="31.5"/>
-  </g>
+  <rect width="128" height="128" fill="#ff5c7a" mask="url(#logo-woven-pulse)"/>
   <text x="152" y="91" fill="#f7f5f2" font-family="Avenir Next, Inter, Segoe UI, Arial, sans-serif" font-size="80" font-weight="400" letter-spacing="1" textLength="223" lengthAdjust="spacingAndGlyphs">obser</text>
   <rect x="365" y="51" width="8" height="40" rx="4" fill="#f7f5f2"/>
   <circle cx="369" cy="34" r="6" fill="#ff5c7a"/>
