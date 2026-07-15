@@ -101,8 +101,8 @@ function Index() {
 
 function Hero() {
   return (
-    <section className="relative min-h-[900px] w-full min-w-0 overflow-hidden bg-[#f4f4ef] text-[#151518]">
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,#ff8d78_0%,#f5a18f_24%,#dedcf0_57%,#f4f4ef_92%)]" />
+    <section className="relative min-h-[820px] w-full min-w-0 overflow-hidden bg-[#f4f4ef] text-[#151518] sm:min-h-[860px] lg:min-h-[900px]">
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,#ff8b78_0%,#f7a293_22%,#e3deed_58%,#f4f4ef_94%)]" />
       <div className="absolute inset-0 opacity-[0.14] mix-blend-soft-light">
         <PrismaticBurst
           animationType="rotate3d"
@@ -115,7 +115,8 @@ function Hero() {
           colors={["#ff5c7a", "#ff9c89", "#ffd1c7", "#9e91c9", "#f7f5f2"]}
         />
       </div>
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_34%,rgba(255,245,239,.22),transparent_35%),linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.18)_62%,#f4f4ef_100%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_30%,rgba(255,220,207,.32),transparent_24%),radial-gradient(circle_at_82%_40%,rgba(163,150,210,.18),transparent_25%),radial-gradient(circle_at_50%_32%,rgba(255,247,242,.2),transparent_35%),linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.16)_62%,#f4f4ef_100%)]" />
+      <div className="pointer-events-none absolute left-1/2 top-[44%] h-[420px] w-[760px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/10 blur-[90px]" />
 
       <header className="absolute inset-x-4 top-4 z-20 mx-auto flex h-[72px] max-w-[1460px] items-center justify-between rounded-full border border-white/65 bg-[#fff8f0]/80 px-5 shadow-[0_16px_50px_rgba(72,31,38,.08),inset_0_1px_0_rgba(255,255,255,.9)] backdrop-blur-2xl sm:inset-x-6 sm:px-7 lg:top-5 lg:px-9">
         <Link to="/" aria-label="Obseri home" className="inline-flex items-center">
@@ -140,20 +141,20 @@ function Hero() {
         </Link>
       </header>
 
-      <div className="relative z-10 mx-auto flex min-h-[900px] w-full min-w-0 max-w-[1500px] flex-col items-center justify-center px-6 pb-24 pt-36 text-center lg:px-10">
-        <div className="mb-8 flex items-center gap-4 sm:gap-5">
+      <div className="relative z-10 mx-auto flex min-h-[820px] w-full min-w-0 max-w-[1500px] flex-col items-center justify-start px-6 pb-14 pt-[150px] text-center sm:min-h-[860px] sm:pt-[164px] lg:min-h-[900px] lg:px-10 lg:pt-[176px]">
+        <div className="mb-5 flex items-center gap-4 sm:gap-5">
           <span className="h-px w-10 bg-[#8e4a57]/25 sm:w-16" />
           <img src="/obseri-pulse-mark.svg" alt="" className="h-9 w-9" />
           <span className="h-px w-10 bg-[#8e4a57]/25 sm:w-16" />
         </div>
-        <p className="mb-7 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#6c3942]/80">
+        <p className="mb-5 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#6c3942]/80">
           Website intelligence that can speak
         </p>
-        <h1 className="w-full min-w-0 max-w-[1120px] [font-family:Georgia,'Times_New_Roman',serif] text-[clamp(3.7rem,7.7vw,7.6rem)] font-normal leading-[0.91] tracking-[-0.065em]">
+        <h1 className="w-full min-w-0 max-w-[1080px] [font-family:Georgia,'Times_New_Roman',serif] text-[clamp(3.45rem,7.1vw,7.15rem)] font-normal leading-[0.9] tracking-[-0.064em]">
           <span className="block sm:whitespace-nowrap">Your website,</span>
           <span className="block text-[#8e3145]">ready to talk.</span>
         </h1>
-        <p className="mt-7 w-full min-w-0 max-w-[650px] text-[14px] leading-7 text-black/58 sm:text-[16px] sm:leading-8">
+        <p className="mt-6 w-full min-w-0 max-w-[650px] text-[14px] leading-7 text-black/58 sm:text-[16px] sm:leading-8">
           Obseri learns every page, takes on your personality, and helps visitors by voice or
           text&mdash;grounded in the sources you control.
         </p>
@@ -161,9 +162,9 @@ function Hero() {
         <form
           action="/app"
           method="get"
-          className="group relative mt-10 flex w-full min-w-0 max-w-[740px] flex-col gap-2 overflow-hidden rounded-[1.65rem] border border-white/80 bg-[#fffaf4]/78 p-1.5 shadow-[0_24px_80px_rgba(94,43,53,.13),inset_0_1px_0_rgba(255,255,255,.94)] backdrop-blur-2xl transition duration-300 focus-within:border-[#ff5c7a]/35 sm:flex-row sm:rounded-full"
+          className="group relative mt-7 flex w-full min-w-0 max-w-[760px] flex-col items-stretch gap-2 overflow-hidden rounded-[1.65rem] border border-white/85 bg-[#fffaf5]/82 p-1.5 shadow-[0_24px_80px_rgba(94,43,53,.13),inset_0_1px_0_rgba(255,255,255,.96)] backdrop-blur-2xl transition-[border-color,box-shadow,transform] duration-300 focus-within:-translate-y-0.5 focus-within:border-[#ff5c7a]/55 focus-within:shadow-[0_28px_90px_rgba(94,43,53,.16),0_0_0_4px_rgba(255,92,122,.10),0_0_65px_rgba(255,92,122,.28),inset_0_1px_0_rgba(255,255,255,.98)] sm:flex-row sm:items-center sm:rounded-full"
         >
-          <div className="flex min-w-0 flex-1 items-center gap-3 px-3 py-1 sm:px-4 sm:py-0">
+          <div className="flex min-h-14 min-w-0 flex-1 items-center gap-3 px-3 py-1 sm:px-4 sm:py-0">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/7 bg-white/55 text-black/38 transition group-focus-within:border-[#ff5c7a]/30 group-focus-within:text-[#d94763]">
               <Globe2 className="h-4 w-4" />
             </span>
@@ -181,13 +182,13 @@ function Hero() {
                 required
                 autoComplete="url"
                 placeholder="https://yourwebsite.com"
-                className="h-6 w-full min-w-0 bg-transparent text-[14px] text-[#17171a] outline-none placeholder:text-black/35"
+                className="h-6 w-full min-w-0 bg-transparent text-[14px] text-[#17171a] outline-none selection:bg-[#ff5c7a]/25 placeholder:text-black/35"
               />
             </div>
           </div>
           <button
             type="submit"
-            className="inline-flex h-14 shrink-0 items-center justify-center gap-3 rounded-[1.25rem] bg-[#17171a] px-7 text-[12px] font-bold text-white shadow-[0_10px_30px_rgba(21,21,24,.16)] transition duration-300 hover:bg-[#ff5c7a] sm:rounded-full"
+            className="inline-flex h-14 shrink-0 items-center justify-center gap-3 rounded-[1.25rem] bg-[#17171a] px-7 text-[12px] font-bold text-white shadow-[0_10px_30px_rgba(21,21,24,.16)] transition-[background-color,box-shadow,transform] duration-300 hover:-translate-y-px hover:bg-[#ff5c7a] hover:shadow-[0_12px_34px_rgba(255,92,122,.28)] active:translate-y-0 sm:rounded-full"
           >
             Build its soul
             <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
