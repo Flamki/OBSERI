@@ -141,22 +141,14 @@ function Hero() {
         </Link>
       </header>
 
-      <div className="relative z-10 mx-auto flex min-h-[820px] w-full min-w-0 max-w-[1500px] flex-col items-center justify-start px-6 pb-14 pt-[150px] text-center sm:min-h-[860px] sm:pt-[164px] lg:min-h-[900px] lg:px-10 lg:pt-[176px]">
-        <div className="mb-5 flex items-center gap-4 sm:gap-5">
-          <span className="h-px w-10 bg-[#8e4a57]/25 sm:w-16" />
-          <img src="/obseri-pulse-mark.svg" alt="" className="h-9 w-9" />
-          <span className="h-px w-10 bg-[#8e4a57]/25 sm:w-16" />
-        </div>
-        <p className="mb-5 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#6c3942]/80">
-          Website intelligence that can speak
-        </p>
-        <h1 className="w-full min-w-0 max-w-[1080px] [font-family:Georgia,'Times_New_Roman',serif] text-[clamp(3.45rem,7.1vw,7.15rem)] font-normal leading-[0.9] tracking-[-0.064em]">
-          <span className="block sm:whitespace-nowrap">Your website,</span>
-          <span className="block text-[#8e3145]">ready to talk.</span>
+      <div className="relative z-10 mx-auto flex min-h-[820px] w-full min-w-0 max-w-[1500px] flex-col items-center justify-center px-6 pb-16 pt-28 text-center sm:min-h-[860px] lg:min-h-[900px] lg:px-10">
+        <img src="/obseri-pulse-mark.svg" alt="" className="mb-7 h-10 w-10" />
+        <h1 className="w-full min-w-0 max-w-[1040px] [font-family:'Avenir_Next','Segoe_UI',ui-sans-serif,sans-serif] text-[clamp(3.35rem,6.8vw,6.9rem)] font-medium leading-[0.9] tracking-[-0.068em]">
+          <span className="block sm:whitespace-nowrap">Your website.</span>
+          <span className="block text-[#8e3145]">Ready to talk.</span>
         </h1>
-        <p className="mt-6 w-full min-w-0 max-w-[650px] text-[14px] leading-7 text-black/58 sm:text-[16px] sm:leading-8">
-          Obseri learns every page, takes on your personality, and helps visitors by voice or
-          text&mdash;grounded in the sources you control.
+        <p className="mt-6 w-full min-w-0 max-w-[560px] text-[14px] leading-7 text-black/52 sm:text-[16px]">
+          One URL. A voice and chat agent that knows your website.
         </p>
 
         <form
@@ -169,10 +161,7 @@ function Hero() {
               <Globe2 className="h-4 w-4" />
             </span>
             <div className="min-w-0 flex-1 text-left">
-              <label
-                htmlFor="quick-start-url"
-                className="block text-[9px] font-semibold uppercase tracking-[0.16em] text-black/38"
-              >
+              <label htmlFor="quick-start-url" className="sr-only">
                 Your website URL
               </label>
               <input
@@ -181,8 +170,8 @@ function Hero() {
                 type="url"
                 required
                 autoComplete="url"
-                placeholder="https://yourwebsite.com"
-                className="h-6 w-full min-w-0 bg-transparent text-[14px] text-[#17171a] outline-none selection:bg-[#ff5c7a]/25 placeholder:text-black/35"
+                placeholder="Enter your website URL"
+                className="h-8 w-full min-w-0 bg-transparent text-[14px] text-[#17171a] outline-none selection:bg-[#ff5c7a]/25 placeholder:text-black/35"
               />
             </div>
           </div>
@@ -194,18 +183,6 @@ function Hero() {
             <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
           </button>
         </form>
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[10px] font-medium text-black/40">
-          <span className="inline-flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#ff5c7a] shadow-[0_0_12px_rgba(255,92,122,.45)]" />
-            Start from one URL
-          </span>
-          <a
-            href="#how"
-            className="inline-flex items-center gap-1.5 transition hover:text-black/75"
-          >
-            See how it works <ArrowRight className="h-3 w-3" />
-          </a>
-        </div>
       </div>
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[12] h-28 bg-[linear-gradient(to_bottom,transparent,#f4f4ef)]" />
     </section>
