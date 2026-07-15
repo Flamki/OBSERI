@@ -77,7 +77,7 @@ function HowItWorks() {
           <div>
             <Eyebrow>Simple by design</Eyebrow>
             <h2 className="mt-6 max-w-xl text-4xl font-semibold leading-[0.98] tracking-[-0.055em] sm:text-6xl">
-              From website to presence in three moves.
+              Turn your website into an AI voice agent in three moves.
             </h2>
           </div>
           <p className="max-w-xl text-[15px] leading-7 text-black/48 lg:justify-self-end">
@@ -120,7 +120,7 @@ function StudioSection() {
         <div className="grid min-h-[610px] items-center px-7 py-16 sm:px-12 lg:grid-cols-[0.72fr_1.28fr] lg:px-20">
           <div className="relative z-20 max-w-[430px] pb-[440px] lg:pb-0">
             <h2 className="text-4xl font-semibold leading-[0.98] tracking-[-0.05em] sm:text-5xl">
-              One URL becomes living knowledge.
+              Train an AI chatbot on your website—automatically.
             </h2>
             <p className="mt-5 max-w-sm text-lg leading-7 text-white/42">
               Crawl every page. Keep it current. Verify every answer.
@@ -284,7 +284,7 @@ function IdentitySection() {
         <div className="max-w-3xl">
           <Eyebrow>More than answers</Eyebrow>
           <h2 className="mt-6 text-4xl font-semibold leading-[0.98] tracking-[-0.055em] sm:text-6xl">
-            Knowledge gives it a mind. You give it a character.
+            A website assistant that speaks in your brand’s voice.
           </h2>
         </div>
         <div className="mt-16 grid gap-4 lg:grid-cols-2">
@@ -414,7 +414,7 @@ function FinalCta() {
         <div className="relative max-w-4xl">
           <MessageCircle className="mx-auto h-6 w-6 text-[#b7f774]" />
           <h2 className="mt-8 text-5xl font-semibold leading-[0.9] tracking-[-0.065em] sm:text-7xl lg:text-8xl">
-            Your website has something to say.
+            Build an AI assistant your visitors can talk to.
           </h2>
           <p className="mx-auto mt-7 max-w-xl text-[14px] leading-7 text-white/42">
             Give Obseri the URL. Shape the soul. Let every visitor meet the most useful version of

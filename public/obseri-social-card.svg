@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Obseri — AI voice agent for your website</title>
+  <desc id="desc">Obseri turns website content into a source-grounded voice and text AI assistant.</desc>
+  <defs>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="translate(930 175) rotate(135) scale(520 420)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff5c7a" stop-opacity=".27"/>
+      <stop offset="1" stop-color="#ff5c7a" stop-opacity="0"/>
+    </radialGradient>
+    <ellipse id="social-loop" cx="64" cy="34" rx="14" ry="27"/>
+    <mask id="social-weave" maskUnits="userSpaceOnUse" x="0" y="0" width="128" height="128">
+      <rect width="128" height="128" fill="black"/>
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <use href="#social-loop" stroke="white" stroke-width="7"/>
+        <g transform="rotate(51.4286 64 64)"><use href="#social-loop" stroke="black" stroke-width="13"/><use href="#social-loop" stroke="white" stroke-width="7"/></g>
+        <g transform="rotate(102.8571 64 64)"><use href="#social-loop" stroke="black" stroke-width="13"/><use href="#social-loop" stroke="white" stroke-width="7"/></g>
+        <g transform="rotate(154.2857 64 64)"><use href="#social-loop" stroke="black" stroke-width="13"/><use href="#social-loop" stroke="white" stroke-width="7"/></g>
+        <g transform="rotate(205.7143 64 64)"><use href="#social-loop" stroke="black" stroke-width="13"/><use href="#social-loop" stroke="white" stroke-width="7"/></g>
+        <g transform="rotate(257.1429 64 64)"><use href="#social-loop" stroke="black" stroke-width="13"/><use href="#social-loop" stroke="white" stroke-width="7"/></g>
+        <g transform="rotate(308.5714 64 64)"><use href="#social-loop" stroke="black" stroke-width="13"/><use href="#social-loop" stroke="white" stroke-width="7"/></g>
+      </g>
+    </mask>
+  </defs>
+  <rect width="1200" height="630" fill="#0b0b0d"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <g transform="translate(70 54) scale(.64)">
+    <rect width="128" height="128" fill="#ff5c7a" mask="url(#social-weave)"/>
+  </g>
+  <text x="170" y="116" fill="#f7f5f2" font-family="Avenir Next, Inter, Segoe UI, Arial, sans-serif" font-size="54" font-weight="400">obseri</text>
+  <circle cx="325" cy="72" r="5" fill="#ff5c7a"/>
+  <text x="72" y="276" fill="#f7f5f2" font-family="Avenir Next, Inter, Segoe UI, Arial, sans-serif" font-size="67" font-weight="600" letter-spacing="-2">Your website’s AI voice agent.</text>
+  <text x="75" y="342" fill="#a9a8ad" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="27">Trained on your content. Grounded in visible sources.</text>
+  <g transform="translate(72 443)">
+    <rect width="795" height="74" rx="37" fill="#151518" stroke="#36363b"/>
+    <circle cx="38" cy="37" r="6" fill="#ff5c7a"/>
+    <text x="62" y="46" fill="#d8d7da" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="22">Website chatbot · Natural voice · One-line embed</text>
+  </g>
+  <text x="72" y="575" fill="#6f6e74" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="19">OBSERI.COM</text>
+</svg>

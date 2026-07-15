@@ -44,9 +44,28 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+function redirectToCanonicalHost(request: Request): Response | undefined {
+  const url = new URL(request.url);
+  const forwardedHost = request.headers
+    .get("x-forwarded-host")
+    ?.split(",")[0]
+    ?.trim()
+    .toLowerCase();
+  const host = forwardedHost || url.hostname.toLowerCase();
+  if (host !== "www.obseri.com") return undefined;
+
+  url.protocol = "https:";
+  url.hostname = "obseri.com";
+  url.port = "";
+  return Response.redirect(url, 308);
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const canonicalRedirect = redirectToCanonicalHost(request);
+      if (canonicalRedirect) return canonicalRedirect;
+
       if (env && typeof env === "object") {
         (
           globalThis as typeof globalThis & {

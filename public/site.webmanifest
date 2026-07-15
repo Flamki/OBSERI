@@ -1,0 +1,21 @@
+{
+  "name": "Obseri — AI Voice Agent for Your Website",
+  "short_name": "Obseri",
+  "description": "A voice and text AI assistant trained on your website content.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0b0d",
+  "theme_color": "#0b0b0d",
+  "icons": [
+    {
+      "src": "/obseri-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/obseri-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

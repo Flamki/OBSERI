@@ -1,0 +1,20 @@
+# Obseri
+
+> Obseri turns a website URL into a source-grounded AI voice agent and text chatbot trained on that website's content.
+
+## Product
+
+- [Obseri](https://obseri.com/): Product overview, capabilities, trust model, and quick start.
+- [Soul Studio](https://obseri.com/app): Build and test website knowledge, personality, voice, integrations, and conversations.
+
+## Core capabilities
+
+- Advanced website crawling with robots.txt, sitemap, canonical URL, deduplication, and incremental refresh support.
+- Source-grounded retrieval with citations and pre-launch retrieval testing.
+- Custom personality, greeting, boundaries, escalation behavior, and lead intent.
+- Real-time voice and text website assistant experiences.
+- Embeddable website widget, signed events, and webhook integrations.
+
+## Contact
+
+- Email: flamki@obseri.com

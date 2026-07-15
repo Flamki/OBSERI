@@ -68,6 +68,7 @@ export const Route = createFileRoute("/app")({
         name: "description",
         content: "Build the knowledge, personality, voice, and presence behind your website.",
       },
+      { name: "robots", content: "noindex, nofollow, noarchive" },
     ],
   }),
   component: SoulStudio,

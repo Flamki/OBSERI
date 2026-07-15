@@ -89,6 +89,34 @@ Last verified on **15 July 2026**:
 - All 50 enabled Kokoro preset voices return valid WAV audio locally
 - No API keys or local environment files are tracked by Git
 
+## Search and discovery
+
+The public landing page targets high-intent language that matches how buyers describe the product:
+
+- AI chatbot for a website
+- AI chatbot trained on website content
+- AI voice agent for a website
+- voice and text website assistant
+- source-grounded customer support chatbot
+
+Technical search assets are shipped from stable public URLs:
+
+- `/favicon.ico` and `/obseri-favicon.svg` use the same Obseri woven mark
+- `/robots.txt` allows the public site and protects API and widget endpoints
+- `/sitemap.xml` lists canonical indexable pages
+- `/llms.txt` provides a concise product description for AI discovery systems
+- `/site.webmanifest` provides installable product identity and icons
+- `/obseri-social-card.png` supplies a 1200x630 Open Graph and social preview
+- `/obseri-search-logo.png` supplies the crawlable 512x512 organization logo
+
+The home page includes a self-referencing canonical URL, complete Open Graph and Twitter metadata,
+and JSON-LD for `Organization`, `WebSite`, and `SoftwareApplication`. Soul Studio and embedded widget
+routes are excluded from search results because they contain customer-specific application state.
+
+After a brand or metadata release, use Google Search Console to submit `/sitemap.xml`, inspect
+`https://obseri.com/`, and request re-indexing. Search engines control recrawl timing, so a previous
+favicon or snippet may remain visible until their cached result is refreshed.
+
 Run the same code gates locally:
 
 ```powershell

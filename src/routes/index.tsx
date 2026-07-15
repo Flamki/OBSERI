@@ -6,19 +6,86 @@ import ProductSections from "@/components/ProductSections";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Obseri — Give your interface a soul" },
+      { title: "AI Voice Agent & Website Chatbot Trained on Your Content | Obseri" },
       {
         name: "description",
         content:
-          "Turn any website into a source-grounded conversational presence with deep knowledge, a designed personality, and a natural voice.",
+          "Turn your website into an AI voice agent and chatbot trained on your content. Crawl pages, shape its personality, test answers, and embed it in minutes.",
       },
-      { property: "og:title", content: "Obseri — Give your interface a soul" },
+      { property: "og:title", content: "Obseri — AI Voice Agent for Your Website" },
       {
         property: "og:description",
         content:
-          "A deeply knowledgeable AI presence for your website—grounded in your content, shaped by you, and ready to speak.",
+          "Build a voice and text AI assistant trained on your website content, grounded in visible sources, and shaped to sound like your brand.",
+      },
+      { property: "og:url", content: "https://obseri.com/" },
+      { property: "og:image", content: "https://obseri.com/obseri-social-card.png" },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+      { property: "og:image:alt", content: "Obseri AI voice agent and website chatbot" },
+      { name: "twitter:title", content: "Obseri — AI Voice Agent for Your Website" },
+      {
+        name: "twitter:description",
+        content: "A voice and text AI assistant trained on your website content.",
+      },
+      { name: "twitter:image", content: "https://obseri.com/obseri-social-card.png" },
+      {
+        "script:ld+json": {
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "Organization",
+              "@id": "https://obseri.com/#organization",
+              name: "Obseri",
+              alternateName: "Obseri AI",
+              url: "https://obseri.com/",
+              email: "flamki@obseri.com",
+              logo: {
+                "@type": "ImageObject",
+                url: "https://obseri.com/obseri-search-logo.png",
+                contentUrl: "https://obseri.com/obseri-search-logo.png",
+                width: 512,
+                height: 512,
+              },
+              description:
+                "Obseri builds source-grounded AI voice agents and website chatbots trained on a business's own content.",
+            },
+            {
+              "@type": "WebSite",
+              "@id": "https://obseri.com/#website",
+              url: "https://obseri.com/",
+              name: "Obseri",
+              alternateName: "Obseri AI",
+              description: "AI voice agents and website chatbots trained on your content.",
+              publisher: { "@id": "https://obseri.com/#organization" },
+              inLanguage: "en",
+            },
+            {
+              "@type": "SoftwareApplication",
+              "@id": "https://obseri.com/#software",
+              name: "Obseri Soul Studio",
+              url: "https://obseri.com/",
+              applicationCategory: "BusinessApplication",
+              applicationSubCategory: "Conversational AI",
+              operatingSystem: "Web",
+              isAccessibleForFree: true,
+              description:
+                "Create a source-grounded AI voice agent and website chatbot from your website URL, then customize its personality, test retrieval, and embed it on your site.",
+              featureList: [
+                "Advanced website crawling and content refresh",
+                "Source-grounded AI answers with citations",
+                "Voice and text conversations",
+                "Custom assistant personality",
+                "Retrieval testing before launch",
+                "Embeddable website widget and signed webhooks",
+              ],
+              publisher: { "@id": "https://obseri.com/#organization" },
+            },
+          ],
+        },
       },
     ],
+    links: [{ rel: "canonical", href: "https://obseri.com/" }],
   }),
   component: Index,
 });
@@ -123,7 +190,7 @@ function Hero() {
         <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[10px] font-medium text-white/38">
           <span className="inline-flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-[#b7f774] shadow-[0_0_12px_rgba(183,247,116,.7)]" />
-            No setup required
+            Start from one URL
           </span>
           <a
             href="#how"

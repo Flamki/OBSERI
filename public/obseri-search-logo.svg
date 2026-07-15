@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Obseri</title>
+  <rect width="512" height="512" rx="112" fill="#ffffff"/>
+  <g transform="translate(64 64) scale(3)">
+    <defs>
+      <ellipse id="search-loop" cx="64" cy="34" rx="14" ry="27"/>
+      <mask id="search-weave" maskUnits="userSpaceOnUse" x="0" y="0" width="128" height="128">
+        <rect width="128" height="128" fill="black"/>
+        <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <use href="#search-loop" stroke="white" stroke-width="7"/>
+          <g transform="rotate(51.4286 64 64)"><use href="#search-loop" stroke="black" stroke-width="13"/><use href="#search-loop" stroke="white" stroke-width="7"/></g>
+          <g transform="rotate(102.8571 64 64)"><use href="#search-loop" stroke="black" stroke-width="13"/><use href="#search-loop" stroke="white" stroke-width="7"/></g>
+          <g transform="rotate(154.2857 64 64)"><use href="#search-loop" stroke="black" stroke-width="13"/><use href="#search-loop" stroke="white" stroke-width="7"/></g>
+          <g transform="rotate(205.7143 64 64)"><use href="#search-loop" stroke="black" stroke-width="13"/><use href="#search-loop" stroke="white" stroke-width="7"/></g>
+          <g transform="rotate(257.1429 64 64)"><use href="#search-loop" stroke="black" stroke-width="13"/><use href="#search-loop" stroke="white" stroke-width="7"/></g>
+          <g transform="rotate(308.5714 64 64)"><use href="#search-loop" stroke="black" stroke-width="13"/><use href="#search-loop" stroke="white" stroke-width="7"/></g>
+        </g>
+      </mask>
+    </defs>
+    <rect width="128" height="128" fill="#ff5c7a" mask="url(#search-weave)"/>
+  </g>
+</svg>
