@@ -118,24 +118,24 @@ function Hero() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_30%,rgba(255,220,207,.32),transparent_24%),radial-gradient(circle_at_82%_40%,rgba(163,150,210,.18),transparent_25%),radial-gradient(circle_at_50%_32%,rgba(255,247,242,.2),transparent_35%),linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.16)_62%,#f4f4ef_100%)]" />
       <div className="pointer-events-none absolute left-1/2 top-[44%] h-[420px] w-[760px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/10 blur-[90px]" />
 
-      <header className="absolute inset-x-4 top-4 z-20 mx-auto flex h-[72px] max-w-[1460px] items-center justify-between rounded-full border border-white/65 bg-[#fff8f0]/80 px-5 shadow-[0_16px_50px_rgba(72,31,38,.08),inset_0_1px_0_rgba(255,255,255,.9)] backdrop-blur-2xl sm:inset-x-6 sm:px-7 lg:top-5 lg:px-9">
+      <header className="absolute left-1/2 top-5 z-20 flex h-[62px] w-[calc(100%-2rem)] max-w-[720px] -translate-x-1/2 items-center justify-between rounded-[1.65rem] border border-white/[0.075] bg-[#111016]/90 px-3.5 shadow-[0_22px_60px_rgba(22,12,20,.24),inset_0_1px_0_rgba(255,255,255,.055)] backdrop-blur-2xl sm:px-5">
         <Link to="/" aria-label="Obseri home" className="inline-flex items-center">
-          <img src="/obseri-logo-dark.svg" alt="Obseri" className="h-7 w-auto sm:h-8" />
+          <img src="/obseri-logo-light.svg" alt="Obseri" className="h-6 w-auto sm:h-7" />
         </Link>
-        <nav className="hidden items-center gap-8 text-[11px] font-semibold text-black/55 md:flex lg:gap-10">
-          <a href="#how" className="transition hover:text-black">
+        <nav className="hidden items-center gap-8 text-[11px] font-medium text-white/42 md:flex">
+          <a href="#how" className="transition duration-200 hover:text-white">
             How it works
           </a>
-          <a href="#studio" className="transition hover:text-black">
+          <a href="#studio" className="transition duration-200 hover:text-white">
             Soul Studio
           </a>
-          <a href="#trust" className="transition hover:text-black">
+          <a href="#trust" className="transition duration-200 hover:text-white">
             Trust
           </a>
         </nav>
         <Link
           to="/app"
-          className="inline-flex h-10 items-center gap-2 rounded-full bg-[#17171a] px-4 text-[11px] font-semibold text-white shadow-[0_8px_24px_rgba(21,21,24,.14)] transition hover:bg-[#ff5c7a] sm:px-5"
+          className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#f8f6f2] px-4 text-[11px] font-semibold text-[#17171a] shadow-[0_8px_22px_rgba(0,0,0,.18),inset_0_1px_0_white] transition duration-200 hover:bg-white hover:shadow-[0_10px_28px_rgba(255,255,255,.16)] sm:px-5"
         >
           Open Studio <ArrowRight className="h-3.5 w-3.5" />
         </Link>
