@@ -3073,44 +3073,51 @@ function PlaygroundView({
               </div>
 
               <div
-                className={`absolute bottom-12 z-30 flex items-center drop-shadow-[0_14px_32px_rgba(0,0,0,.34)] ${
+                className={`absolute bottom-12 z-30 flex items-center rounded-full border border-white/15 bg-[#11140f]/90 p-1.5 shadow-[0_16px_40px_rgba(0,0,0,.34)] backdrop-blur-xl ${
                   soul.appearance.position === "bottom-right"
                     ? "right-4 sm:right-5"
                     : "left-4 sm:left-5"
                 }`}
+                role="group"
+                aria-label="Choose conversation mode"
               >
                 <button
                   onClick={() =>
                     setAssistantMode((current) => (current === "voice" ? "closed" : "voice"))
                   }
-                  className={`relative z-10 flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/80 transition hover:-translate-y-0.5 ${
+                  className={`flex h-11 w-11 items-center justify-center rounded-full transition-colors duration-200 ${
                     assistantMode === "voice"
-                      ? "scale-105 text-[#151914] shadow-[0_0_0_3px_rgba(255,255,255,.45)]"
-                      : "text-[#171a16] hover:scale-105"
+                      ? "text-[#151914] shadow-[0_5px_14px_rgba(0,0,0,.24)]"
+                      : "text-white/60 hover:bg-white/10 hover:text-white"
                   }`}
-                  style={{ backgroundColor: soul.appearance.accent }}
+                  style={
+                    assistantMode === "voice"
+                      ? { backgroundColor: soul.appearance.accent }
+                      : undefined
+                  }
                   aria-label={
                     assistantMode === "voice"
                       ? "Close voice conversation"
                       : "Start voice conversation"
                   }
                   aria-expanded={assistantMode === "voice"}
-                  title="Talk by voice"
+                  aria-pressed={assistantMode === "voice"}
                 >
                   <Phone className="h-5 w-5" />
                 </button>
+                <span className="mx-1 h-5 w-px bg-white/10" aria-hidden="true" />
                 <button
                   onClick={() =>
                     setAssistantMode((current) => (current === "chat" ? "closed" : "chat"))
                   }
-                  className={`relative -ml-2 flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/25 bg-[#171a16] text-white transition hover:-translate-y-0.5 hover:bg-black ${
+                  className={`flex h-11 w-11 items-center justify-center rounded-full transition-colors duration-200 ${
                     assistantMode === "chat"
-                      ? "z-20 scale-105 shadow-[0_0_0_3px_rgba(255,255,255,.38)]"
-                      : "z-0 hover:scale-105"
+                      ? "bg-white text-[#151914] shadow-[0_5px_14px_rgba(0,0,0,.24)]"
+                      : "text-white/60 hover:bg-white/10 hover:text-white"
                   }`}
                   aria-label={assistantMode === "chat" ? "Close text chat" : "Open text chat"}
                   aria-expanded={assistantMode === "chat"}
-                  title="Chat by text"
+                  aria-pressed={assistantMode === "chat"}
                 >
                   <MessageCircle className="h-5 w-5" />
                 </button>
@@ -3527,26 +3534,35 @@ function DeployView({
                   )}
                 </div>
                 <div
-                  className={`absolute bottom-4 flex items-center drop-shadow-[0_12px_26px_rgba(0,0,0,.3)] ${soul.appearance.position === "bottom-right" ? "right-4" : "left-4"}`}
+                  className={`absolute bottom-4 flex items-center rounded-full border border-white/15 bg-[#11140f]/90 p-1 shadow-[0_12px_28px_rgba(0,0,0,.3)] backdrop-blur-xl ${soul.appearance.position === "bottom-right" ? "right-4" : "left-4"}`}
+                  role="group"
+                  aria-label="Choose preview mode"
                 >
                   <button
                     onClick={() =>
                       setPreviewMode((current) => (current === "voice" ? "closed" : "voice"))
                     }
-                    className={`relative z-10 flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/80 text-[#171a16] transition ${previewMode === "voice" ? "scale-105 shadow-[0_0_0_3px_rgba(0,0,0,.12)]" : "hover:-translate-y-0.5"}`}
-                    style={{ backgroundColor: soul.appearance.accent }}
+                    className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors duration-200 ${previewMode === "voice" ? "text-[#171a16] shadow-[0_4px_12px_rgba(0,0,0,.22)]" : "text-white/60 hover:bg-white/10 hover:text-white"}`}
+                    style={
+                      previewMode === "voice"
+                        ? { backgroundColor: soul.appearance.accent }
+                        : undefined
+                    }
                     aria-label={
                       previewMode === "voice" ? "Close voice preview" : "Open voice preview"
                     }
+                    aria-pressed={previewMode === "voice"}
                   >
                     <Phone className="h-4 w-4" />
                   </button>
+                  <span className="mx-1 h-4 w-px bg-white/10" aria-hidden="true" />
                   <button
                     onClick={() =>
                       setPreviewMode((current) => (current === "chat" ? "closed" : "chat"))
                     }
-                    className={`relative -ml-2 flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/25 bg-[#171a16] text-white transition ${previewMode === "chat" ? "z-20 scale-105 shadow-[0_0_0_3px_rgba(0,0,0,.12)]" : "hover:-translate-y-0.5"}`}
+                    className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors duration-200 ${previewMode === "chat" ? "bg-white text-[#171a16] shadow-[0_4px_12px_rgba(0,0,0,.22)]" : "text-white/60 hover:bg-white/10 hover:text-white"}`}
                     aria-label={previewMode === "chat" ? "Close chat preview" : "Open chat preview"}
+                    aria-pressed={previewMode === "chat"}
                   >
                     <MessageCircle className="h-4 w-4" />
                   </button>

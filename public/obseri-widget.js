@@ -37,20 +37,15 @@
   launcher.setAttribute("role", "group");
   launcher.setAttribute("aria-label", "Choose how to talk with this website");
   launcher.style.cssText =
-    "margin-top:12px;display:flex;align-items:center;" +
-    (position === "left" ? "justify-content:flex-start;" : "justify-content:flex-end;") +
-    "filter:drop-shadow(0 14px 30px rgba(0,0,0,.34));";
+    "margin-top:12px;display:flex;width:max-content;align-items:center;gap:4px;padding:6px;border:1px solid rgba(255,255,255,.14);border-radius:999px;background:rgba(13,17,13,.9);box-shadow:0 16px 40px rgba(0,0,0,.34);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);" +
+    (position === "left" ? "margin-right:auto;" : "margin-left:auto;");
 
-  var voiceButton = createLauncherButton(
-    "Start voice conversation",
-    phoneIcon(),
-    accent,
-    "#171a16",
-  );
-  voiceButton.style.zIndex = "1";
-
-  var chatButton = createLauncherButton("Open text chat", chatIcon(), "#171a16", "#ffffff");
-  chatButton.style.marginLeft = "-8px";
+  var voiceButton = createLauncherButton("Start voice conversation", phoneIcon());
+  var chatButton = createLauncherButton("Open text chat", chatIcon());
+  var divider = document.createElement("span");
+  divider.setAttribute("aria-hidden", "true");
+  divider.style.cssText =
+    "display:block;width:1px;height:20px;margin:0 1px;background:rgba(255,255,255,.1);";
 
   voiceButton.addEventListener("click", function () {
     toggleMode("voice");
@@ -59,21 +54,19 @@
     toggleMode("chat");
   });
 
-  function createLauncherButton(label, icon, background, color) {
+  function createLauncherButton(label, icon) {
     var button = document.createElement("button");
     button.type = "button";
     button.setAttribute("aria-label", label);
     button.setAttribute("aria-expanded", "false");
-    button.title = label;
     button.innerHTML = icon;
     button.style.cssText =
-      "position:relative;display:flex;width:58px;height:58px;flex:0 0 58px;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,.72);border-radius:999px;padding:0;background:" +
-      background +
-      ";color:" +
-      color +
-      ";box-shadow:0 10px 26px rgba(0,0,0,.22);cursor:pointer;transition:transform 180ms ease,box-shadow 180ms ease,background 180ms ease;";
+      "display:flex;width:44px;height:44px;flex:0 0 44px;align-items:center;justify-content:center;border:0;border-radius:999px;padding:0;background:transparent;color:rgba(255,255,255,.62);box-shadow:none;cursor:pointer;transition:color 180ms ease,box-shadow 180ms ease,background 180ms ease;";
     button.addEventListener("mouseenter", function () {
-      button.style.transform = "translateY(-2px) scale(1.03)";
+      if (button.getAttribute("aria-pressed") !== "true") {
+        button.style.background = "rgba(255,255,255,.09)";
+        button.style.color = "#ffffff";
+      }
     });
     button.addEventListener("mouseleave", function () {
       renderLauncherState();
@@ -101,8 +94,8 @@
   }
 
   function renderLauncherState() {
-    renderButton(voiceButton, open && currentMode === "voice", 2);
-    renderButton(chatButton, open && currentMode === "chat", 3);
+    renderButton(voiceButton, open && currentMode === "voice", "voice");
+    renderButton(chatButton, open && currentMode === "chat", "chat");
     voiceButton.setAttribute("aria-expanded", String(open && currentMode === "voice"));
     chatButton.setAttribute("aria-expanded", String(open && currentMode === "chat"));
     voiceButton.setAttribute(
@@ -113,14 +106,14 @@
       "aria-label",
       open && currentMode === "chat" ? "Close text chat" : "Open text chat",
     );
+    voiceButton.setAttribute("aria-pressed", String(open && currentMode === "voice"));
+    chatButton.setAttribute("aria-pressed", String(open && currentMode === "chat"));
   }
 
-  function renderButton(button, active, activeZIndex) {
-    button.style.transform = active ? "scale(1.06)" : "none";
-    button.style.zIndex = active ? String(activeZIndex) : button === voiceButton ? "1" : "0";
-    button.style.boxShadow = active
-      ? "0 0 0 3px rgba(255,255,255,.44),0 14px 32px rgba(0,0,0,.3)"
-      : "0 10px 26px rgba(0,0,0,.22)";
+  function renderButton(button, active, mode) {
+    button.style.background = active ? (mode === "voice" ? accent : "#ffffff") : "transparent";
+    button.style.color = active ? "#171a16" : "rgba(255,255,255,.62)";
+    button.style.boxShadow = active ? "0 5px 14px rgba(0,0,0,.24)" : "none";
   }
 
   function layout() {
@@ -151,6 +144,7 @@
   renderLauncherState();
   mobile.addEventListener("change", layout);
   launcher.appendChild(voiceButton);
+  launcher.appendChild(divider);
   launcher.appendChild(chatButton);
   root.appendChild(frame);
   root.appendChild(launcher);
