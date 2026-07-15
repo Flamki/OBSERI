@@ -5,6 +5,7 @@ import {
   BookOpen,
   Check,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   CircleHelp,
   Clipboard,
@@ -388,7 +389,7 @@ function SoulStudio() {
           <main
             className={`mx-auto min-h-0 w-full flex-1 ${
               view === "playground"
-                ? "max-w-[1600px] overflow-hidden px-3 py-3 sm:px-5 sm:py-5"
+                ? "max-w-none overflow-hidden p-0"
                 : "max-w-[1240px] overflow-y-auto px-5 py-8 sm:px-8 lg:px-10 lg:py-10"
             }`}
           >
@@ -2840,6 +2841,7 @@ function PlaygroundView({
 }) {
   const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
   const [chatOpen, setChatOpen] = useState(true);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
   const [address, setAddress] = useState(soul.siteUrl);
   const [previewUrl, setPreviewUrl] = useState(soul.siteUrl);
   const [frameKey, setFrameKey] = useState(0);
@@ -2897,9 +2899,9 @@ function PlaygroundView({
   }
 
   return (
-    <div className="grid h-full min-h-0 gap-4 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_310px] lg:overflow-hidden">
-      <section className="flex min-h-[650px] min-w-0 flex-col overflow-hidden rounded-2xl border border-[#dfe1dc] bg-[#e9ebe6] shadow-[0_18px_55px_rgba(31,35,29,.08)] lg:min-h-0">
-        <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-[#dde0da] bg-white px-4 py-2.5">
+    <div className="relative h-full min-h-[560px] overflow-hidden bg-[#e8eae5]">
+      <section className="absolute inset-0 flex min-w-0 flex-col overflow-hidden bg-[#e9ebe6]">
+        <div className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full border border-black/10 bg-white/92 px-2 py-1.5 shadow-md backdrop-blur-xl">
           <div className="flex items-center gap-2">
             <span className="flex items-center gap-1.5 text-xs font-semibold text-[#30332f]">
               <span
@@ -2911,7 +2913,7 @@ function PlaygroundView({
               · {safeHost(previewUrl)}
             </span>
           </div>
-          <div className="flex rounded-lg border border-[#e0e2dd] bg-[#f5f6f3] p-1">
+          <div className="flex rounded-full bg-[#f5f6f3] p-1">
             {(
               [
                 { id: "desktop", label: "Desktop", icon: <Monitor className="h-3.5 w-3.5" /> },
@@ -2924,9 +2926,9 @@ function PlaygroundView({
                 onClick={() => setDevice(option.id)}
                 aria-label={`${option.label} preview`}
                 title={`${option.label} preview`}
-                className={`flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition ${
+                className={`flex h-8 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium transition ${
                   device === option.id
-                    ? "bg-white text-[#20231f] shadow-sm"
+                    ? "bg-[#1c1f1b] text-white shadow-sm"
                     : "text-[#858a82] hover:text-[#343832]"
                 }`}
               >
@@ -2937,11 +2939,11 @@ function PlaygroundView({
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 items-stretch justify-center overflow-auto p-3 sm:p-4">
+        <div className="absolute inset-0 flex items-stretch justify-center overflow-hidden p-0">
           <div
-            className={`flex h-full min-h-[560px] w-full flex-col overflow-hidden rounded-xl border border-black/10 bg-white shadow-[0_18px_48px_rgba(28,33,25,.15)] transition-[max-width] duration-300 ${frameWidth}`}
+            className={`flex h-full min-h-[560px] w-full flex-col overflow-hidden bg-white transition-[max-width,border-radius] duration-300 ${frameWidth} ${device === "desktop" ? "" : "my-3 max-h-[calc(100%-24px)] rounded-2xl border border-black/15 shadow-[0_24px_70px_rgba(25,31,23,.2)]"}`}
           >
-            <div className="flex h-11 shrink-0 items-center gap-3 border-b border-[#e7e9e4] bg-[#f8f8f6] px-3">
+            <div className="hidden h-11 shrink-0 items-center gap-3 border-b border-[#e7e9e4] bg-[#f8f8f6] px-3">
               <div className="hidden gap-1.5 sm:flex">
                 <span className="h-2.5 w-2.5 rounded-full bg-[#ff6b61]" />
                 <span className="h-2.5 w-2.5 rounded-full bg-[#f2bd45]" />
@@ -2984,23 +2986,23 @@ function PlaygroundView({
                 title={`${soul.name} website preview`}
                 referrerPolicy="strict-origin-when-cross-origin"
                 onLoad={() => setFrameLoading(false)}
-                className="absolute inset-0 h-full w-full border-0 bg-white"
+                className="absolute inset-x-0 bottom-9 top-0 h-[calc(100%-36px)] w-full border-0 bg-white"
               />
 
               <div
-                className={`absolute bottom-[78px] z-20 w-[370px] max-w-[calc(100%-24px)] transition-all duration-300 ${
+                className={`absolute bottom-[108px] z-20 w-[390px] max-w-[calc(100%-24px)] transition-all duration-300 ${
                   soul.appearance.position === "bottom-right"
                     ? "right-3 sm:right-5"
                     : "left-3 sm:left-5"
                 } ${chatOpen ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-4 opacity-0"}`}
-                style={{ height: "min(560px, calc(100% - 96px))" }}
+                style={{ height: "min(580px, calc(100% - 136px))" }}
               >
                 <SoulChat soul={soul} fill onMessagesChange={onMessagesChange} />
               </div>
 
               <button
                 onClick={() => setChatOpen((current) => !current)}
-                className={`absolute bottom-4 z-30 flex h-12 items-center justify-center gap-2 border border-black/10 bg-[#171a16] text-white shadow-[0_12px_35px_rgba(0,0,0,.3)] transition hover:-translate-y-0.5 ${
+                className={`absolute bottom-12 z-30 flex h-12 items-center justify-center gap-2 border border-black/10 bg-[#171a16] text-white shadow-[0_12px_35px_rgba(0,0,0,.3)] transition hover:-translate-y-0.5 ${
                   soul.appearance.position === "bottom-right"
                     ? "right-4 sm:right-5"
                     : "left-4 sm:left-5"
@@ -3024,12 +3026,61 @@ function PlaygroundView({
                   </span>
                 )}
               </button>
+
+              <div className="absolute inset-x-0 bottom-0 z-20 flex h-9 items-center justify-between border-t border-black/10 bg-white/95 px-4 text-[11px] text-[#747970] backdrop-blur-xl">
+                <span className="flex min-w-0 items-center gap-2 truncate">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#72a648]" />
+                  Live simulation · click the assistant to experience your website
+                </span>
+                <span className="hidden shrink-0 text-[#9a9e97] sm:inline">
+                  {safeHost(previewUrl)}
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <aside className="min-h-0 overflow-y-auto rounded-2xl border border-[#dfe1dc] bg-white shadow-sm">
+      <div className="absolute right-4 top-3 z-30 flex items-center gap-2">
+        <button
+          onClick={() => {
+            setFrameLoading(true);
+            setFrameKey((current) => current + 1);
+          }}
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white/92 text-[#555a52] shadow-md backdrop-blur-xl hover:bg-white"
+          aria-label="Reload website preview"
+        >
+          <RefreshCw className={`h-4 w-4 ${frameLoading ? "animate-spin" : ""}`} />
+        </button>
+        <a
+          href={previewUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="hidden h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white/92 text-[#555a52] shadow-md backdrop-blur-xl hover:bg-white sm:flex"
+          aria-label="Open website in a new tab"
+        >
+          <ExternalLink className="h-4 w-4" />
+        </a>
+        <button
+          onClick={() => setCustomizeOpen(true)}
+          className="flex h-10 items-center gap-2 rounded-full border border-black/10 bg-[#1c1f1b] px-4 text-xs font-semibold text-white shadow-md hover:bg-black"
+        >
+          <WandSparkles className="h-4 w-4" />
+          <span className="hidden sm:inline">Customize</span>
+        </button>
+      </div>
+
+      {customizeOpen && (
+        <button
+          aria-label="Close customization drawer"
+          onClick={() => setCustomizeOpen(false)}
+          className="absolute inset-0 z-40 bg-black/12 backdrop-blur-[1px]"
+        />
+      )}
+
+      <aside
+        className={`absolute inset-y-0 right-0 z-50 flex w-[330px] max-w-[calc(100%-28px)] flex-col overflow-hidden border-l border-[#dfe1dc] bg-white shadow-[-20px_0_55px_rgba(20,24,18,.16)] transition-transform duration-300 ${customizeOpen ? "translate-x-0" : "translate-x-full"}`}
+      >
         <div className="border-b border-[#eceee9] p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -3041,13 +3092,37 @@ function PlaygroundView({
             <span className="rounded-full bg-[#edf5e6] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[.12em] text-[#5d8438]">
               Live
             </span>
+            <button
+              onClick={() => setCustomizeOpen(false)}
+              className="rounded-lg p-2 text-[#777c74] hover:bg-[#f0f2ed]"
+              aria-label="Close customization drawer"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
           {addressError && (
             <p className="mt-3 text-xs font-medium text-[#a34b3e]">{addressError}</p>
           )}
         </div>
 
-        <div className="space-y-6 p-5">
+        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-5">
+          <form onSubmit={openAddress}>
+            <label className="text-xs font-semibold uppercase tracking-[.12em] text-[#8b9088]">
+              Preview URL
+            </label>
+            <div className="mt-2 flex items-center gap-2 rounded-xl border border-[#dde0da] px-3">
+              <Globe2 className="h-4 w-4 shrink-0 text-[#92978f]" />
+              <input
+                value={address}
+                onChange={(event) => setAddress(event.target.value)}
+                className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none"
+              />
+              <button type="submit" className="text-xs font-semibold text-[#5e8738]">
+                Go
+              </button>
+            </div>
+          </form>
+
           <div>
             <p className="text-xs font-semibold uppercase tracking-[.12em] text-[#8b9088]">
               Chat style
@@ -3173,6 +3248,16 @@ function PlaygroundView({
           </p>
         </div>
       </aside>
+
+      <button
+        onClick={() => setCustomizeOpen((current) => !current)}
+        className={`absolute top-1/2 z-[55] flex h-16 w-7 -translate-y-1/2 items-center justify-center rounded-l-xl border border-r-0 border-black/10 bg-white text-[#5e635b] shadow-lg transition-[right] duration-300 hover:bg-[#f5f6f3] ${
+          customizeOpen ? "right-[330px]" : "right-0"
+        }`}
+        aria-label={customizeOpen ? "Close customization drawer" : "Open customization drawer"}
+      >
+        {customizeOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+      </button>
     </div>
   );
 }
