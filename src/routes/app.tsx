@@ -25,6 +25,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Pause,
+  Phone,
   Play,
   Plus,
   RefreshCw,
@@ -2903,7 +2904,7 @@ function PlaygroundView({
   onIntegrate: () => void;
 }) {
   const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
-  const [chatOpen, setChatOpen] = useState(true);
+  const [assistantMode, setAssistantMode] = useState<"closed" | "chat" | "voice">("chat");
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [address, setAddress] = useState(soul.siteUrl);
   const [previewUrl, setPreviewUrl] = useState(soul.siteUrl);
@@ -3057,43 +3058,68 @@ function PlaygroundView({
                   soul.appearance.position === "bottom-right"
                     ? "right-3 sm:right-5"
                     : "left-3 sm:left-5"
-                } ${chatOpen ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-4 opacity-0"}`}
+                } ${assistantMode !== "closed" ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-4 opacity-0"}`}
                 style={{ height: "min(580px, calc(100% - 136px))" }}
               >
-                <SoulChat soul={soul} fill onMessagesChange={onMessagesChange} />
+                {assistantMode !== "closed" && (
+                  <SoulChat
+                    key={assistantMode}
+                    soul={soul}
+                    fill
+                    voiceMode={assistantMode === "voice"}
+                    onMessagesChange={onMessagesChange}
+                  />
+                )}
               </div>
 
-              <button
-                onClick={() => setChatOpen((current) => !current)}
-                className={`absolute bottom-12 z-30 flex h-12 items-center justify-center gap-2 border border-black/10 bg-[#171a16] text-white shadow-[0_12px_35px_rgba(0,0,0,.3)] transition hover:-translate-y-0.5 ${
+              <div
+                className={`absolute bottom-12 z-30 flex items-center drop-shadow-[0_14px_32px_rgba(0,0,0,.34)] ${
                   soul.appearance.position === "bottom-right"
                     ? "right-4 sm:right-5"
                     : "left-4 sm:left-5"
-                } ${soul.appearance.launcher === "pill" ? "rounded-full px-4" : "w-12 rounded-full"}`}
-                aria-expanded={chatOpen}
-                aria-label={chatOpen ? "Close website guide" : soul.appearance.welcomeLabel}
+                }`}
               >
-                {chatOpen ? (
-                  <X className="h-4 w-4" />
-                ) : (
-                  <span
-                    className="flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold text-[#171a16]"
-                    style={{ backgroundColor: soul.appearance.accent }}
-                  >
-                    {soul.personality.name.charAt(0)}
-                  </span>
-                )}
-                {soul.appearance.launcher === "pill" && (
-                  <span className="max-w-36 truncate text-xs font-semibold">
-                    {chatOpen ? "Close" : soul.appearance.welcomeLabel}
-                  </span>
-                )}
-              </button>
+                <button
+                  onClick={() =>
+                    setAssistantMode((current) => (current === "voice" ? "closed" : "voice"))
+                  }
+                  className={`relative z-10 flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/80 transition hover:-translate-y-0.5 ${
+                    assistantMode === "voice"
+                      ? "scale-105 text-[#151914] shadow-[0_0_0_3px_rgba(255,255,255,.45)]"
+                      : "text-[#171a16] hover:scale-105"
+                  }`}
+                  style={{ backgroundColor: soul.appearance.accent }}
+                  aria-label={
+                    assistantMode === "voice"
+                      ? "Close voice conversation"
+                      : "Start voice conversation"
+                  }
+                  aria-expanded={assistantMode === "voice"}
+                  title="Talk by voice"
+                >
+                  <Phone className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={() =>
+                    setAssistantMode((current) => (current === "chat" ? "closed" : "chat"))
+                  }
+                  className={`relative -ml-2 flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/25 bg-[#171a16] text-white transition hover:-translate-y-0.5 hover:bg-black ${
+                    assistantMode === "chat"
+                      ? "z-20 scale-105 shadow-[0_0_0_3px_rgba(255,255,255,.38)]"
+                      : "z-0 hover:scale-105"
+                  }`}
+                  aria-label={assistantMode === "chat" ? "Close text chat" : "Open text chat"}
+                  aria-expanded={assistantMode === "chat"}
+                  title="Chat by text"
+                >
+                  <MessageCircle className="h-5 w-5" />
+                </button>
+              </div>
 
               <div className="absolute inset-x-0 bottom-0 z-20 flex h-9 items-center justify-between border-t border-black/10 bg-white/95 px-4 text-[11px] text-[#747970] backdrop-blur-xl">
                 <span className="flex min-w-0 items-center gap-2 truncate">
                   <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#72a648]" />
-                  Live simulation · click the assistant to experience your website
+                  Live simulation · choose voice or chat
                 </span>
                 <span className="hidden shrink-0 text-[#9a9e97] sm:inline">
                   {safeHost(previewUrl)}
@@ -3251,18 +3277,9 @@ function PlaygroundView({
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Launcher">
-              <select
-                value={soul.appearance.launcher}
-                onChange={(event) =>
-                  updateAppearance({
-                    launcher: event.target.value as Soul["appearance"]["launcher"],
-                  })
-                }
-                className="clean-input"
-              >
-                <option value="orb">Orb</option>
-                <option value="pill">Label</option>
-              </select>
+              <div className="flex h-11 items-center gap-2 rounded-lg border border-[#dedfdb] bg-[#f7f8f5] px-3 text-sm font-medium text-[#4f544c]">
+                <Phone className="h-4 w-4 text-[#6f9948]" /> Voice + chat
+              </div>
             </Field>
             <Field label="Position">
               <select
@@ -3280,23 +3297,13 @@ function PlaygroundView({
             </Field>
           </div>
 
-          <label className="block">
-            <span className="text-sm font-medium">Launcher message</span>
-            <input
-              value={soul.appearance.welcomeLabel}
-              maxLength={48}
-              onChange={(event) => updateAppearance({ welcomeLabel: event.target.value })}
-              className="clean-input mt-2"
-            />
-          </label>
-
           <div className="rounded-xl border border-[#e2e5de] bg-[#f8f9f6] p-4">
             <div className="flex items-center gap-2 text-sm font-semibold">
-              <MessageCircle className="h-4 w-4 text-[#719d47]" /> Real conversation
+              <MessageCircle className="h-4 w-4 text-[#719d47]" /> Two ways to connect
             </div>
             <p className="mt-2 text-xs leading-5 text-[#777c74]">
-              Messages here use the same knowledge, citations, personality, and selected voice as
-              your installed widget.
+              Visitors can start a hands-free voice call or open the normal text chat. Both use the
+              same knowledge, personality, citations, and selected voice.
             </p>
           </div>
 
@@ -3336,9 +3343,9 @@ function DeployView({
 }) {
   const [tab, setTab] = useState<"widget" | "webhook">("widget");
   const [busy, setBusy] = useState(false);
+  const [previewMode, setPreviewMode] = useState<"closed" | "chat" | "voice">("chat");
   const origin = typeof window === "undefined" ? "https://app.obseri.com" : window.location.origin;
-  const widgetLabel = soul.appearance.welcomeLabel.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-  const code = `<script\n  src="${origin}/obseri-widget.js"\n  data-soul-id="${soul.id}"\n  data-position="${soul.appearance.position}"\n  data-accent="${soul.appearance.accent}"\n  data-launcher="${soul.appearance.launcher}"\n  data-label="${widgetLabel}"\n  async\n></script>`;
+  const code = `<script\n  src="${origin}/obseri-widget.js"\n  data-soul-id="${soul.id}"\n  data-position="${soul.appearance.position}"\n  data-accent="${soul.appearance.accent}"\n  async\n></script>`;
   const updateAppearance = (patch: Partial<Soul["appearance"]>) =>
     onUpdate((current) => ({ ...current, appearance: { ...current.appearance, ...patch } }));
   const updateChannels = (patch: Partial<Soul["channels"]>) =>
@@ -3488,12 +3495,10 @@ function DeployView({
                     className="clean-input"
                   />
                 </Field>
-                <Field label="Launcher label">
-                  <input
-                    value={soul.appearance.welcomeLabel}
-                    onChange={(event) => updateAppearance({ welcomeLabel: event.target.value })}
-                    className="clean-input"
-                  />
+                <Field label="Launcher">
+                  <div className="flex h-11 items-center gap-2 rounded-lg border border-[#dedfdb] bg-[#f7f8f5] px-3 text-sm font-medium text-[#4f544c]">
+                    <Phone className="h-4 w-4 text-[#6f9948]" /> Voice + chat
+                  </div>
                 </Field>
               </div>
             </Card>
@@ -3510,9 +3515,41 @@ function DeployView({
                   <div className="mt-2 h-3 w-4/5 rounded bg-[#f1f1ee]" />
                 </div>
                 <div
-                  className={`absolute bottom-4 ${soul.appearance.position === "bottom-right" ? "right-4" : "left-4"} w-[340px] max-w-[calc(100%-32px)]`}
+                  className={`absolute bottom-20 ${soul.appearance.position === "bottom-right" ? "right-4" : "left-4"} h-[500px] w-[340px] max-w-[calc(100%-32px)] transition ${previewMode === "closed" ? "pointer-events-none translate-y-3 opacity-0" : "translate-y-0 opacity-100"}`}
                 >
-                  <SoulChat soul={soul} compact />
+                  {previewMode !== "closed" && (
+                    <SoulChat
+                      key={previewMode}
+                      soul={soul}
+                      fill
+                      voiceMode={previewMode === "voice"}
+                    />
+                  )}
+                </div>
+                <div
+                  className={`absolute bottom-4 flex items-center drop-shadow-[0_12px_26px_rgba(0,0,0,.3)] ${soul.appearance.position === "bottom-right" ? "right-4" : "left-4"}`}
+                >
+                  <button
+                    onClick={() =>
+                      setPreviewMode((current) => (current === "voice" ? "closed" : "voice"))
+                    }
+                    className={`relative z-10 flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/80 text-[#171a16] transition ${previewMode === "voice" ? "scale-105 shadow-[0_0_0_3px_rgba(0,0,0,.12)]" : "hover:-translate-y-0.5"}`}
+                    style={{ backgroundColor: soul.appearance.accent }}
+                    aria-label={
+                      previewMode === "voice" ? "Close voice preview" : "Open voice preview"
+                    }
+                  >
+                    <Phone className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() =>
+                      setPreviewMode((current) => (current === "chat" ? "closed" : "chat"))
+                    }
+                    className={`relative -ml-2 flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/25 bg-[#171a16] text-white transition ${previewMode === "chat" ? "z-20 scale-105 shadow-[0_0_0_3px_rgba(0,0,0,.12)]" : "hover:-translate-y-0.5"}`}
+                    aria-label={previewMode === "chat" ? "Close chat preview" : "Open chat preview"}
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
             </div>

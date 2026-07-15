@@ -6,6 +6,8 @@ import {
   LoaderCircle,
   Mic,
   MicOff,
+  Phone,
+  PhoneOff,
   RotateCcw,
   Volume2,
   VolumeX,
@@ -17,11 +19,13 @@ export default function SoulChat({
   soul,
   compact = false,
   fill = false,
+  voiceMode = false,
   onMessagesChange,
 }: {
   soul: Soul;
   compact?: boolean;
   fill?: boolean;
+  voiceMode?: boolean;
   onMessagesChange?: (messages: SoulMessage[], leadIntent: ChatResponse["leadIntent"]) => void;
 }) {
   const [messages, setMessages] = useState<SoulMessage[]>(() => [
@@ -31,8 +35,15 @@ export default function SoulChat({
   const [sending, setSending] = useState(false);
   const [listening, setListening] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(soul.voice.enabled);
+  const [voiceCallActive, setVoiceCallActive] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<"idle" | "listening" | "thinking" | "speaking">(
+    "idle",
+  );
   const [error, setError] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const voiceCallActiveRef = useRef(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const theme = soul.appearance.theme ?? "light";
   const isDark = theme === "dark";
   const isGlass = theme === "glass";
@@ -50,13 +61,28 @@ export default function SoulChat({
   useEffect(() => {
     setMessages([greetingMessage(soul.id, soul.personality.greeting)]);
     setSoundEnabled(soul.voice.enabled);
+    stopVoiceCall();
   }, [soul.id, soul.personality.greeting, soul.voice.enabled]);
+
+  useEffect(() => {
+    if (!voiceMode) stopVoiceCall();
+  }, [voiceMode]);
+
+  useEffect(
+    () => () => {
+      voiceCallActiveRef.current = false;
+      recognitionRef.current?.abort();
+      audioRef.current?.pause();
+      window.speechSynthesis?.cancel();
+    },
+    [],
+  );
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, sending]);
 
-  async function sendMessage(text = value) {
+  async function sendMessage(text = value, continueVoiceCall = false) {
     const question = text.trim();
     if (!question || sending) return;
     const visitor: SoulMessage = {
@@ -70,6 +96,7 @@ export default function SoulChat({
     setValue("");
     setError("");
     setSending(true);
+    if (continueVoiceCall) setVoiceStatus("thinking");
 
     try {
       const response = await fetch("/api/chat", {
@@ -101,9 +128,21 @@ export default function SoulChat({
       const completed = [...nextMessages, assistant];
       setMessages(completed);
       onMessagesChange?.(completed, data.leadIntent);
-      if (soundEnabled) await speak(data.answer);
+      const shouldSpeak = continueVoiceCall ? voiceCallActiveRef.current : soundEnabled;
+      if (shouldSpeak) {
+        setVoiceStatus("speaking");
+        try {
+          await speak(data.answer);
+        } catch {
+          setError("I couldn’t play the spoken answer. You can continue by voice.");
+        }
+      }
+      if (continueVoiceCall && voiceCallActiveRef.current) {
+        window.setTimeout(() => startListening(true), 220);
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The conversation was interrupted.");
+      if (continueVoiceCall) stopVoiceCall();
     } finally {
       setSending(false);
     }
@@ -123,8 +162,26 @@ export default function SoulChat({
       if (response.ok) {
         const href = URL.createObjectURL(await response.blob());
         const audio = new Audio(href);
-        audio.onended = () => URL.revokeObjectURL(href);
-        await audio.play();
+        audioRef.current = audio;
+        await new Promise<void>((resolve, reject) => {
+          let settled = false;
+          const finish = (playbackError?: Error) => {
+            if (settled) return;
+            settled = true;
+            URL.revokeObjectURL(href);
+            audioRef.current = null;
+            if (playbackError) reject(playbackError);
+            else resolve();
+          };
+          audio.onended = () => finish();
+          audio.onpause = () => finish();
+          audio.onerror = () => finish(new Error("Voice playback failed."));
+          void audio
+            .play()
+            .catch((cause) =>
+              finish(cause instanceof Error ? cause : new Error("Voice playback failed.")),
+            );
+        });
         return;
       }
     }
@@ -139,15 +196,15 @@ export default function SoulChat({
         .getVoices()
         .find((candidate) => candidate.name === soul.voice.browserVoiceName);
       if (voice) utterance.voice = voice;
-      window.speechSynthesis.speak(utterance);
+      await new Promise<void>((resolve) => {
+        utterance.onend = () => resolve();
+        utterance.onerror = () => resolve();
+        window.speechSynthesis.speak(utterance);
+      });
     }
   }
 
-  function toggleListening() {
-    if (listening) {
-      setListening(false);
-      return;
-    }
+  function startListening(autoSend: boolean) {
     const constructor =
       (
         window as typeof window & {
@@ -162,28 +219,232 @@ export default function SoulChat({
       ).webkitSpeechRecognition;
     if (!constructor) {
       setError("Voice input is not supported in this browser.");
+      if (autoSend) stopVoiceCall();
       return;
     }
     const recognition = new constructor();
+    recognitionRef.current = recognition;
     recognition.lang = soul.voice.language;
     recognition.interimResults = false;
+    recognition.continuous = false;
+    let heardResult = false;
     recognition.onresult = (event) => {
-      setValue(event.results[0]?.[0]?.transcript ?? "");
+      heardResult = true;
+      const transcript = event.results[0]?.[0]?.transcript ?? "";
       setListening(false);
+      recognitionRef.current = null;
+      if (autoSend) void sendMessage(transcript, true);
+      else setValue(transcript);
     };
-    recognition.onerror = () => {
+    recognition.onerror = (event) => {
+      heardResult = true;
       setListening(false);
-      setError("I couldn’t hear that clearly. Please try again.");
+      recognitionRef.current = null;
+      if (autoSend && event.error === "no-speech" && voiceCallActiveRef.current) {
+        window.setTimeout(() => startListening(true), 350);
+        return;
+      }
+      setError(
+        event.error === "not-allowed"
+          ? "Microphone access is required for a voice call."
+          : "I couldn’t hear that clearly. Please try again.",
+      );
+      if (autoSend) stopVoiceCall();
     };
-    recognition.onend = () => setListening(false);
-    recognition.start();
-    setListening(true);
+    recognition.onend = () => {
+      setListening(false);
+      recognitionRef.current = null;
+      if (autoSend && !heardResult && voiceCallActiveRef.current) {
+        window.setTimeout(() => startListening(true), 350);
+      }
+    };
+    try {
+      recognition.start();
+      setListening(true);
+      if (autoSend) setVoiceStatus("listening");
+    } catch {
+      setError("The microphone is already in use. Please try again.");
+      if (autoSend) stopVoiceCall();
+    }
+  }
+
+  function toggleListening() {
+    if (listening) {
+      recognitionRef.current?.stop();
+      recognitionRef.current = null;
+      setListening(false);
+      return;
+    }
+    startListening(false);
+  }
+
+  function startVoiceCall() {
+    setError("");
+    setSoundEnabled(true);
+    voiceCallActiveRef.current = true;
+    setVoiceCallActive(true);
+    startListening(true);
+  }
+
+  function stopVoiceCall() {
+    voiceCallActiveRef.current = false;
+    recognitionRef.current?.abort();
+    recognitionRef.current = null;
+    audioRef.current?.pause();
+    audioRef.current = null;
+    window.speechSynthesis?.cancel();
+    setListening(false);
+    setVoiceCallActive(false);
+    setVoiceStatus("idle");
   }
 
   function restart() {
     setMessages([greetingMessage(soul.id, soul.personality.greeting)]);
     setError("");
     window.speechSynthesis?.cancel();
+  }
+
+  if (voiceMode) {
+    const lastVisitor = [...messages].reverse().find((message) => message.role === "visitor");
+    const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant");
+    const statusLabel =
+      voiceStatus === "listening"
+        ? "Listening…"
+        : voiceStatus === "thinking"
+          ? "Thinking…"
+          : voiceStatus === "speaking"
+            ? "Speaking…"
+            : "Ready to talk";
+
+    return (
+      <div
+        className={`flex flex-col overflow-hidden rounded-2xl border ${shellTone} ${
+          fill ? "h-full min-h-[420px]" : compact ? "h-[560px]" : "h-[650px]"
+        }`}
+      >
+        <div className={`flex items-center justify-between border-b px-5 py-4 ${dividerTone}`}>
+          <div className="flex min-w-0 items-center gap-3">
+            <span
+              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-[#20221f]"
+              style={{ backgroundColor: soul.appearance.accent }}
+            >
+              {soul.personality.name.charAt(0)}
+              <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#55a65a]" />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{soul.personality.name}</p>
+              <p className={`mt-0.5 truncate text-xs ${mutedTone}`}>Voice conversation</p>
+            </div>
+          </div>
+          <span
+            className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
+              voiceCallActive
+                ? isDark
+                  ? "bg-[#b6ff60]/15 text-[#c9ff8a]"
+                  : "bg-[#edf6e5] text-[#557d31]"
+                : isDark
+                  ? "bg-white/8 text-white/48"
+                  : "bg-[#f1f2ef] text-[#747971]"
+            }`}
+          >
+            {voiceCallActive ? "Call active" : "Voice ready"}
+          </span>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 py-8 text-center">
+          <div className="relative">
+            {voiceCallActive && (
+              <>
+                <span
+                  className="absolute inset-[-16px] animate-pulse rounded-full opacity-20"
+                  style={{ backgroundColor: soul.appearance.accent }}
+                />
+                <span
+                  className="absolute inset-[-8px] animate-pulse rounded-full opacity-25 [animation-delay:180ms]"
+                  style={{ backgroundColor: soul.appearance.accent }}
+                />
+              </>
+            )}
+            <span
+              className="relative flex h-24 w-24 items-center justify-center rounded-full text-3xl font-semibold text-[#171a16] shadow-[0_18px_45px_rgba(0,0,0,.18)]"
+              style={{ backgroundColor: soul.appearance.accent }}
+            >
+              {soul.personality.name.charAt(0)}
+            </span>
+          </div>
+
+          <h3 className="mt-7 text-xl font-semibold">{statusLabel}</h3>
+          <p className={`mt-2 max-w-xs text-sm leading-6 ${mutedTone}`}>
+            {voiceCallActive
+              ? "Speak naturally. I’ll answer, then listen again automatically."
+              : `Start a hands-free conversation with ${soul.personality.name}.`}
+          </p>
+
+          <div className="mt-6 flex h-9 items-center justify-center gap-1.5" aria-hidden="true">
+            {[14, 24, 32, 20, 28, 16, 22].map((height, index) => (
+              <span
+                key={`${height}-${index}`}
+                className={`w-1.5 rounded-full transition-all ${voiceCallActive ? "animate-pulse" : "opacity-30"}`}
+                style={{
+                  height,
+                  backgroundColor: soul.appearance.accent,
+                  animationDelay: `${index * 90}ms`,
+                }}
+              />
+            ))}
+          </div>
+
+          {(lastVisitor || lastAssistant) && (
+            <div
+              className={`mt-6 w-full max-w-sm rounded-2xl border p-4 text-left ${
+                isDark ? "border-white/10 bg-white/5" : "border-[#e4e6e1] bg-[#fafbf9]"
+              }`}
+            >
+              {lastVisitor && (
+                <p className={`text-xs ${mutedTone}`}>
+                  You:{" "}
+                  <span className={isDark ? "text-white/75" : "text-[#3f433d]"}>
+                    {lastVisitor.content}
+                  </span>
+                </p>
+              )}
+              {lastAssistant && (
+                <p className={`mt-2 line-clamp-2 text-xs leading-5 ${mutedTone}`}>
+                  {soul.personality.name}:{" "}
+                  <span className={isDark ? "text-white/75" : "text-[#3f433d]"}>
+                    {lastAssistant.content}
+                  </span>
+                </p>
+              )}
+            </div>
+          )}
+
+          {error && (
+            <div className="mt-5 w-full max-w-sm rounded-xl border border-[#eed5ce] bg-[#fff6f2] px-4 py-3 text-sm text-[#934b3a]">
+              {error}
+            </div>
+          )}
+        </div>
+
+        <div className={`border-t p-5 ${dividerTone}`}>
+          <button
+            onClick={voiceCallActive ? stopVoiceCall : startVoiceCall}
+            className={`mx-auto flex h-14 items-center justify-center gap-2 rounded-full px-7 text-sm font-semibold shadow-lg transition hover:-translate-y-0.5 ${
+              voiceCallActive
+                ? "bg-[#b84c43] text-white hover:bg-[#a9433b]"
+                : "bg-[#20231f] text-white hover:bg-black"
+            }`}
+            aria-label={voiceCallActive ? "End voice call" : "Start voice call"}
+          >
+            {voiceCallActive ? <PhoneOff className="h-5 w-5" /> : <Phone className="h-5 w-5" />}
+            {voiceCallActive ? "End call" : "Start voice call"}
+          </button>
+          <p className={`mt-3 text-center text-xs ${isDark ? "text-white/34" : "text-[#969993]"}`}>
+            Microphone access is used only during the call
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -360,10 +621,13 @@ type SpeechRecognitionResultEvent = {
 type SpeechRecognitionInstance = {
   lang: string;
   interimResults: boolean;
+  continuous: boolean;
   onresult: ((event: SpeechRecognitionResultEvent) => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
   onend: (() => void) | null;
   start: () => void;
+  stop: () => void;
+  abort: () => void;
 };
 
 type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;

@@ -15,9 +15,8 @@
   var origin = scriptUrl.origin;
   var position = script.dataset.position === "bottom-left" ? "left" : "right";
   var accent = script.dataset.accent || "#b6ff60";
-  var label = script.dataset.label || "Talk to this website";
-  var launcher = script.dataset.launcher === "orb" ? "orb" : "pill";
   var mobile = window.matchMedia("(max-width: 520px)");
+  var currentMode = null;
   var open = false;
 
   var root = document.createElement("div");
@@ -25,45 +24,104 @@
   root.style.cssText =
     "position:fixed;z-index:2147483000;bottom:20px;" +
     position +
-    ":20px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;";
+    ":20px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;";
 
   var frame = document.createElement("iframe");
-  frame.title = label;
-  frame.src = origin + "/widget/" + encodeURIComponent(soulId);
+  frame.title = "Obseri website assistant";
   frame.allow = "microphone; autoplay";
   frame.referrerPolicy = "strict-origin-when-cross-origin";
   frame.style.cssText =
     "display:none;width:390px;height:660px;max-height:calc(100vh - 110px);border:0;background:transparent;filter:drop-shadow(0 24px 48px rgba(0,0,0,.36));";
 
-  var button = document.createElement("button");
-  button.type = "button";
-  button.setAttribute("aria-label", label);
-  button.setAttribute("aria-expanded", "false");
-  button.style.cssText =
-    "margin-top:12px;margin-left:auto;display:flex;height:58px;min-width:58px;align-items:center;justify-content:center;gap:10px;border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:0 18px;background:rgba(7,13,9,.88);color:white;box-shadow:0 18px 45px rgba(0,0,0,.35);backdrop-filter:blur(18px);cursor:pointer;font:700 12px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:-.02em;";
-  if (launcher === "orb") {
-    button.style.width = "58px";
-    button.style.padding = "0";
-  }
-  button.innerHTML =
-    '<span style="position:relative;display:block;width:20px;height:20px"><span style="position:absolute;inset:0;border-radius:50%;background:' +
-    accent +
-    ";box-shadow:0 0 24px " +
-    accent +
-    '"></span><span style="position:absolute;inset:5px;border-radius:50%;background:#10140f"></span></span><span class="obseri-label">' +
-    escapeHtml(label) +
-    "</span>";
-  if (launcher === "orb") {
-    button.querySelector(".obseri-label").style.display = "none";
+  var launcher = document.createElement("div");
+  launcher.setAttribute("role", "group");
+  launcher.setAttribute("aria-label", "Choose how to talk with this website");
+  launcher.style.cssText =
+    "margin-top:12px;display:flex;align-items:center;" +
+    (position === "left" ? "justify-content:flex-start;" : "justify-content:flex-end;") +
+    "filter:drop-shadow(0 14px 30px rgba(0,0,0,.34));";
+
+  var voiceButton = createLauncherButton(
+    "Start voice conversation",
+    phoneIcon(),
+    accent,
+    "#171a16",
+  );
+  voiceButton.style.zIndex = "1";
+
+  var chatButton = createLauncherButton("Open text chat", chatIcon(), "#171a16", "#ffffff");
+  chatButton.style.marginLeft = "-8px";
+
+  voiceButton.addEventListener("click", function () {
+    toggleMode("voice");
+  });
+  chatButton.addEventListener("click", function () {
+    toggleMode("chat");
+  });
+
+  function createLauncherButton(label, icon, background, color) {
+    var button = document.createElement("button");
+    button.type = "button";
+    button.setAttribute("aria-label", label);
+    button.setAttribute("aria-expanded", "false");
+    button.title = label;
+    button.innerHTML = icon;
+    button.style.cssText =
+      "position:relative;display:flex;width:58px;height:58px;flex:0 0 58px;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,.72);border-radius:999px;padding:0;background:" +
+      background +
+      ";color:" +
+      color +
+      ";box-shadow:0 10px 26px rgba(0,0,0,.22);cursor:pointer;transition:transform 180ms ease,box-shadow 180ms ease,background 180ms ease;";
+    button.addEventListener("mouseenter", function () {
+      button.style.transform = "translateY(-2px) scale(1.03)";
+    });
+    button.addEventListener("mouseleave", function () {
+      renderLauncherState();
+    });
+    return button;
   }
 
-  button.addEventListener("click", function () {
-    open = !open;
-    frame.style.display = open ? "block" : "none";
-    button.setAttribute("aria-expanded", String(open));
-    var labelNode = button.querySelector(".obseri-label");
-    if (labelNode) labelNode.textContent = open ? "Close" : label;
-  });
+  function toggleMode(mode) {
+    if (open && currentMode === mode) {
+      open = false;
+      frame.style.display = "none";
+      renderLauncherState();
+      return;
+    }
+
+    if (currentMode !== mode) {
+      frame.src =
+        origin + "/widget/" + encodeURIComponent(soulId) + "?mode=" + encodeURIComponent(mode);
+      frame.title = mode === "voice" ? "Obseri voice conversation" : "Obseri text chat";
+    }
+    currentMode = mode;
+    open = true;
+    frame.style.display = "block";
+    renderLauncherState();
+  }
+
+  function renderLauncherState() {
+    renderButton(voiceButton, open && currentMode === "voice", 2);
+    renderButton(chatButton, open && currentMode === "chat", 3);
+    voiceButton.setAttribute("aria-expanded", String(open && currentMode === "voice"));
+    chatButton.setAttribute("aria-expanded", String(open && currentMode === "chat"));
+    voiceButton.setAttribute(
+      "aria-label",
+      open && currentMode === "voice" ? "Close voice conversation" : "Start voice conversation",
+    );
+    chatButton.setAttribute(
+      "aria-label",
+      open && currentMode === "chat" ? "Close text chat" : "Open text chat",
+    );
+  }
+
+  function renderButton(button, active, activeZIndex) {
+    button.style.transform = active ? "scale(1.06)" : "none";
+    button.style.zIndex = active ? String(activeZIndex) : button === voiceButton ? "1" : "0";
+    button.style.boxShadow = active
+      ? "0 0 0 3px rgba(255,255,255,.44),0 14px 32px rgba(0,0,0,.3)"
+      : "0 10px 26px rgba(0,0,0,.22)";
+  }
 
   function layout() {
     if (mobile.matches) {
@@ -81,15 +139,20 @@
     }
   }
 
-  layout();
-  mobile.addEventListener("change", layout);
-  root.appendChild(frame);
-  root.appendChild(button);
-  document.body.appendChild(root);
-
-  function escapeHtml(value) {
-    var node = document.createElement("span");
-    node.textContent = value;
-    return node.innerHTML;
+  function phoneIcon() {
+    return '<svg aria-hidden="true" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.68 2.8a2 2 0 0 1-.45 2.11L8.07 9.9a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.32 1.84.55 2.8.68A2 2 0 0 1 22 16.92z"/></svg>';
   }
+
+  function chatIcon() {
+    return '<svg aria-hidden="true" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>';
+  }
+
+  layout();
+  renderLauncherState();
+  mobile.addEventListener("change", layout);
+  launcher.appendChild(voiceButton);
+  launcher.appendChild(chatButton);
+  root.appendChild(frame);
+  root.appendChild(launcher);
+  document.body.appendChild(root);
 })();

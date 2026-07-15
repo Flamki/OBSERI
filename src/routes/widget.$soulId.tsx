@@ -5,6 +5,9 @@ import SoulChat from "@/components/SoulChat";
 import type { Soul } from "@/lib/soul";
 
 export const Route = createFileRoute("/widget/$soulId")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    mode: search.mode === "voice" ? ("voice" as const) : ("chat" as const),
+  }),
   head: () => ({
     meta: [{ title: "Website soul · Obseri" }, { name: "robots", content: "noindex, nofollow" }],
   }),
@@ -13,6 +16,7 @@ export const Route = createFileRoute("/widget/$soulId")({
 
 function EmbeddedSoul() {
   const { soulId } = Route.useParams();
+  const { mode } = Route.useSearch();
   const [soul, setSoul] = useState<Soul | null>(null);
   const [error, setError] = useState("");
 
@@ -37,6 +41,7 @@ function EmbeddedSoul() {
         <SoulChat
           soul={soul}
           compact
+          voiceMode={mode === "voice"}
           onMessagesChange={(messages, leadIntent) => {
             void fetch(`/api/souls/${encodeURIComponent(soul.id)}/events`, {
               method: "POST",
