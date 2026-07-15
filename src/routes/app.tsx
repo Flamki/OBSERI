@@ -14,7 +14,6 @@ import {
   ExternalLink,
   FileText,
   Globe2,
-  Home,
   LoaderCircle,
   LogOut,
   Menu,
@@ -73,20 +72,12 @@ export const Route = createFileRoute("/app")({
 });
 
 type StudioView =
-  | "home"
-  | "knowledge"
-  | "personality"
-  | "voice"
-  | "playground"
-  | "deploy"
-  | "conversations"
-  | "settings";
+  "knowledge" | "personality" | "voice" | "playground" | "deploy" | "conversations" | "settings";
 
 const STORAGE_KEY = "obseri.soul-studio.v1";
 const SIDEBAR_STORAGE_KEY = "obseri.sidebar-collapsed.v1";
 
 const PAGE_META: Record<StudioView, { title: string; description: string }> = {
-  home: { title: "Home", description: "Everything your website soul needs, in one place." },
   knowledge: { title: "Knowledge", description: "The pages and facts your soul can use." },
   personality: {
     title: "Personality",
@@ -107,7 +98,7 @@ const PAGE_META: Record<StudioView, { title: string; description: string }> = {
 
 function SoulStudio() {
   const [workspace, setWorkspace] = useState<SoulWorkspace>(DEMO_WORKSPACE);
-  const [view, setView] = useState<StudioView>("home");
+  const [view, setView] = useState<StudioView>("knowledge");
   const [hydrated, setHydrated] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -408,8 +399,6 @@ function SoulStudio() {
           >
             {!soul ? (
               <EmptyState onCreate={() => setCreateOpen(true)} />
-            ) : view === "home" ? (
-              <HomeView soul={soul} onNavigate={navigate} />
             ) : view === "knowledge" ? (
               <KnowledgeView
                 soul={soul}
@@ -445,7 +434,7 @@ function SoulStudio() {
                     const souls = current.souls.filter((candidate) => candidate.id !== soul.id);
                     return { ...current, souls, activeSoulId: souls[0]?.id ?? null };
                   });
-                  setView("home");
+                  setView("knowledge");
                 }}
               />
             )}
@@ -504,7 +493,6 @@ function Sidebar({
 }) {
   const [soulMenuOpen, setSoulMenuOpen] = useState(false);
   const items: Array<{ id: StudioView; label: string; icon: ReactNode }> = [
-    { id: "home", label: "Home", icon: <Home /> },
     { id: "knowledge", label: "Knowledge", icon: <BookOpen /> },
     { id: "personality", label: "Personality", icon: <WandSparkles /> },
     { id: "voice", label: "Voice", icon: <Mic2 /> },
@@ -696,6 +684,14 @@ function Topbar({
   onProfile: () => void;
   onNavigate: (view: StudioView) => void;
 }) {
+  const [setupOpen, setSetupOpen] = useState(false);
+  const setupSteps = soul ? getSetupSteps(soul) : [];
+  const completeSteps = setupSteps.filter((step) => step.done).length;
+
+  useEffect(() => {
+    if (profileOpen) setSetupOpen(false);
+  }, [profileOpen]);
+
   return (
     <header className="z-30 flex h-16 shrink-0 items-center justify-between border-b border-[#e3e4e0] bg-white/95 px-4 backdrop-blur sm:px-6 lg:px-8">
       <div className="flex min-w-0 items-center gap-3">
@@ -718,6 +714,42 @@ function Topbar({
             <PanelLeftClose className="h-[18px] w-[18px]" />
           )}
         </button>
+        <div className="relative z-50">
+          {setupOpen && (
+            <button
+              className="fixed inset-0 z-40 cursor-default"
+              onClick={() => setSetupOpen(false)}
+              aria-label="Close setup progress"
+            />
+          )}
+          <button
+            onClick={() => {
+              if (profileOpen) onProfile();
+              setSetupOpen((current) => !current);
+            }}
+            className={`relative z-50 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-sm font-extrabold tracking-[-0.05em] transition ${setupOpen ? "border-[#a8c88b] bg-[#f0f7e9] text-[#355d18]" : "border-[#dedfdb] bg-white text-[#20231f] hover:border-[#c7d6b9] hover:bg-[#f7faf4]"}`}
+            aria-label="Open setup progress"
+            aria-expanded={setupOpen}
+            title={`${completeSteps} of ${setupSteps.length} setup steps complete`}
+          >
+            O<span className="text-[#76aa41]">.</span>
+            <span
+              className={`absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-white px-0.5 text-[8px] font-bold tracking-normal text-white ${completeSteps === setupSteps.length && setupSteps.length ? "bg-[#65953a]" : "bg-[#20231f]"}`}
+            >
+              {completeSteps}
+            </span>
+          </button>
+          {setupOpen && soul && (
+            <SetupProgressMenu
+              soul={soul}
+              steps={setupSteps}
+              onNavigate={(next) => {
+                setSetupOpen(false);
+                onNavigate(next);
+              }}
+            />
+          )}
+        </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold tracking-[-0.01em]">{workspace.name}</p>
           {soul ? (
@@ -739,7 +771,10 @@ function Topbar({
       <div className="flex items-center gap-2">
         <div className="relative z-50">
           <button
-            onClick={onProfile}
+            onClick={() => {
+              setSetupOpen(false);
+              onProfile();
+            }}
             className="flex items-center gap-2 rounded-full border border-[#dedfdb] bg-white p-1 pr-2 shadow-sm hover:bg-[#f7f7f5]"
             aria-expanded={profileOpen}
           >
@@ -752,6 +787,116 @@ function Topbar({
         </div>
       </div>
     </header>
+  );
+}
+
+type SetupStep = {
+  view: StudioView;
+  icon: ReactNode;
+  title: string;
+  detail: string;
+  done: boolean;
+};
+
+function getSetupSteps(soul: Soul): SetupStep[] {
+  return [
+    {
+      view: "knowledge",
+      icon: <BookOpen />,
+      title: "Website knowledge",
+      detail: soul.knowledge.pages.length
+        ? `${soul.knowledge.pages.length} pages ready`
+        : "Add and crawl your website",
+      done: soul.knowledge.pages.length > 0,
+    },
+    {
+      view: "personality",
+      icon: <WandSparkles />,
+      title: "Personality",
+      detail: soul.personality.name
+        ? `${soul.personality.name} · ${soul.personality.tone}`
+        : "Choose its identity and tone",
+      done: soul.personality.name.trim().length > 0,
+    },
+    {
+      view: "voice",
+      icon: <Mic2 />,
+      title: "Voice",
+      detail: soul.voice.enabled ? soul.voice.profileName : "Choose how it sounds",
+      done: soul.voice.enabled,
+    },
+    {
+      view: "deploy",
+      icon: <Code2 />,
+      title: "Website installation",
+      detail: soul.status === "live" ? "Live on your website" : "Install and publish the widget",
+      done: soul.status === "live",
+    },
+  ];
+}
+
+function SetupProgressMenu({
+  soul,
+  steps,
+  onNavigate,
+}: {
+  soul: Soul;
+  steps: SetupStep[];
+  onNavigate: (view: StudioView) => void;
+}) {
+  const complete = steps.filter((step) => step.done).length;
+  const percentage = Math.round((complete / steps.length) * 100);
+
+  return (
+    <div className="absolute left-0 top-12 z-50 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[#dfe1dc] bg-white shadow-[0_20px_60px_rgba(25,29,22,0.18)]">
+      <div className="border-b border-[#eceee9] p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">Website setup</p>
+            <p className="mt-1 truncate text-xs text-[#777c74]">{soul.name}</p>
+          </div>
+          <span className="shrink-0 rounded-full bg-[#f0f3ed] px-2.5 py-1 text-[11px] font-semibold text-[#5d6359]">
+            {complete} of {steps.length}
+          </span>
+        </div>
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#e8ebe5]">
+          <div
+            className="h-full rounded-full bg-[#75a847] transition-[width] duration-500"
+            style={{ width: `${percentage}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="p-2">
+        {steps.map((step) => (
+          <button
+            key={step.view}
+            onClick={() => onNavigate(step.view)}
+            className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-[#f5f6f3]"
+          >
+            <span
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl [&_svg]:h-4 [&_svg]:w-4 ${step.done ? "bg-[#eaf4df] text-[#547d2e]" : "bg-[#f0f1ee] text-[#747971]"}`}
+            >
+              {step.done ? <Check /> : step.icon}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold">{step.title}</span>
+              <span className="mt-0.5 block truncate text-xs text-[#7a7f77]">{step.detail}</span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-[#a1a59e] transition group-hover:translate-x-0.5 group-hover:text-[#555b52]" />
+          </button>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-2 border-t border-[#eceee9] bg-[#fafbf9] px-4 py-3 text-xs text-[#6f756b]">
+        <span
+          className={`h-2 w-2 rounded-full ${complete === steps.length ? "bg-[#70a43f]" : "bg-[#c4a14e]"}`}
+        />
+        {complete === steps.length
+          ? "Your website soul is fully set up."
+          : `${steps.length - complete} setup ${steps.length - complete === 1 ? "step" : "steps"} remaining.`}
+      </div>
+    </div>
   );
 }
 
@@ -822,165 +967,6 @@ function MenuRow({
       {icon}
       {label}
     </button>
-  );
-}
-
-function HomeView({ soul, onNavigate }: { soul: Soul; onNavigate: (view: StudioView) => void }) {
-  const steps = [
-    {
-      view: "knowledge" as const,
-      icon: <BookOpen />,
-      title: "Teach it",
-      detail: soul.knowledge.pages.length
-        ? `${soul.knowledge.pages.length} pages ready`
-        : "Add website knowledge",
-      done: soul.knowledge.pages.length > 0,
-    },
-    {
-      view: "personality" as const,
-      icon: <WandSparkles />,
-      title: "Shape it",
-      detail: `${soul.personality.name} · ${soul.personality.tone}`,
-      done: soul.personality.name.length > 0,
-    },
-    {
-      view: "voice" as const,
-      icon: <Mic2 />,
-      title: "Give it a voice",
-      detail: soul.voice.enabled ? soul.voice.profileName : "Voice is off",
-      done: soul.voice.enabled,
-    },
-    {
-      view: "deploy" as const,
-      icon: <Code2 />,
-      title: "Put it on your site",
-      detail: soul.status === "live" ? "Published" : "Ready when you are",
-      done: soul.status === "live",
-    },
-  ];
-  const complete = steps.filter((step) => step.done).length;
-  return (
-    <div className="space-y-7">
-      <section className="overflow-hidden rounded-2xl border border-[#dedfdb] bg-white shadow-sm">
-        <div className="flex flex-col gap-5 border-b border-[#ecece9] p-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#eaf4df] text-lg font-bold text-[#4e7428]">
-              {soul.personality.name.charAt(0)}
-            </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-semibold">{soul.name}</h3>
-                <StatusBadge status={soul.status} />
-              </div>
-              <a
-                href={soul.siteUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-1 flex items-center gap-1 text-sm text-[#73776f] hover:text-[#252824]"
-              >
-                {safeHost(soul.siteUrl)}
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            </div>
-          </div>
-          <button
-            onClick={() => onNavigate("playground")}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#dcded9] px-4 py-2.5 text-sm font-semibold hover:bg-[#f5f5f2]"
-          >
-            <MessageCircle className="h-4 w-4" />
-            Test conversation
-          </button>
-        </div>
-        <div className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold">Set up your website soul</h3>
-              <p className="mt-1 text-sm text-[#747870]">
-                Four steps. You can change any of them later.
-              </p>
-            </div>
-            <span className="text-sm font-medium text-[#656a62]">{complete} of 4</span>
-          </div>
-          <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#eceee9]">
-            <div
-              className="h-full rounded-full bg-[#7da84c] transition-all"
-              style={{ width: `${complete * 25}%` }}
-            />
-          </div>
-          <div className="mt-6 divide-y divide-[#ecece9]">
-            {steps.map((step, index) => (
-              <button
-                key={step.title}
-                onClick={() => onNavigate(step.view)}
-                className="group flex w-full items-center gap-4 py-4 text-left"
-              >
-                <span
-                  className={`flex h-10 w-10 items-center justify-center rounded-xl [&_svg]:h-[18px] [&_svg]:w-[18px] ${step.done ? "bg-[#edf5e6] text-[#577f31]" : "bg-[#f2f3f0] text-[#777b74]"}`}
-                >
-                  {step.done ? <Check /> : step.icon}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">
-                    {index + 1}. {step.title}
-                  </p>
-                  <p className="mt-1 truncate text-sm text-[#777b74]">{step.detail}</p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-[#a1a49e] transition group-hover:translate-x-0.5 group-hover:text-[#4a4e48]" />
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-5 lg:grid-cols-[1.35fr_.65fr]">
-        <Card>
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold">What your soul knows</h3>
-              <p className="mt-1 text-sm text-[#777b74]">
-                A simple snapshot of its current memory.
-              </p>
-            </div>
-            <button
-              onClick={() => onNavigate("knowledge")}
-              className="text-sm font-semibold text-[#587d34] hover:underline"
-            >
-              View knowledge
-            </button>
-          </div>
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            <SimpleStat value={String(soul.knowledge.pages.length)} label="Pages" />
-            <SimpleStat
-              value={String(
-                soul.knowledge.pages.reduce((total, page) => total + page.chunks.length, 0),
-              )}
-              label="Knowledge blocks"
-            />
-            <SimpleStat
-              value={soul.knowledge.errors.length ? String(soul.knowledge.errors.length) : "None"}
-              label="Issues"
-            />
-          </div>
-        </Card>
-        <Card>
-          <div className="flex h-full flex-col">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef4e8] text-[#5b8136]">
-              <MessageCircle className="h-5 w-5" />
-            </span>
-            <h3 className="mt-5 font-semibold">See it as a visitor</h3>
-            <p className="mt-2 text-sm leading-6 text-[#747870]">
-              Ask a real question and check the answer before you publish.
-            </p>
-            <button
-              onClick={() => onNavigate("playground")}
-              className="mt-5 text-left text-sm font-semibold text-[#587d34]"
-            >
-              Open test conversation →
-            </button>
-          </div>
-        </Card>
-      </section>
-    </div>
   );
 }
 
@@ -4001,14 +3987,6 @@ function SectionHeading({ title, description }: { title: string; description: st
     <div>
       <h3 className="font-semibold">{title}</h3>
       <p className="mt-1 text-sm text-[#777b74]">{description}</p>
-    </div>
-  );
-}
-function SimpleStat({ value, label }: { value: string; label: string }) {
-  return (
-    <div className="rounded-xl bg-[#f5f6f3] p-4">
-      <p className="text-2xl font-semibold tracking-[-0.03em]">{value}</p>
-      <p className="mt-1 text-sm text-[#777b74]">{label}</p>
     </div>
   );
 }
