@@ -102,21 +102,25 @@ function Index() {
 function Hero() {
   return (
     <section className="relative min-h-[820px] w-full min-w-0 overflow-hidden bg-[#f4f4ef] text-[#151518] sm:min-h-[860px] lg:min-h-[900px]">
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,#ff8b78_0%,#f7a293_22%,#e3deed_58%,#f4f4ef_94%)]" />
-      <div className="absolute inset-0 opacity-[0.14] mix-blend-soft-light">
-        <PrismaticBurst
-          animationType="rotate3d"
-          intensity={1.15}
-          speed={0.16}
-          distort={0.42}
-          offset={{ x: 0, y: 0 }}
-          hoverDampness={0.35}
-          rayCount={12}
-          colors={["#ff5c7a", "#ff9c89", "#ffd1c7", "#9e91c9", "#f7f5f2"]}
-        />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,#f8e4df_0%,#e5dff0_48%,#f4f4ef_91%)]" />
+      <div className="pointer-events-none absolute left-1/2 top-[-19rem] h-[680px] w-[150vw] -translate-x-1/2 overflow-hidden bg-[radial-gradient(ellipse_at_50%_22%,#ff7169_0%,#ff897c_34%,#efa096_59%,#c9c2df_83%,#a8a0cc_100%)] shadow-[0_70px_150px_rgba(112,89,145,.24)] [border-radius:47%_53%_49%_51%/62%_58%_42%_38%] sm:top-[-31rem] sm:h-[880px] sm:w-[138vw] lg:top-[-44rem] lg:h-[1180px] lg:w-[126vw]">
+        <div className="absolute inset-0 opacity-[0.16] mix-blend-soft-light">
+          <PrismaticBurst
+            animationType="rotate3d"
+            intensity={1.15}
+            speed={0.16}
+            distort={0.42}
+            offset={{ x: 0, y: 0 }}
+            hoverDampness={0.35}
+            rayCount={12}
+            colors={["#ff5c7a", "#ff9c89", "#ffd1c7", "#9e91c9", "#f7f5f2"]}
+          />
+        </div>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_72%,rgba(255,241,235,.22),transparent_39%),radial-gradient(circle_at_21%_54%,rgba(255,213,202,.28),transparent_28%),radial-gradient(circle_at_80%_48%,rgba(116,99,164,.2),transparent_25%)]" />
+        <div className="absolute inset-[5%] border border-white/10 [border-radius:inherit]" />
       </div>
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_30%,rgba(255,220,207,.32),transparent_24%),radial-gradient(circle_at_82%_40%,rgba(163,150,210,.18),transparent_25%),radial-gradient(circle_at_50%_32%,rgba(255,247,242,.2),transparent_35%),linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.16)_62%,#f4f4ef_100%)]" />
-      <div className="pointer-events-none absolute left-1/2 top-[44%] h-[420px] w-[760px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/10 blur-[90px]" />
+      <div className="pointer-events-none absolute left-1/2 top-[38%] h-[190px] w-[88vw] -translate-x-1/2 rounded-full bg-[#9e94c8]/18 blur-[80px]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(255,248,244,.2),transparent_31%),linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,.1)_67%,#f4f4ef_100%)]" />
 
       <header className="fixed left-1/2 top-5 z-50 flex h-[62px] w-[calc(100%-2rem)] max-w-[720px] -translate-x-1/2 items-center justify-between rounded-[1.65rem] border border-white/12 bg-[#111016]/48 px-3.5 shadow-[0_18px_55px_rgba(22,12,20,.18),inset_0_1px_0_rgba(255,255,255,.08)] backdrop-blur-2xl backdrop-saturate-150 sm:px-5">
         <Link to="/" aria-label="Obseri home" className="inline-flex items-center">
