@@ -143,8 +143,8 @@ function Hero() {
 
       <div className="relative z-10 mx-auto flex min-h-[820px] w-full min-w-0 max-w-[1500px] flex-col items-center justify-center px-6 pb-36 pt-24 text-center sm:min-h-[860px] sm:pb-40 lg:min-h-[900px] lg:px-10 lg:pb-48">
         <img src="/obseri-pulse-mark.svg" alt="" className="mb-7 h-10 w-10" />
-        <h1 className="w-full min-w-0 max-w-[1180px] [font-family:Baskerville,'Iowan_Old_Style','Palatino_Linotype','Times_New_Roman',serif] text-[clamp(3.25rem,5.2vw,5.6rem)] font-normal leading-[0.96] tracking-[-0.055em]">
-          Make every visit a conversation.
+        <h1 className="w-full min-w-0 max-w-[1100px] [font-family:Baskerville,'Iowan_Old_Style','Palatino_Linotype','Times_New_Roman',serif] text-[clamp(2.85rem,4.4vw,4.65rem)] font-normal leading-[0.98] tracking-[-0.045em]">
+          Make every visit a <span className="text-[#a4314a]">LEAD.</span>
         </h1>
         <p className="mt-5 w-full min-w-0 max-w-[620px] text-[14px] leading-7 text-black/52 sm:text-[17px]">
           A voice and chat agent trained on your website—built to answer, qualify, and convert.
@@ -153,19 +153,19 @@ function Hero() {
         <form
           action="/app"
           method="get"
-          className="group relative mt-7 flex w-full min-w-0 max-w-[760px] flex-col items-stretch gap-2 overflow-hidden rounded-[1.65rem] border border-white/85 bg-[#fffaf5]/82 p-1.5 shadow-[0_24px_80px_rgba(94,43,53,.13),inset_0_1px_0_rgba(255,255,255,.96)] backdrop-blur-2xl transition-[border-color,box-shadow,transform] duration-300 focus-within:-translate-y-0.5 focus-within:border-[#ff5c7a]/55 focus-within:shadow-[0_28px_90px_rgba(94,43,53,.16),0_0_0_4px_rgba(255,92,122,.10),0_0_65px_rgba(255,92,122,.28),inset_0_1px_0_rgba(255,255,255,.98)] sm:flex-row sm:items-center sm:rounded-full"
+          className="group relative mt-7 w-full min-w-0 max-w-[700px]"
         >
-          <div className="flex min-h-14 min-w-0 flex-1 items-center gap-3 px-3 py-1 sm:px-4 sm:py-0">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/7 bg-white/55 text-black/38 transition group-focus-within:border-[#ff5c7a]/30 group-focus-within:text-[#d94763]">
-              <Globe2 className="h-4 w-4" />
-            </span>
-            <div className="min-w-0 flex-1 text-left">
-              <label
-                htmlFor="quick-start-url"
-                className="block text-[9px] font-semibold uppercase tracking-[0.16em] text-black/38"
-              >
-                Your website URL
-              </label>
+          <label
+            htmlFor="quick-start-url"
+            className="mb-2.5 block text-[10px] font-semibold uppercase tracking-[0.2em] text-black/42"
+          >
+            Your website URL
+          </label>
+          <div className="flex min-w-0 flex-col gap-2 rounded-[1.7rem] border border-white/90 bg-[#fffaf5]/72 p-2 shadow-[0_24px_70px_rgba(94,43,53,.12),inset_0_1px_0_rgba(255,255,255,.98)] backdrop-blur-2xl transition-[border-color,box-shadow,transform] duration-300 group-focus-within:-translate-y-0.5 group-focus-within:border-[#ff5c7a]/55 group-focus-within:shadow-[0_28px_85px_rgba(94,43,53,.15),0_0_0_4px_rgba(255,92,122,.10),0_0_55px_rgba(255,92,122,.24),inset_0_1px_0_rgba(255,255,255,.98)] sm:flex-row sm:items-center sm:rounded-full">
+            <div className="flex min-h-14 min-w-0 flex-1 items-center gap-3 px-3 sm:px-4">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/[0.06] bg-white/65 text-black/35 transition duration-300 group-focus-within:border-[#ff5c7a]/35 group-focus-within:bg-[#fff7f5] group-focus-within:text-[#d94763]">
+                <Globe2 className="h-4 w-4" />
+              </span>
               <input
                 id="quick-start-url"
                 name="url"
@@ -173,17 +173,17 @@ function Hero() {
                 required
                 autoComplete="url"
                 placeholder="Enter your website URL"
-                className="h-6 w-full min-w-0 bg-transparent text-[14px] text-[#17171a] outline-none selection:bg-[#ff5c7a]/25 placeholder:text-black/35"
+                className="h-10 w-full min-w-0 bg-transparent text-[15px] text-[#17171a] outline-none selection:bg-[#ff5c7a]/25 placeholder:text-black/32"
               />
             </div>
+            <button
+              type="submit"
+              className="inline-flex h-14 shrink-0 items-center justify-center gap-3 rounded-[1.2rem] bg-[#17171a] px-7 text-[12px] font-bold text-white shadow-[0_10px_30px_rgba(21,21,24,.16)] transition-[background-color,box-shadow,transform] duration-300 hover:-translate-y-px hover:bg-[#ff5c7a] hover:shadow-[0_12px_34px_rgba(255,92,122,.28)] active:translate-y-0 sm:min-w-[170px] sm:rounded-full"
+            >
+              Build its soul
+              <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
+            </button>
           </div>
-          <button
-            type="submit"
-            className="inline-flex h-14 shrink-0 items-center justify-center gap-3 rounded-[1.25rem] bg-[#17171a] px-7 text-[12px] font-bold text-white shadow-[0_10px_30px_rgba(21,21,24,.16)] transition-[background-color,box-shadow,transform] duration-300 hover:-translate-y-px hover:bg-[#ff5c7a] hover:shadow-[0_12px_34px_rgba(255,92,122,.28)] active:translate-y-0 sm:rounded-full"
-          >
-            Build its soul
-            <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
-          </button>
         </form>
       </div>
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[12] h-28 bg-[linear-gradient(to_bottom,transparent,#f4f4ef)]" />
