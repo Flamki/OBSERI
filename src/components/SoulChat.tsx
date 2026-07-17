@@ -222,7 +222,7 @@ export default function SoulChat({
         try {
           await speak(data.answer);
         } catch {
-          setError("I couldn’t play the spoken answer. You can continue by voice.");
+          setError("The selected voice is temporarily unavailable. The text answer is still here.");
         }
       }
     } catch (cause) {
@@ -352,14 +352,10 @@ export default function SoulChat({
       const segment = text.trim();
       if (!segment) return;
       if (soul.voice.provider === "voicebox" && soul.voice.profileId) {
-        const audio = fetchVoiceboxAudio(segment, voiceRequestRef.current?.signal).catch(
-          () => null,
-        );
+        const audio = fetchVoiceboxAudio(segment, voiceRequestRef.current?.signal);
         playback = playback.then(async () => {
           if (!voiceCallActiveRef.current) return;
-          const blob = await audio;
-          if (blob) await playAudioBlob(blob);
-          else await speakBrowserSegment(segment);
+          await playAudioBlob(await audio);
         });
       } else if (soul.voice.provider === "supertonic") {
         // Keep inference serialized on the small voice host, but start the
@@ -371,14 +367,15 @@ export default function SoulChat({
             language: callLanguage,
             speed: soul.voice.speed,
             qualitySteps: 2,
-          }).catch(() => null),
+          }),
         );
-        synthesis = audio.then(() => undefined);
+        synthesis = audio.then(
+          () => undefined,
+          () => undefined,
+        );
         playback = playback.then(async () => {
           if (!voiceCallActiveRef.current) return;
-          const blob = await audio;
-          if (blob) await playSupertonicAudio(blob);
-          else await speakBrowserSegment(segment);
+          await playSupertonicAudio(await audio);
         });
       } else {
         playback = playback.then(() =>
@@ -580,9 +577,12 @@ export default function SoulChat({
           }).then(playSupertonicAudio)
         : speak(greeting);
     void opening
-      .catch(() => speakBrowserSegment(greeting))
       .then(() => {
         if (voiceCallActiveRef.current) startListening(true);
+      })
+      .catch(() => {
+        setError("The selected voice is temporarily unavailable. Please try again shortly.");
+        stopVoiceCall();
       });
   }
 

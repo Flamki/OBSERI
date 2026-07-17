@@ -168,17 +168,7 @@ export async function speakSupertonic(
   text: string,
   options: NonNullable<Parameters<typeof synthesizeSupertonic>[1]> = {},
 ) {
-  let blob: Blob;
-  try {
-    blob = await fetchSupertonicAudio(text, options);
-  } catch (cloudError) {
-    // Never make a visitor download the large model during a live call. An
-    // already-warm local runtime may rescue a cloud request; otherwise the
-    // caller immediately falls back to an installed browser voice.
-    if (!readyRuntime) throw cloudError;
-    blob = await synthesizeSupertonic(text, options);
-  }
-  await playSupertonicAudio(blob);
+  await playSupertonicAudio(await fetchSupertonicAudio(text, options));
 }
 
 export function fetchSupertonicAudio(

@@ -30,12 +30,12 @@ self-serve customers.
 | Website ingestion                | Done and live             | Same-origin discovery, robots and sitemap support, bounded depth/page limits, canonicalization, deduplication, revisions, refresh validators, and visible crawl progress |
 | Retrieval and chat               | Done and live             | Source-grounded answers, visible citations, deterministic fallback, and an OpenAI-compatible hosted provider                                                             |
 | Personality                      | Done and live             | Name, role, purpose, tone, traits, greeting, instructions, unknown response, and guardrails                                                                              |
-| Consistent neural voice          | Done and live             | Ten Supertonic presets route through the authenticated Mumbai voice service; browser speech fails over immediately when that service is unavailable                      |
-| Browser voice                    | Done and live             | Instant device speech synthesis and speech recognition remains the zero-download fallback                                                                                |
+| Consistent neural voice          | Done and live             | Ten Supertonic presets route through the authenticated Mumbai voice service; a selected voice never changes silently during a call                                       |
+| Browser voice                    | Done and live             | Instant device speech synthesis remains an explicit engine choice, while device speech recognition handles voice input                                                   |
 | Voicebox presets                 | Done locally              | 50 Kokoro voices verified across English, Spanish, French, Hindi, Italian, Japanese, Portuguese, and Chinese                                                             |
 | Voice cloning                    | Done locally              | Consent-gated Voicebox profile and sample workflow with `self`, `permission`, or `licensed` rights basis                                                                 |
 | Voice preview cache              | Done locally              | Repeated generated previews are served from cache instead of regenerating audio                                                                                          |
-| Public Voicebox service          | Waiting on infrastructure | Requires a public GPU worker; production currently falls back safely to browser voices                                                                                   |
+| Public Voicebox service          | Waiting on infrastructure | Requires a public GPU worker; unavailable voices fail clearly instead of substituting a different speaker                                                               |
 | Widget                           | Done and live             | Responsive isolated widget loader from `public/obseri-widget.js`                                                                                                         |
 | Webhooks                         | Done                      | HMAC-SHA256 signatures, timestamps, event IDs, test delivery, and idempotency keys                                                                                       |
 | Production schema                | Done, not provisioned     | Supabase/Postgres migrations cover accounts, workspaces, Souls, knowledge, conversations, voice consent, jobs, and webhook delivery                                      |
@@ -63,9 +63,9 @@ self-serve customers.
 - Configurable personality, greeting, behavioral instructions, guardrails, and escalation behavior
 - Deterministic source-grounded answers when no hosted model is configured
 - Fireworks-compatible production conversation and analysis configuration
-- Browser text-to-speech and speech-to-text fallback
+- Explicit browser text-to-speech option and browser speech recognition
 - Ten consistent Supertonic 3 neural presets with lazy model loading, WebGPU/WASM routing,
-  immutable model revision pinning, per-style loading, and native-voice failover
+  immutable model revision pinning, per-style loading, and strict voice identity
 - Voicebox preset discovery, profile creation, cached speech generation, speed control, and cloning
   consent
 
@@ -224,10 +224,9 @@ credits and free-plan eligibility are temporary; billing must still be reviewed 
 credit window ends. The first deployment is intentionally CPU-capable. Add GPU capacity or managed
 streaming TTS only when measured concurrency, time-to-first-audio, or voice quality requires it.
 
-If the cloud voice is unavailable, a call immediately uses an installed browser voice rather than
-showing a loader or attempting a large cold download. The original WebGPU/WASM runtime remains in the
-codebase as a warm local recovery path and for future privacy mode, but it is no longer the default
-visitor experience. Licensing and attribution are recorded in
+If the selected cloud voice is unavailable, the call stops with a clear retry message instead of
+silently changing speakers. The original WebGPU/WASM runtime remains in the codebase for an explicit
+future privacy mode, but it is not an automatic live-call substitute. Licensing and attribution are recorded in
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ## Voice platform decision
@@ -245,7 +244,7 @@ The production routing target is:
 - **Sarvam** for Indian languages, Indian English, and code-switched conversations
 - **ElevenLabs** for premium global voices, low-latency English, and managed voice cloning
 - **Supertonic** for consistent, pre-warmed cloud speech and private deployment without mandatory GPU capacity
-- **Browser speech** as the instant, zero-download greeting and availability fallback
+- **Browser speech** as an explicit zero-download voice choice, never a hidden replacement
 - **Self-hosted open models through Voicebox** for private deployments, experiments, batch work,
   and a future cost-control path
 
@@ -270,7 +269,7 @@ Obseri will follow that boundary:
 - The call worker owns VAD, turn detection, barge-in, cancellation, and latency telemetry.
 - Website retrieval runs beside the call worker and returns a compact evidence context before the model turn.
 - Native speech-to-speech is the lowest-latency premium route; streamed STT + LLM + TTS is the portable route.
-- Supertonic remains a preview, fallback, and private-deployment voice until it exposes true incremental audio.
+- Supertonic remains a preview and private-deployment voice until it exposes true incremental audio.
 - Cached greetings and common confirmations hide predictable inference without pretending cached audio is a live model.
 
 Do not buy permanent GPU capacity until production traffic demonstrates that provider spend is
@@ -297,7 +296,7 @@ Two external infrastructure items block paid self-serve launch:
 2. **Full-duplex real-time voice.** Production Supertonic TTS is live, but natural phone-like calls
    still need streaming STT/TTS adapters behind Obseri-owned interfaces, beginning with Sarvam for
    Indian languages and ElevenLabs for premium global voices. Add interruption handling, quotas,
-   cancellation, private sample storage, and provider-level failover. Keep Voicebox as the
+   cancellation, private sample storage, and provider health monitoring without cross-voice failover. Keep Voicebox as the
    self-hosted/private path until measured demand justifies GPU infrastructure.
 
 Before charging customers, also complete:
@@ -316,7 +315,7 @@ Before charging customers, also complete:
 
 1. Add a dedicated Supabase project and apply `supabase/migrations`.
 2. Replace browser-local workspace persistence with authenticated Supabase persistence.
-3. Add Sarvam and ElevenLabs streaming adapters with provider routing and browser fallback.
+3. Add Sarvam and ElevenLabs streaming adapters with explicit provider routing and no cross-voice fallback.
 4. Cache public voice previews in object storage/CDN and benchmark full call latency by region.
 5. Add API ownership, rate limits, domain verification, durable queues, and observability.
 6. Run a private pilot before enabling Stripe and self-serve onboarding.
