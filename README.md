@@ -30,7 +30,7 @@ self-serve customers.
 | Website ingestion                | Done and live             | Same-origin discovery, robots and sitemap support, bounded depth/page limits, canonicalization, deduplication, revisions, refresh validators, and visible crawl progress |
 | Retrieval and chat               | Done and live             | Source-grounded answers, visible citations, deterministic fallback, and an OpenAI-compatible hosted provider                                                             |
 | Personality                      | Done and live             | Name, role, purpose, tone, traits, greeting, instructions, unknown response, and guardrails                                                                              |
-| On-device neural voice           | Done, ready to publish    | Ten consistent Supertonic presets run in-browser through WebGPU with WASM fallback; the first greeting stays instant while the pinned model warms and caches             |
+| Consistent neural voice          | Cloud adapter done        | Ten Supertonic presets route through an authenticated pre-warmed service; browser speech fails over immediately when that service is unavailable                         |
 | Browser voice                    | Done and live             | Instant device speech synthesis and speech recognition remains the zero-download fallback                                                                                |
 | Voicebox presets                 | Done locally              | 50 Kokoro voices verified across English, Spanish, French, Hindi, Italian, Japanese, Portuguese, and Chinese                                                             |
 | Voice cloning                    | Done locally              | Consent-gated Voicebox profile and sample workflow with `self`, `permission`, or `licensed` rights basis                                                                 |
@@ -164,6 +164,8 @@ to connect hosted services. Never commit `.env.local` or provider credentials.
 | `OBSERI_CHAT_API_KEY`       | Server-only grounded-chat credential                             |
 | `OBSERI_CHAT_MODEL`         | Grounded-chat model identifier                                   |
 | `OBSERI_VOICE_MODEL`        | Optional low-latency model for streamed live voice turns         |
+| `OBSERI_SUPERTONIC_URL`     | Private URL for the pre-warmed Supertonic container              |
+| `OBSERI_SUPERTONIC_API_KEY` | Shared server-only bearer secret for the Supertonic container    |
 | `OBSERI_VOICEBOX_URL`       | Public or local Voicebox REST base URL                           |
 | `OBSERI_ENABLE_QWEN_VOICES` | Enables Qwen presets only when the worker has adequate GPU/RAM   |
 
@@ -198,26 +200,23 @@ calls, Qwen voices, and scalable cloning.
 Until that worker exists, production exposes on-device Supertonic and browser voices instead of
 advertising a Voicebox catalogue that cannot generate audio.
 
-## On-device neural voice
+## Cloud neural voice
 
-Supertonic 3 is Obseri's consistent no-server-GPU voice layer. Its ~99M-parameter ONNX model runs
-inside the visitor's browser: WebGPU is preferred and ONNX Runtime automatically falls back to
-WebAssembly. Obseri exposes ten stable presets in Studio, so a selected voice does not change merely
-because the visitor moved from laptop to mobile.
+Supertonic 3 is Obseri's consistent open-weight voice layer. Ten stable presets appear in Studio, so
+a selected voice stays the same across laptop and mobile. Normal calls now use an authenticated,
+pre-warmed server instead of downloading roughly 400 MB of model data into each visitor's browser.
+The Obseri web API is the only client of that server; its bearer credential never reaches the widget.
 
-The model is not shipped in the initial JavaScript bundle. After explicit voice interaction, Obseri
-loads the four ONNX sessions from an immutable Hugging Face revision, loads only the selected style,
-and lets the browser cache those assets. During the first cold start, Obseri speaks the greeting with
-the best native device voice while warming Supertonic in the background. Later turns use the selected
-neural preset. Unsupported, low-capability, offline, or failed devices continue through the native
-voice path rather than losing the call.
+The deployment image in [`services/supertonic`](services/supertonic) bakes the model into the image,
+keeps the official engine loopback-only, and exposes it through a bearer-authenticated proxy. Run at
+least one warm instance in the same region as the web API. The first production deployment is
+intentionally CPU-capable; add GPU capacity only when measured concurrency or latency requires it.
 
-Supertonic improves consistency and removes server GPU cost, but it does not replace a managed
-streaming provider for every production call. Cold downloads are substantial, WASM-only devices can
-have slower synthesis, and browser speech recognition is still platform-dependent. Paid traffic
-should therefore retain managed STT/TTS adapters for strict time-to-first-audio SLAs, while
-Supertonic provides privacy-friendly on-device speech and cost control. Licensing and attribution are
-recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+If the cloud voice is unavailable, a call immediately uses an installed browser voice rather than
+showing a loader or attempting a large cold download. The original WebGPU/WASM runtime remains in the
+codebase as a warm local recovery path and for future privacy mode, but it is no longer the default
+visitor experience. Licensing and attribution are recorded in
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ## Voice platform decision
 
@@ -233,7 +232,7 @@ The production routing target is:
 
 - **Sarvam** for Indian languages, Indian English, and code-switched conversations
 - **ElevenLabs** for premium global voices, low-latency English, and managed voice cloning
-- **Supertonic** for consistent, private, on-device neural speech without server GPU capacity
+- **Supertonic** for consistent, pre-warmed cloud speech and private deployment without mandatory GPU capacity
 - **Browser speech** as the instant, zero-download greeting and availability fallback
 - **Self-hosted open models through Voicebox** for private deployments, experiments, batch work,
   and a future cost-control path

@@ -12,13 +12,7 @@ import {
   ShieldCheck,
   Webhook,
 } from "lucide-react";
-import {
-  isSupertonicReady,
-  preloadSupertonic,
-  speakSupertonic,
-  stopSupertonic,
-  type SupertonicVoiceId,
-} from "@/lib/supertonic";
+import { speakSupertonic, stopSupertonic, type SupertonicVoiceId } from "@/lib/supertonic";
 
 const displayFont =
   "[font-family:Baskerville,'Iowan_Old_Style','Palatino_Linotype','Times_New_Roman',serif]";
@@ -323,28 +317,16 @@ function PlayableAgent() {
       setNotice("Call ended");
     };
 
-    if (isSupertonicReady()) {
-      setVoiceStatus("speaking");
-      setNotice(speakingNotice);
-      void speakSupertonic(answer, {
-        voice: agent.neuralVoice,
-        language: "en",
-        speed: agent.rate,
-        qualitySteps: 4,
-      })
-        .then(finishTurn)
-        .catch(() => speakBrowserReply());
-      return;
-    }
-
-    // Keep the first greeting instant while the consistent neural model warms in
-    // the background. Every later turn automatically upgrades to Supertonic.
-    void preloadSupertonic((stage) => {
-      if (stage.phase === "loading" && conversationActiveRef.current) {
-        setNotice(`${speakingNotice} · natural voice ${Math.round(stage.progress * 100)}%`);
-      }
-    }).catch(() => undefined);
-    speakBrowserReply();
+    setVoiceStatus("speaking");
+    setNotice(speakingNotice);
+    void speakSupertonic(answer, {
+      voice: agent.neuralVoice,
+      language: "en",
+      speed: agent.rate,
+      qualitySteps: 4,
+    })
+      .then(finishTurn)
+      .catch(() => speakBrowserReply());
 
     function speakBrowserReply() {
       if (!("speechSynthesis" in window)) {

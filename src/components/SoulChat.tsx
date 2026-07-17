@@ -19,13 +19,7 @@ import {
 } from "lucide-react";
 import { rankKnowledgeChunks, type ChatResponse } from "@/lib/conversation";
 import type { KnowledgeChunk, Soul, SoulMessage } from "@/lib/soul";
-import {
-  isSupertonicReady,
-  preloadSupertonic,
-  speakSupertonic,
-  stopSupertonic,
-  type SupertonicVoiceId,
-} from "@/lib/supertonic";
+import { speakSupertonic, stopSupertonic, type SupertonicVoiceId } from "@/lib/supertonic";
 
 const VOICE_LANGUAGES = [
   { code: "en-US", name: "English", flag: "US" },
@@ -305,7 +299,7 @@ export default function SoulChat({
       return;
     }
 
-    if (soul.voice.provider === "supertonic" && isSupertonicReady()) {
+    if (soul.voice.provider === "supertonic") {
       await speakSupertonic(text, {
         voice: (soul.voice.profileId || "F1") as SupertonicVoiceId,
         language: callLanguage,
@@ -340,7 +334,7 @@ export default function SoulChat({
           if (blob) await playAudioBlob(blob);
           else await speakBrowserSegment(segment);
         });
-      } else if (soul.voice.provider === "supertonic" && isSupertonicReady()) {
+      } else if (soul.voice.provider === "supertonic") {
         playback = playback.then(() =>
           voiceCallActiveRef.current
             ? speakSupertonic(segment, {
@@ -540,16 +534,9 @@ export default function SoulChat({
     voiceCallActiveRef.current = true;
     setVoiceCallActive(true);
     const greeting = soul.personality.greeting.trim();
-    if (soul.voice.provider === "supertonic" && !isSupertonicReady()) {
-      void preloadSupertonic().catch(() => undefined);
-      void speakBrowserSegment(greeting).then(() => {
-        if (voiceCallActiveRef.current) startListening(true);
-      });
-      return;
-    }
     setVoiceStatus("speaking");
     void speak(greeting)
-      .catch(() => undefined)
+      .catch(() => speakBrowserSegment(greeting))
       .then(() => {
         if (voiceCallActiveRef.current) startListening(true);
       });

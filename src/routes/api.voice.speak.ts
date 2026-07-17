@@ -4,7 +4,8 @@ import { getRuntimeEnvironment } from "@/lib/runtime-env";
 
 const schema = z.object({
   text: z.string().min(1).max(4_000),
-  profileId: z.string().min(1).max(120),
+  provider: z.enum(["voicebox", "supertonic"]).optional(),
+  profileId: z.string().min(1).max(120).optional(),
   language: z.string().min(2).max(10).default("en"),
   engine: z
     .enum([
@@ -38,13 +39,54 @@ export const Route = createFileRoute("/api/voice/speak")({
         const parsed = schema.safeParse(await request.json());
         if (!parsed.success)
           return Response.json({ error: { message: "Invalid speech request." } }, { status: 400 });
-        const baseUrl = getRuntimeEnvironment().OBSERI_VOICEBOX_URL?.replace(/\/$/, "");
+        const env = getRuntimeEnvironment();
+        const provider = parsed.data.provider ?? "voicebox";
+        const supertonicApiKey = env.OBSERI_SUPERTONIC_API_KEY;
+        const baseUrl = (
+          provider === "supertonic" ? env.OBSERI_SUPERTONIC_URL : env.OBSERI_VOICEBOX_URL
+        )?.replace(/\/$/, "");
         if (!baseUrl)
           return Response.json(
-            { error: { message: "Voicebox is not configured." } },
+            {
+              error: {
+                message:
+                  provider === "supertonic"
+                    ? "Cloud neural voice is not configured."
+                    : "Voicebox is not configured.",
+              },
+            },
+            { status: 503 },
+          );
+        if (provider === "supertonic" && !supertonicApiKey)
+          return Response.json(
+            { error: { message: "Cloud neural voice authentication is not configured." } },
             { status: 503 },
           );
         try {
+          if (provider === "supertonic") {
+            const supertonicRequest = {
+              text: parsed.data.text,
+              voice: parsed.data.profileId ?? "F1",
+              lang: normalizeLanguage(parsed.data.language),
+              steps: 4,
+              speed: parsed.data.speed ?? 1.03,
+              response_format: "wav",
+            } satisfies SupertonicGenerationRequest;
+            const cacheKey = `supertonic:${JSON.stringify(supertonicRequest)}`;
+            const cached = readCachedAudio(cacheKey);
+            const audio =
+              cached ??
+              (await generateCachedAudio(cacheKey, () =>
+                generateSupertonicAudio(baseUrl, supertonicApiKey!, supertonicRequest),
+              ));
+            return audioResponse(audio, cached ? "HIT" : "MISS", "supertonic");
+          }
+
+          if (!parsed.data.profileId)
+            return Response.json(
+              { error: { message: "A Voicebox profile is required." } },
+              { status: 400 },
+            );
           const engine =
             parsed.data.engine ?? (await resolveProfileEngine(baseUrl, parsed.data.profileId));
           const voiceboxRequest = {
@@ -61,17 +103,9 @@ export const Route = createFileRoute("/api/voice/speak")({
           const audio =
             cached ??
             (cacheable
-              ? await generateCachedAudio(cacheKey, baseUrl, voiceboxRequest)
+              ? await generateCachedAudio(cacheKey, () => generateAudio(baseUrl, voiceboxRequest))
               : await generateAudio(baseUrl, voiceboxRequest));
-          return new Response(audio.bytes.slice(0), {
-            status: 200,
-            headers: {
-              "content-type": audio.contentType,
-              "cache-control": "no-store",
-              "content-disposition": 'inline; filename="obseri-voice.wav"',
-              "x-obseri-voice-cache": cached ? "HIT" : "MISS",
-            },
-          });
+          return audioResponse(audio, cached ? "HIT" : "MISS", "voicebox");
         } catch (error) {
           return Response.json(
             {
@@ -108,10 +142,10 @@ function readCachedAudio(key: string) {
   return cached;
 }
 
-async function generateCachedAudio(key: string, baseUrl: string, body: VoiceboxGenerationRequest) {
+async function generateCachedAudio(key: string, generate: () => Promise<CachedAudio>) {
   const existing = previewInflight.get(key);
   if (existing) return existing;
-  const generation = generateAudio(baseUrl, body).then((audio) => {
+  const generation = generate().then((audio) => {
     previewCache.set(key, audio);
     while (previewCache.size > PREVIEW_CACHE_LIMIT) {
       const oldest = previewCache.keys().next().value;
@@ -126,6 +160,58 @@ async function generateCachedAudio(key: string, baseUrl: string, body: VoiceboxG
   } finally {
     previewInflight.delete(key);
   }
+}
+
+function audioResponse(audio: CachedAudio, cache: "HIT" | "MISS", provider: string) {
+  return new Response(audio.bytes.slice(0), {
+    status: 200,
+    headers: {
+      "content-type": audio.contentType,
+      "cache-control": "no-store",
+      "content-disposition": 'inline; filename="obseri-voice.wav"',
+      "x-obseri-voice-cache": cache,
+      "x-obseri-voice-provider": provider,
+    },
+  });
+}
+
+type SupertonicGenerationRequest = {
+  text: string;
+  voice: string;
+  lang: string;
+  steps: number;
+  speed: number;
+  response_format: "wav";
+};
+
+async function generateSupertonicAudio(
+  baseUrl: string,
+  apiKey: string,
+  body: SupertonicGenerationRequest,
+) {
+  const response = await fetch(`${baseUrl}/v1/tts`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(readVoiceboxError(detail) || `Supertonic returned ${response.status}.`);
+  }
+  return {
+    bytes: await response.arrayBuffer(),
+    contentType: response.headers.get("content-type") ?? "audio/wav",
+    createdAt: Date.now(),
+  } satisfies CachedAudio;
+}
+
+function normalizeLanguage(language: string) {
+  const base = language.toLowerCase().split(/[-_]/)[0];
+  return base || "na";
 }
 
 async function generateAudio(baseUrl: string, body: VoiceboxGenerationRequest) {

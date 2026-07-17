@@ -2500,7 +2500,20 @@ function VoiceView({
           },
         });
       } catch {
-        onNotice("This device could not start the neural voice. Device voices still work.");
+        if ("speechSynthesis" in window) {
+          const fallback = new SpeechSynthesisUtterance(previewText);
+          fallback.lang = voice.language;
+          fallback.rate = soul.voice.speed;
+          fallback.pitch = soul.voice.pitch;
+          fallback.voice =
+            browserVoices.find((candidate) =>
+              candidate.lang.toLowerCase().startsWith(voice.language.toLowerCase().split("-")[0]),
+            ) ?? null;
+          window.speechSynthesis.speak(fallback);
+          onNotice("Using an instant device voice while the cloud voice is offline.");
+        } else {
+          onNotice("Cloud neural voice is offline and this browser has no device voice.");
+        }
       } finally {
         setPreparingId(null);
         setPlayingId(null);

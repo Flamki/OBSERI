@@ -164,10 +164,19 @@ export async function synthesizeSupertonic(
 
 export async function speakSupertonic(
   text: string,
-  options: Parameters<typeof synthesizeSupertonic>[1] = {},
+  options: NonNullable<Parameters<typeof synthesizeSupertonic>[1]> = {},
 ) {
   const generation = ++speechGeneration;
-  const blob = await synthesizeSupertonic(text, options);
+  let blob: Blob;
+  try {
+    blob = await fetchCloudSupertonic(text, options);
+  } catch (cloudError) {
+    // Never make a visitor download the large model during a live call. An
+    // already-warm local runtime may rescue a cloud request; otherwise the
+    // caller immediately falls back to an installed browser voice.
+    if (!readyRuntime) throw cloudError;
+    blob = await synthesizeSupertonic(text, options);
+  }
   if (generation !== speechGeneration) throw new DOMException("Speech stopped", "AbortError");
   clearActiveAudio();
   const href = URL.createObjectURL(blob);
@@ -190,6 +199,33 @@ export async function speakSupertonic(
         finish(cause instanceof Error ? cause : new Error("Neural voice playback failed.")),
       );
   });
+}
+
+async function fetchCloudSupertonic(
+  text: string,
+  options: NonNullable<Parameters<typeof synthesizeSupertonic>[1]>,
+) {
+  const response = await fetch("/api/voice/speak", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      provider: "supertonic",
+      text: normalizeSpeechText(text),
+      profileId: options.voice ?? "F1",
+      language: normalizeLanguage(options.language),
+      speed: options.speed ?? 1.03,
+    }),
+    // A live call must fail over quickly instead of leaving dead air. A warm
+    // regional service should answer well inside this ceiling.
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      error?: { message?: string };
+    } | null;
+    throw new Error(payload?.error?.message || "Cloud neural voice is unavailable.");
+  }
+  return response.blob();
 }
 
 export function stopSupertonic() {
