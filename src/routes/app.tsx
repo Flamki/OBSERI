@@ -85,6 +85,7 @@ type StudioView =
   | "playground"
   | "deploy"
   | "conversations"
+  | "profile"
   | "settings"
   | "help";
 
@@ -107,7 +108,8 @@ const PAGE_META: Record<StudioView, { title: string; description: string }> = {
     title: "Conversations",
     description: "Understand what visitors are asking for.",
   },
-  settings: { title: "Settings", description: "Manage your profile, workspace, and data." },
+  profile: { title: "Profile and workspace", description: "Manage your account and workspace." },
+  settings: { title: "Settings", description: "Manage the selected website and its data." },
   help: { title: "Help", description: "Get support and find the right next step." },
 };
 
@@ -440,10 +442,15 @@ function SoulStudio() {
               <DeployView soul={soul} onUpdate={updateSoul} onNotice={setNotice} />
             ) : view === "conversations" ? (
               <ConversationsView soul={soul} onTest={() => navigate("playground")} />
+            ) : view === "profile" ? (
+              <ProfileWorkspaceView
+                workspace={workspace}
+                onWorkspaceNameChange={(name) => setWorkspace((current) => ({ ...current, name }))}
+              />
             ) : view === "settings" ? (
               <SettingsView
                 soul={soul}
-                workspace={workspace}
+                onUpdate={updateSoul}
                 onDelete={() => {
                   setWorkspace((current) => {
                     const souls = current.souls.filter((candidate) => candidate.id !== soul.id);
@@ -968,7 +975,7 @@ function ProfileMenu({
       <MenuRow
         icon={<UserRound />}
         label="Profile and workspace"
-        onClick={() => onNavigate("settings")}
+        onClick={() => onNavigate("profile")}
       />
       <MenuRow icon={<Settings />} label="Settings" onClick={() => onNavigate("settings")} />
       <div className="my-2 h-px bg-[#ecece9]" />
@@ -3797,28 +3804,24 @@ function HelpView() {
   );
 }
 
-function SettingsView({
-  soul,
+function ProfileWorkspaceView({
   workspace,
-  onDelete,
+  onWorkspaceNameChange,
 }: {
-  soul: Soul;
   workspace: SoulWorkspace;
-  onDelete: () => void;
+  onWorkspaceNameChange: (name: string) => void;
 }) {
+  const learnedPages = workspace.souls.reduce(
+    (total, workspaceSoul) => total + workspaceSoul.knowledge.pages.length,
+    0,
+  );
+
   return (
-    <Page
-      title="Profile and workspace"
-      description="Local founder settings for this build."
-      hideHeader
-    >
+    <Page title="Profile and workspace" description="Your account, plan, and workspace." hideHeader>
       <div className="grid min-h-[calc(100vh-64px)] lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 lg:border-r lg:border-[#e5e6e2]">
           <Card>
-            <SectionHeading
-              title="Profile"
-              description="OAuth account details will replace this local profile in production."
-            />
+            <SectionHeading title="Profile" description="The person who owns this workspace." />
             <div className="mt-6 flex items-center gap-4">
               <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#20221f] font-semibold text-white">
                 BB
@@ -3830,50 +3833,134 @@ function SettingsView({
             </div>
             <div className="mt-6 grid gap-5 sm:grid-cols-2">
               <Field label="Display name">
-                <input defaultValue="Obseri Founder" className="clean-input" />
+                <input value="Obseri Founder" readOnly className="clean-input" />
               </Field>
               <Field label="Email">
-                <input placeholder="you@company.com" className="clean-input" />
+                <input value="flamki@obseri.com" readOnly className="clean-input" />
               </Field>
             </div>
           </Card>
           <Card>
-            <SectionHeading
-              title="Workspace"
-              description="The shared home for your website souls."
-            />
+            <SectionHeading title="Workspace" description="The shared home for your websites." />
             <Field label="Workspace name" className="mt-5">
-              <input defaultValue={workspace.name} className="clean-input" />
+              <input
+                value={workspace.name}
+                onChange={(event) => onWorkspaceNameChange(event.target.value)}
+                className="clean-input"
+              />
             </Field>
-            <div className="mt-5 flex items-center justify-between rounded-xl bg-[#f5f6f3] p-4">
+          </Card>
+        </div>
+        <div className="min-w-0 bg-[#fafaf8]">
+          <Card>
+            <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold">Founder plan</p>
-                <p className="mt-1 text-xs text-[#7b7f78]">Local build · billing not connected</p>
+                <h3 className="font-semibold">Founder plan</h3>
+                <p className="mt-1 text-sm text-[#747870]">Workspace access</p>
               </div>
-              <span className="rounded-lg border border-[#dfe0dc] bg-white px-3 py-1.5 text-xs font-semibold">
+              <span className="rounded-lg bg-[#20221f] px-3 py-1.5 text-xs font-semibold text-white">
                 Active
               </span>
+            </div>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <div className="rounded-xl bg-[#f3f4f1] p-4">
+                <p className="text-2xl font-semibold">{workspace.souls.length}</p>
+                <p className="mt-1 text-xs text-[#777b74]">Websites</p>
+              </div>
+              <div className="rounded-xl bg-[#f3f4f1] p-4">
+                <p className="text-2xl font-semibold">{learnedPages}</p>
+                <p className="mt-1 text-xs text-[#777b74]">Pages learned</p>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+    </Page>
+  );
+}
+
+function SettingsView({
+  soul,
+  onUpdate,
+  onDelete,
+}: {
+  soul: Soul;
+  onUpdate: (updater: (soul: Soul) => Soul) => void;
+  onDelete: () => void;
+}) {
+  return (
+    <Page title="Settings" description="Manage the selected website and its data." hideHeader>
+      <div className="grid min-h-[calc(100vh-64px)] lg:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="min-w-0 lg:border-r lg:border-[#e5e6e2]">
+          <Card>
+            <SectionHeading
+              title="Website"
+              description="Identity and visitor access for the selected website."
+            />
+            <div className="mt-6 flex items-center gap-4">
+              <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-black/5 bg-[#f3f5f0]">
+                <img
+                  src={websiteFaviconUrl(soul.siteUrl)}
+                  alt=""
+                  className="h-7 w-7 rounded object-contain"
+                />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate font-semibold">{soul.name}</p>
+                <a
+                  href={soul.siteUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 block truncate text-sm text-[#6c8f4b] hover:underline"
+                >
+                  {safeHost(soul.siteUrl)}
+                </a>
+              </div>
+            </div>
+            <Field label="Website name" className="mt-6">
+              <input
+                value={soul.name}
+                onChange={(event) =>
+                  onUpdate((current) => ({ ...current, name: event.target.value }))
+                }
+                className="clean-input"
+              />
+            </Field>
+            <div className="mt-6 flex items-center justify-between rounded-xl border border-[#e3e5df] p-4">
+              <div>
+                <p className="text-sm font-semibold">Visitor widget</p>
+                <p className="mt-1 text-xs text-[#777b74]">Allow voice and chat on this website.</p>
+              </div>
+              <Toggle
+                checked={soul.channels.widgetEnabled}
+                onChange={(widgetEnabled) =>
+                  onUpdate((current) => ({
+                    ...current,
+                    channels: { ...current.channels, widgetEnabled },
+                  }))
+                }
+              />
             </div>
           </Card>
         </div>
         <div className="min-w-0 bg-[#fafaf8]">
           <Card>
-            <h3 className="font-semibold">Your data</h3>
+            <h3 className="font-semibold">Website data</h3>
             <p className="mt-2 text-sm leading-6 text-[#747870]">
-              Export this Soul before clearing local browser storage.
+              Download this website’s knowledge, personality, voice, and configuration.
             </p>
             <button
               onClick={() => exportSoul(soul)}
               className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-[#dfe0dc] px-4 py-2.5 text-sm font-semibold hover:bg-[#f5f5f3]"
             >
               <Download className="h-4 w-4" />
-              Export Soul
+              Export website
             </button>
           </Card>
           <Card className="border-[#edd8d2]">
-            <h3 className="font-semibold text-[#8b493a]">Delete website soul</h3>
+            <h3 className="font-semibold text-[#8b493a]">Delete website</h3>
             <p className="mt-2 text-sm leading-6 text-[#8a6a62]">
-              This removes the local knowledge, settings, and conversations.
+              Permanently remove its knowledge, settings, and conversations.
             </p>
             <button
               onClick={() => {
@@ -3882,7 +3969,7 @@ function SettingsView({
               className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-[#e8c8bf] px-4 py-2.5 text-sm font-semibold text-[#984c3b] hover:bg-[#fff7f4]"
             >
               <Trash2 className="h-4 w-4" />
-              Delete Soul
+              Delete website
             </button>
           </Card>
         </div>
