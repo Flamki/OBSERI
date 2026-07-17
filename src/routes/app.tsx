@@ -3335,13 +3335,13 @@ function PlaygroundView({
       </aside>
 
       <div
-        className={`absolute top-1/2 z-[55] flex -translate-y-1/2 items-center overflow-hidden rounded-l-2xl border border-r-0 border-black/10 bg-white/95 shadow-[0_12px_32px_rgba(20,24,18,.16)] backdrop-blur-xl transition-[right] duration-300 ${
+        className={`absolute top-1/2 z-[55] flex w-[132px] -translate-y-1/2 flex-col overflow-hidden rounded-l-2xl border border-r-0 border-black/10 bg-white/95 shadow-[0_12px_32px_rgba(20,24,18,.16)] backdrop-blur-xl transition-[right] duration-300 ${
           customizeOpen ? "right-[330px]" : "right-0"
         }`}
       >
         <button
           onClick={() => setCustomizeOpen((current) => !current)}
-          className="flex h-12 items-center justify-center gap-2 px-4 text-sm font-semibold text-[#343832] transition hover:bg-[#f3f5f0]"
+          className="flex h-12 w-full items-center justify-center gap-2 px-3 text-sm font-semibold text-[#343832] transition hover:bg-[#f3f5f0]"
           aria-label={customizeOpen ? "Close customization drawer" : "Open customization drawer"}
           title="Customize visitor experience"
         >
@@ -3358,7 +3358,7 @@ function PlaygroundView({
             setFrameLoading(true);
             setFrameKey((current) => current + 1);
           }}
-          className="flex h-12 w-11 items-center justify-center border-l border-black/10 text-[#555a52] transition hover:bg-[#f3f5f0]"
+          className="flex h-11 w-full items-center justify-center border-t border-black/10 text-[#555a52] transition hover:bg-[#f3f5f0]"
           aria-label="Refresh website preview"
           title="Refresh website"
         >
@@ -3368,7 +3368,7 @@ function PlaygroundView({
           href={previewUrl}
           target="_blank"
           rel="noreferrer"
-          className="flex h-12 w-11 items-center justify-center border-l border-black/10 text-[#555a52] transition hover:bg-[#f3f5f0]"
+          className="flex h-11 w-full items-center justify-center border-t border-black/10 text-[#555a52] transition hover:bg-[#f3f5f0]"
           aria-label="Open website in a new tab"
           title="Open website"
         >
