@@ -5,11 +5,10 @@ import {
   ArrowRight,
   Check,
   ExternalLink,
-  MessageCircle,
   Mic2,
   PhoneCall,
+  PhoneOff,
   RefreshCw,
-  Send,
   ShieldCheck,
   Webhook,
 } from "lucide-react";
@@ -30,226 +29,412 @@ export default function ProductSections() {
   );
 }
 
+type VoiceStatus = "idle" | "listening" | "thinking" | "speaking" | "error";
+
+type VoiceAgent = {
+  id: string;
+  name: string;
+  role: string;
+  tone: string;
+  colors: [string, string, string];
+  rate: number;
+  pitch: number;
+  voiceHints: string[];
+  fallback: string;
+};
+
+type BrowserRecognition = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start: () => void;
+  stop: () => void;
+  abort?: () => void;
+  onresult: ((event: VoiceRecognitionEvent) => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
+  onend: (() => void) | null;
+};
+
+type VoiceRecognitionEvent = {
+  results: {
+    [index: number]: {
+      [index: number]: {
+        transcript: string;
+      };
+    };
+  };
+};
+
+type BrowserRecognitionConstructor = new () => BrowserRecognition;
+
 function PlayableAgent() {
-  const demos = [
+  const agents: VoiceAgent[] = [
     {
-      question: "Which plan fits my team?",
-      answer:
-        "For a growing team, Pro adds shared knowledge, lead capture, and conversation history.",
-      source: "Pricing",
+      id: "ona",
+      name: "Ona",
+      role: "Lead qualification",
+      tone: "Warm · persuasive",
+      colors: ["#ff6f91", "#b39cff", "#ffd3dc"],
+      rate: 1.02,
+      pitch: 1.08,
+      voiceHints: ["aria", "samantha", "female"],
+      fallback:
+        "I can learn what a visitor needs, recommend the right next step, and capture a qualified lead.",
     },
     {
-      question: "Can I book a demo?",
-      answer: "Yes. I can collect your details and pass the request to the sales team now.",
-      source: "Contact",
+      id: "arlo",
+      name: "Arlo",
+      role: "Product guidance",
+      tone: "Clear · confident",
+      colors: ["#ff8a62", "#ffc178", "#e98594"],
+      rate: 0.98,
+      pitch: 0.92,
+      voiceHints: ["guy", "david", "male"],
+      fallback:
+        "Tell me what you are trying to accomplish and I will guide you to the most relevant product information.",
     },
     {
-      question: "Is my data secure?",
-      answer: "Workspace access is scoped, sources remain visible, and webhook events are signed.",
-      source: "Security",
+      id: "mira",
+      name: "Mira",
+      role: "Customer support",
+      tone: "Calm · helpful",
+      colors: ["#8d7bd1", "#d6b4ec", "#ffb7c8"],
+      rate: 0.94,
+      pitch: 1.02,
+      voiceHints: ["zira", "jenny", "female"],
+      fallback:
+        "I can answer common support questions, cite the right documentation, and escalate when human help is needed.",
     },
   ];
-  const [mode, setMode] = useState<"voice" | "chat">("voice");
-  const [voiceState, setVoiceState] = useState<"idle" | "listening" | "speaking">("idle");
-  const [activeDemo, setActiveDemo] = useState(0);
-  const voiceTimers = useRef<number[]>([]);
+  const [activeAgent, setActiveAgent] = useState<string | null>(null);
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
+  const [transcript, setTranscript] = useState(
+    "Choose a voice and ask about pricing, product, or support.",
+  );
+  const [reply, setReply] = useState("Every voice answers from the same website knowledge.");
+  const [notice, setNotice] = useState("Live browser voice · nothing is uploaded");
+  const recognitionRef = useRef<BrowserRecognition | null>(null);
 
   useEffect(
     () => () => {
-      voiceTimers.current.forEach((timer) => window.clearTimeout(timer));
+      recognitionRef.current?.abort?.();
+      window.speechSynthesis?.cancel();
     },
     [],
   );
 
-  const switchMode = (nextMode: "voice" | "chat") => {
-    voiceTimers.current.forEach((timer) => window.clearTimeout(timer));
-    voiceTimers.current = [];
-    setVoiceState("idle");
-    setMode(nextMode);
+  const buildAnswer = (agent: VoiceAgent, spoken: string) => {
+    const question = spoken.toLowerCase();
+
+    if (question.includes("price") || question.includes("plan") || question.includes("cost")) {
+      return agent.id === "ona"
+        ? "I can compare the plans, qualify what your team needs, and guide you to the right option."
+        : "The pricing page is the best source. I can explain each plan and cite the exact details.";
+    }
+
+    if (
+      question.includes("demo") ||
+      question.includes("book") ||
+      question.includes("call") ||
+      question.includes("contact")
+    ) {
+      return "Absolutely. I can collect the visitor's details and send a signed lead event to your sales workflow.";
+    }
+
+    if (question.includes("secure") || question.includes("privacy") || question.includes("data")) {
+      return "Answers stay grounded in approved sources, workspace access is scoped, and integration events are signed.";
+    }
+
+    return agent.fallback;
   };
 
-  const startVoiceDemo = () => {
-    voiceTimers.current.forEach((timer) => window.clearTimeout(timer));
-    setVoiceState("listening");
-    voiceTimers.current = [
-      window.setTimeout(() => setVoiceState("speaking"), 1200),
-      window.setTimeout(() => setVoiceState("idle"), 5000),
-    ];
+  const speakReply = (agent: VoiceAgent, answer: string) => {
+    if (!("speechSynthesis" in window)) {
+      setVoiceStatus("idle");
+      setNotice("Voice playback is not available in this browser.");
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(answer);
+    const availableVoices = window.speechSynthesis
+      .getVoices()
+      .filter((voice) => voice.lang.toLowerCase().startsWith("en"));
+    const preferredVoice = agent.voiceHints
+      .map((hint) =>
+        availableVoices.find((voice) => voice.name.toLowerCase().includes(hint.toLowerCase())),
+      )
+      .find((voice): voice is SpeechSynthesisVoice => Boolean(voice));
+
+    if (preferredVoice) utterance.voice = preferredVoice;
+    utterance.rate = agent.rate;
+    utterance.pitch = agent.pitch;
+    utterance.onstart = () => {
+      setVoiceStatus("speaking");
+      setNotice(agent.name + " is answering");
+    };
+    utterance.onend = () => {
+      setVoiceStatus("idle");
+      setNotice("Ready for another question");
+    };
+    utterance.onerror = () => {
+      setVoiceStatus("idle");
+      setNotice("Voice playback stopped. Try again.");
+    };
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
   };
 
-  const voiceCopy = {
-    idle: "Start a natural conversation",
-    listening: "Listening...",
-    speaking: "Answering from your website",
+  const stopConversation = () => {
+    recognitionRef.current?.abort?.();
+    recognitionRef.current = null;
+    window.speechSynthesis?.cancel();
+    setVoiceStatus("idle");
+    setNotice("Conversation stopped");
   };
+
+  const startConversation = (agent: VoiceAgent) => {
+    if (activeAgent === agent.id && voiceStatus !== "idle" && voiceStatus !== "error") {
+      stopConversation();
+      return;
+    }
+
+    recognitionRef.current?.abort?.();
+    window.speechSynthesis?.cancel();
+    setActiveAgent(agent.id);
+    setVoiceStatus("listening");
+    setTranscript("Listening...");
+    setReply("");
+    setNotice("Speak naturally");
+
+    const recognitionWindow = window as typeof window & {
+      SpeechRecognition?: BrowserRecognitionConstructor;
+      webkitSpeechRecognition?: BrowserRecognitionConstructor;
+    };
+    const Recognition =
+      recognitionWindow.SpeechRecognition ?? recognitionWindow.webkitSpeechRecognition;
+
+    if (!Recognition) {
+      const fallbackQuestion = "How can you help visitors on my website?";
+      const fallbackAnswer = buildAnswer(agent, fallbackQuestion);
+      setTranscript(fallbackQuestion);
+      setReply(fallbackAnswer);
+      setVoiceStatus("thinking");
+      setNotice("Microphone recognition is unavailable; playing a sample response");
+      speakReply(agent, fallbackAnswer);
+      return;
+    }
+
+    const recognition = new Recognition();
+    recognitionRef.current = recognition;
+    recognition.lang = "en-US";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    let receivedResult = false;
+
+    recognition.onresult = (event) => {
+      receivedResult = true;
+      const spoken = event.results[0]?.[0]?.transcript?.trim();
+
+      if (!spoken) {
+        setVoiceStatus("error");
+        setNotice("I did not catch that. Try again.");
+        return;
+      }
+
+      const answer = buildAnswer(agent, spoken);
+      setTranscript(spoken);
+      setReply(answer);
+      setVoiceStatus("thinking");
+      setNotice("Finding the best grounded answer");
+      speakReply(agent, answer);
+    };
+
+    recognition.onerror = (event) => {
+      setVoiceStatus("error");
+      setNotice(
+        event.error === "not-allowed"
+          ? "Allow microphone access to start talking."
+          : "I could not hear you. Tap and try again.",
+      );
+    };
+
+    recognition.onend = () => {
+      recognitionRef.current = null;
+      if (!receivedResult) {
+        setVoiceStatus((current) => (current === "listening" ? "idle" : current));
+      }
+    };
+
+    try {
+      recognition.start();
+    } catch {
+      recognitionRef.current = null;
+      setVoiceStatus("error");
+      setNotice("The microphone could not start. Tap and try again.");
+    }
+  };
+
+  const selectedAgent = agents.find((agent) => agent.id === activeAgent);
 
   return (
     <section
       id="how"
-      className="bg-[linear-gradient(180deg,#f4f4ef_0%,#f4f1f3_22%,#ede8f0_100%)] px-3 py-20 [contain-intrinsic-size:auto_980px] [content-visibility:auto] sm:px-5 sm:py-28 lg:py-32"
+      className="bg-[linear-gradient(180deg,#f4f4ef_0%,#eeeaf4_48%,#f4f1f3_100%)] px-3 py-20 [contain-intrinsic-size:auto_900px] [content-visibility:auto] sm:px-5 sm:py-28 lg:py-32"
     >
       <div className="mx-auto max-w-[1440px]">
         <div className="mx-auto flex max-w-[1240px] flex-col justify-between gap-6 px-3 sm:px-5 lg:flex-row lg:items-end">
           <div>
-            <Eyebrow>Live on your website</Eyebrow>
+            <Eyebrow>Live voice models</Eyebrow>
             <h2
-              className={`mt-6 text-[clamp(2.9rem,5vw,5rem)] font-normal leading-[0.95] tracking-[-0.05em] ${displayFont}`}
+              className={[
+                "mt-6 text-[clamp(2.9rem,5vw,5rem)] font-normal leading-[0.95] tracking-[-0.05em]",
+                displayFont,
+              ].join(" ")}
             >
-              Try the agent.
+              Choose a voice and talk.
             </h2>
           </div>
-          <p className="max-w-sm text-[13px] leading-6 text-black/44">
-            Switch between voice and chat. Ask a question. Watch the experience your visitors get.
-          </p>
+          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-black/38">
+            <span className="h-2 w-2 rounded-full bg-[#ff5c7a] shadow-[0_0_14px_rgba(255,92,122,.65)]" />
+            Browser voice ready
+          </div>
         </div>
 
-        <div className="mt-12 overflow-hidden rounded-[2rem] border border-black/[0.08] bg-[#fbfaf8] shadow-[0_35px_120px_rgba(79,54,86,.11)] sm:rounded-[2.6rem]">
-          <div className="flex h-12 items-center gap-2 border-b border-black/[0.07] bg-white/75 px-5">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#ff8d85]" />
-            <span className="h-2.5 w-2.5 rounded-full bg-[#e9c26d]" />
-            <span className="h-2.5 w-2.5 rounded-full bg-[#9dc49d]" />
-            <span className="ml-3 rounded-full bg-black/[0.045] px-3 py-1.5 text-[9px] text-black/35">
-              yourwebsite.com
-            </span>
+        <div className="mt-12 overflow-hidden rounded-[2.2rem] border border-black/[0.08] bg-white/75 shadow-[0_35px_120px_rgba(79,54,86,.11)] backdrop-blur-xl sm:rounded-[2.8rem]">
+          <div className="grid snap-x snap-mandatory auto-cols-[minmax(300px,88vw)] grid-flow-col divide-x divide-black/[0.07] overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid-cols-3 lg:auto-cols-auto lg:grid-flow-row lg:overflow-visible">
+            {agents.map((agent) => (
+              <VoiceModelOrb
+                key={agent.id}
+                agent={agent}
+                active={activeAgent === agent.id}
+                status={activeAgent === agent.id ? voiceStatus : "idle"}
+                onToggle={() => startConversation(agent)}
+              />
+            ))}
           </div>
 
-          <div className="relative min-h-[700px] overflow-hidden bg-[radial-gradient(circle_at_18%_22%,rgba(255,142,129,.3),transparent_27%),radial-gradient(circle_at_76%_72%,rgba(153,137,199,.24),transparent_31%),linear-gradient(135deg,#f9f2ec,#eae8f2)] p-5 sm:p-8 lg:p-12">
-            <div className="pointer-events-none absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(20,18,23,.055)_1px,transparent_1px),linear-gradient(90deg,rgba(20,18,23,.055)_1px,transparent_1px)] [background-size:44px_44px] [mask-image:radial-gradient(circle_at_38%_42%,black,transparent_65%)]" />
-
-            <div className="relative flex items-center justify-between">
-              <span className="text-[13px] font-bold uppercase tracking-[0.2em]">Northstar</span>
-              <nav className="hidden gap-6 text-[10px] text-black/42 sm:flex">
-                <span>Product</span>
-                <span>Customers</span>
-                <span>Pricing</span>
-              </nav>
-              <span className="rounded-full border border-black/10 bg-white/45 px-3 py-2 text-[9px] font-semibold backdrop-blur-md">
-                Start free
-              </span>
-            </div>
-
-            <div className="relative mt-20 max-w-[680px] sm:mt-28">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-black/38">
-                Example customer website
+          <div
+            className="grid gap-5 border-t border-black/[0.07] bg-[#f8f5f7] px-6 py-6 sm:px-9 lg:grid-cols-[0.7fr_1.3fr] lg:items-center"
+            aria-live="polite"
+          >
+            <div>
+              <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-black/32">
+                {selectedAgent
+                  ? selectedAgent.name + " · " + selectedAgent.tone
+                  : "Shared knowledge"}
               </p>
-              <h3
-                className={`mt-5 text-[clamp(3.2rem,6.2vw,6.7rem)] font-normal leading-[0.88] tracking-[-0.06em] ${displayFont}`}
-              >
-                Work moves better when everyone sees it.
-              </h3>
-              <div className="mt-8 flex gap-2">
-                <span className="rounded-full bg-[#17171a] px-4 py-2.5 text-[10px] font-semibold text-white">
-                  Explore product
-                </span>
-                <span className="rounded-full border border-black/10 bg-white/35 px-4 py-2.5 text-[10px] font-semibold backdrop-blur-md">
-                  View pricing
-                </span>
-              </div>
+              <p className="mt-2 text-[11px] text-black/48">{notice}</p>
             </div>
-
-            <div className="relative mt-16 grid max-w-[680px] gap-2 sm:grid-cols-3 lg:mt-24">
-              {["Planning", "Projects", "Insights"].map((item, index) => (
-                <div
-                  key={item}
-                  className="rounded-[1.3rem] border border-white/55 bg-white/36 p-4 backdrop-blur-md"
-                >
-                  <span className="text-[9px] text-black/36">0{index + 1}</span>
-                  <p className="mt-7 text-[11px] font-semibold">{item}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="relative mt-6 w-full rounded-[1.8rem] border border-black/[0.08] bg-white/88 p-3 shadow-[0_24px_80px_rgba(55,36,63,.18)] backdrop-blur-2xl sm:p-4 lg:absolute lg:bottom-5 lg:right-5 lg:mt-0 lg:w-[370px]">
-              <div className="flex items-center justify-between border-b border-black/[0.07] pb-3">
-                <div className="flex rounded-full bg-black/[0.045] p-1">
-                  <button
-                    type="button"
-                    onClick={() => switchMode("voice")}
-                    className={`flex h-9 items-center gap-2 rounded-full px-3 text-[10px] font-semibold transition ${mode === "voice" ? "bg-[#17171a] text-white shadow-sm" : "text-black/42 hover:text-black"}`}
-                  >
-                    <Mic2 className="h-3.5 w-3.5" /> Voice
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => switchMode("chat")}
-                    className={`flex h-9 items-center gap-2 rounded-full px-3 text-[10px] font-semibold transition ${mode === "chat" ? "bg-[#17171a] text-white shadow-sm" : "text-black/42 hover:text-black"}`}
-                  >
-                    <MessageCircle className="h-3.5 w-3.5" /> Chat
-                  </button>
-                </div>
-                <span className="flex items-center gap-1.5 pr-1 text-[9px] text-black/34">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#ff5c7a] shadow-[0_0_10px_rgba(255,92,122,.65)]" />
-                  Ona
+            <div className="grid gap-3 text-[11px] leading-5 sm:grid-cols-2">
+              <p className="rounded-2xl border border-black/[0.06] bg-white/70 px-4 py-3 text-black/48">
+                <span className="mr-2 font-semibold text-black/75">You</span>
+                {transcript}
+              </p>
+              <p className="rounded-2xl bg-[#17171a] px-4 py-3 text-white/64">
+                <span className="mr-2 font-semibold text-[#ff9caf]">
+                  {selectedAgent?.name ?? "Obseri"}
                 </span>
-              </div>
-
-              {mode === "voice" ? (
-                <div className="flex min-h-[330px] flex-col items-center justify-center text-center">
-                  <button
-                    type="button"
-                    onClick={startVoiceDemo}
-                    aria-label="Start voice demo"
-                    className={`relative flex h-32 w-32 items-center justify-center rounded-full bg-[radial-gradient(circle_at_34%_28%,#ffd0c5,#ff7180_42%,#8e7bbb_100%)] shadow-[0_24px_70px_rgba(165,67,100,.28)] transition duration-500 hover:scale-[1.03] ${voiceState !== "idle" ? "scale-[1.04]" : ""}`}
-                  >
-                    {voiceState !== "idle" && (
-                      <span className="absolute inset-[-14px] animate-ping rounded-full border border-[#ff5c7a]/30" />
-                    )}
-                    <span className="relative flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#17171a] shadow-xl">
-                      <PhoneCall className="h-5 w-5" />
-                    </span>
-                  </button>
-
-                  <div className="mt-7 flex h-8 items-center gap-1">
-                    {[12, 23, 17, 30, 20, 36, 16, 28, 14, 24, 11].map((height, index) => (
-                      <span
-                        key={index}
-                        className={`w-1 rounded-full bg-[#b44259]/60 ${voiceState !== "idle" ? "animate-pulse" : ""}`}
-                        style={{
-                          height,
-                          animationDelay: `${index * 65}ms`,
-                          animationDuration: `${620 + (index % 4) * 110}ms`,
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <p className="mt-3 text-[12px] font-semibold">{voiceCopy[voiceState]}</p>
-                  <p className="mt-2 max-w-[15rem] text-[10px] leading-5 text-black/38">
-                    {voiceState === "speaking"
-                      ? "I can explain the plans and help you choose the right one."
-                      : "Tap the orb to experience the voice flow."}
-                  </p>
-                </div>
-              ) : (
-                <div className="flex min-h-[330px] flex-col pt-4">
-                  <div className="rounded-2xl bg-black/[0.045] p-4 text-[11px] leading-5 text-black/62">
-                    {demos[activeDemo].answer}
-                    <span className="mt-3 flex items-center gap-1.5 text-[9px] font-semibold text-[#a4314a]">
-                      <Check className="h-3 w-3" /> Source: {demos[activeDemo].source}
-                    </span>
-                  </div>
-                  <div className="mt-4 space-y-2">
-                    {demos.map((demo, index) => (
-                      <button
-                        key={demo.question}
-                        type="button"
-                        onClick={() => setActiveDemo(index)}
-                        className={`w-full rounded-xl border px-3 py-2.5 text-left text-[10px] transition ${activeDemo === index ? "border-[#ff5c7a]/30 bg-[#fff1ef] text-black" : "border-black/[0.07] text-black/45 hover:bg-black/[0.025]"}`}
-                      >
-                        {demo.question}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="mt-auto flex items-center rounded-full border border-black/[0.08] bg-white px-4 py-2.5 text-[10px] text-black/35 shadow-sm">
-                    Ask this website
-                    <Send className="ml-auto h-3.5 w-3.5 text-[#b44259]" />
-                  </div>
-                </div>
-              )}
+                {reply || "Listening for your question..."}
+              </p>
             </div>
           </div>
         </div>
       </div>
     </section>
+  );
+}
+
+function VoiceModelOrb({
+  agent,
+  active,
+  status,
+  onToggle,
+}: {
+  agent: VoiceAgent;
+  active: boolean;
+  status: VoiceStatus;
+  onToggle: () => void;
+}) {
+  const statusLabel = {
+    idle: "Start talking",
+    listening: "Listening...",
+    thinking: "Thinking...",
+    speaking: "Speaking...",
+    error: "Try again",
+  }[status];
+  const gradientId = "voice-orb-" + agent.id;
+  const glowId = "voice-glow-" + agent.id;
+  const busy = active && status !== "idle" && status !== "error";
+
+  return (
+    <article
+      className={[
+        "relative flex min-h-[460px] snap-start flex-col items-center justify-center px-6 py-10 text-center transition duration-500 lg:min-h-[500px]",
+        active ? "bg-[#fff9f7]" : "bg-white/30",
+      ].join(" ")}
+    >
+      <div className="relative h-[300px] w-[300px] max-w-full">
+        <svg
+          viewBox="0 0 320 320"
+          aria-hidden="true"
+          className={[
+            "absolute inset-0 h-full w-full transition duration-700",
+            busy ? "animate-pulse" : "",
+          ].join(" ")}
+        >
+          <defs>
+            <radialGradient id={gradientId} cx="42%" cy="38%" r="72%">
+              <stop offset="0" stopColor={agent.colors[2]} />
+              <stop offset="0.48" stopColor={agent.colors[1]} />
+              <stop offset="1" stopColor={agent.colors[0]} />
+            </radialGradient>
+            <filter id={glowId} x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="12" />
+            </filter>
+          </defs>
+          <path
+            d="M160 12 C171 37 188 43 216 36 C247 28 270 47 267 78 C264 107 276 121 302 134 C326 147 326 173 302 186 C276 199 264 213 267 242 C270 273 247 292 216 284 C188 277 171 283 160 308 C149 283 132 277 104 284 C73 292 50 273 53 242 C56 213 44 199 18 186 C-6 173 -6 147 18 134 C44 121 56 107 53 78 C50 47 73 28 104 36 C132 43 149 37 160 12 Z"
+            fill={agent.colors[0]}
+            opacity="0.18"
+            filter={"url(#" + glowId + ")"}
+          />
+          <path
+            d="M160 12 C171 37 188 43 216 36 C247 28 270 47 267 78 C264 107 276 121 302 134 C326 147 326 173 302 186 C276 199 264 213 267 242 C270 273 247 292 216 284 C188 277 171 283 160 308 C149 283 132 277 104 284 C73 292 50 273 53 242 C56 213 44 199 18 186 C-6 173 -6 147 18 134 C44 121 56 107 53 78 C50 47 73 28 104 36 C132 43 149 37 160 12 Z"
+            fill={"url(#" + gradientId + ")"}
+            stroke={agent.colors[0]}
+            strokeWidth="1.5"
+          />
+          <path
+            d="M160 31 C171 51 188 56 212 50 C238 43 255 59 252 84 C250 111 261 127 284 139 C304 149 304 171 284 181 C261 193 250 209 252 236 C255 261 238 277 212 270 C188 264 171 269 160 289 C149 269 132 264 108 270 C82 277 65 261 68 236 C70 209 59 193 36 181 C16 171 16 149 36 139 C59 127 70 111 68 84 C65 59 82 43 108 50 C132 56 149 51 160 31 Z"
+            fill="none"
+            stroke="rgba(255,255,255,.32)"
+            strokeWidth="1"
+          />
+        </svg>
+
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={`${busy ? "Stop" : "Start"} a voice conversation with ${agent.name}`}
+          className={[
+            "absolute left-1/2 top-1/2 inline-flex h-14 -translate-x-1/2 -translate-y-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-[#fffaf6]/92 px-5 text-[11px] font-semibold text-[#17171a] shadow-[0_14px_40px_rgba(43,24,40,.2)] backdrop-blur-xl transition hover:scale-[1.03]",
+            busy ? "ring-4 ring-white/20" : "",
+          ].join(" ")}
+        >
+          {busy ? (
+            <PhoneOff className="h-4 w-4 text-[#b44259]" />
+          ) : (
+            <PhoneCall className="h-4 w-4" />
+          )}
+          {statusLabel}
+        </button>
+      </div>
+
+      <h3 className="mt-5 text-lg font-semibold tracking-[-0.025em]">{agent.role}</h3>
+      <p className="mt-2 text-[11px] text-black/38">
+        {agent.name} · {agent.tone}
+      </p>
+    </article>
   );
 }
 
