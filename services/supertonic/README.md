@@ -21,11 +21,20 @@ OBSERI_SUPERTONIC_API_KEY=replace-with-a-long-random-secret
 
 ## Production shape
 
-- Deploy this directory as a container on Cloud Run, ECS/Fargate, Fly, Railway, or another service that supports at least one warm instance.
-- Allocate at least 2 vCPU and 4 GiB RAM initially; benchmark with representative call traffic before changing it.
-- Keep minimum instances at 1. Scale horizontally because the official server serializes inference per process.
-- Put the service in the same region as the Obseri web API. Do not call it directly from browsers.
-- Set the same strong `OBSERI_SUPERTONIC_API_KEY` secret on this service and on the Obseri web application.
-- Point `OBSERI_SUPERTONIC_URL` at the private service URL when the platform supports private networking.
+The first live deployment is a single AWS `t3.small` in Mumbai with 2 vCPU and 2 GiB RAM. A
+representative request used roughly 530 MiB after warm-up, and the container is capped below host
+memory with swap available only as an OOM safety net. Re-benchmark before increasing concurrency.
+
+- Keep at least one warm process. Scale horizontally because the official server serializes
+  inference per process.
+- Do not expose the EC2 origin broadly. The live security group accepts port `7788` only from the
+  AWS-managed CloudFront origin-facing prefix list.
+- Keep the image in private ECR, require IMDSv2, encrypt the volume, and operate the host through
+  Systems Manager instead of SSH.
+- Store `OBSERI_SUPERTONIC_API_KEY` in Secrets Manager and the web host's encrypted environment. Do
+  not put it in user data, source control, browser code, or public build variables.
+- Put a no-cache HTTPS edge in front of the origin and forward all methods and request bodies.
+- Use standard T-instance CPU credits or an equivalent hard cost cap. Benchmark time-to-first-audio,
+  throughput, and throttling before enabling additional replicas.
 
 The public health endpoint is `GET /health`. Speech endpoints require the bearer secret.

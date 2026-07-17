@@ -30,7 +30,7 @@ self-serve customers.
 | Website ingestion                | Done and live             | Same-origin discovery, robots and sitemap support, bounded depth/page limits, canonicalization, deduplication, revisions, refresh validators, and visible crawl progress |
 | Retrieval and chat               | Done and live             | Source-grounded answers, visible citations, deterministic fallback, and an OpenAI-compatible hosted provider                                                             |
 | Personality                      | Done and live             | Name, role, purpose, tone, traits, greeting, instructions, unknown response, and guardrails                                                                              |
-| Consistent neural voice          | Cloud adapter done        | Ten Supertonic presets route through an authenticated pre-warmed service; browser speech fails over immediately when that service is unavailable                         |
+| Consistent neural voice          | Done and live             | Ten Supertonic presets route through the authenticated Mumbai voice service; browser speech fails over immediately when that service is unavailable                      |
 | Browser voice                    | Done and live             | Instant device speech synthesis and speech recognition remains the zero-download fallback                                                                                |
 | Voicebox presets                 | Done locally              | 50 Kokoro voices verified across English, Spanish, French, Hindi, Italian, Japanese, Portuguese, and Chinese                                                             |
 | Voice cloning                    | Done locally              | Consent-gated Voicebox profile and sample workflow with `self`, `permission`, or `licensed` rights basis                                                                 |
@@ -92,6 +92,8 @@ Last verified on **17 July 2026**:
 - All 50 enabled Kokoro preset voices return valid WAV audio locally
 - Supertonic loads its pinned ONNX assets in Chrome, generates and plays a 44.1 kHz preview, and
   exposes the same ten preset identities across devices
+- The production Supertonic route returns authenticated WAV audio through Vercel and the AWS
+  CloudFront edge; unauthenticated origin requests return HTTP `401`
 - No API keys or local environment files are tracked by Git
 
 ## Search and discovery
@@ -208,9 +210,19 @@ pre-warmed server instead of downloading roughly 400 MB of model data into each 
 The Obseri web API is the only client of that server; its bearer credential never reaches the widget.
 
 The deployment image in [`services/supertonic`](services/supertonic) bakes the model into the image,
-keeps the official engine loopback-only, and exposes it through a bearer-authenticated proxy. Run at
-least one warm instance in the same region as the web API. The first production deployment is
-intentionally CPU-capable; add GPU capacity only when measured concurrency or latency requires it.
+keeps the official engine loopback-only, and exposes it through a bearer-authenticated proxy. The
+live deployment uses a single pre-warmed `t3.small` in AWS Mumbai (`ap-south-1`) with standard CPU
+credits, encrypted `gp3` storage, IMDSv2, no SSH key or inbound SSH rule, and AWS Systems Manager for
+operations. Its application port only accepts AWS CloudFront origin-facing traffic. CloudFront
+provides the public HTTPS edge, the container image lives in private ECR, and the bearer credential
+lives in Secrets Manager and Vercel's encrypted production environment.
+
+The instance has a restart policy and a 2 GB swap safety net, while the container is capped below
+the host's 2 GB memory. A monthly AWS Budget guardrail alerts `flamki@obseri.com` at 80% actual and
+100% forecasted use of USD 25. The instance type is eligible for this account's AWS Free Plan, but
+credits and free-plan eligibility are temporary; billing must still be reviewed before the six-month
+credit window ends. The first deployment is intentionally CPU-capable. Add GPU capacity or managed
+streaming TTS only when measured concurrency, time-to-first-audio, or voice quality requires it.
 
 If the cloud voice is unavailable, a call immediately uses an installed browser voice rather than
 showing a loader or attempting a large cold download. The original WebGPU/WASM runtime remains in the
@@ -263,10 +275,11 @@ Two external infrastructure items block paid self-serve launch:
    connect authentication and RLS-backed persistence, migrate Studio state out of `localStorage`,
    and load published Soul revisions from durable storage. The current Supabase organization has
    reached its two-active-free-project limit, so it needs another project slot or plan upgrade.
-2. **Public real-time voice.** Connect managed streaming STT/TTS providers behind Obseri-owned
-   adapters, beginning with Sarvam for Indian languages and ElevenLabs for premium global voices.
-   Enforce consent, quotas, cancellation, private sample storage, and provider-level failover. Keep
-   Voicebox as the self-hosted/private path until measured demand justifies GPU infrastructure.
+2. **Full-duplex real-time voice.** Production Supertonic TTS is live, but natural phone-like calls
+   still need streaming STT/TTS adapters behind Obseri-owned interfaces, beginning with Sarvam for
+   Indian languages and ElevenLabs for premium global voices. Add interruption handling, quotas,
+   cancellation, private sample storage, and provider-level failover. Keep Voicebox as the
+   self-hosted/private path until measured demand justifies GPU infrastructure.
 
 Before charging customers, also complete:
 
