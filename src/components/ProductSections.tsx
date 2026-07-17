@@ -73,6 +73,37 @@ type LandingVoiceMessage = {
   content: string;
 };
 
+function chooseHumanBrowserVoice(agent: VoiceAgent, voices: SpeechSynthesisVoice[]) {
+  const sharedNaturalVoices = [
+    "aria",
+    "jenny",
+    "guy",
+    "ava",
+    "andrew",
+    "emma",
+    "brian",
+    "roger",
+    "michelle",
+    "sonia",
+    "samantha",
+  ];
+  const preferredNames = [...agent.voiceHints, ...sharedNaturalVoices];
+  const legacyVoices = ["david", "zira", "mark", "hazel", "desktop", "espeak"];
+
+  return voices
+    .map((voice) => {
+      const name = voice.name.toLowerCase();
+      const preferredIndex = preferredNames.findIndex((candidate) => name.includes(candidate));
+      let score = preferredIndex >= 0 ? 180 - preferredIndex * 8 : 0;
+      if (/natural|neural|online|premium|enhanced/.test(name)) score += 90;
+      if (/google|microsoft|apple/.test(name)) score += 12;
+      if (!voice.localService) score += 18;
+      if (legacyVoices.some((legacy) => name.includes(legacy))) score -= 140;
+      return { voice, score };
+    })
+    .sort((a, b) => b.score - a.score)[0]?.voice;
+}
+
 function PlayableAgent() {
   const agents: VoiceAgent[] = [
     {
@@ -82,9 +113,9 @@ function PlayableAgent() {
       tone: "Warm · persuasive",
       greeting: "Hi, I’m Ona from Obseri. What are you hoping to improve on your website today?",
       colors: ["#ff6f91", "#b39cff", "#ffd3dc"],
-      rate: 1.02,
-      pitch: 1.08,
-      voiceHints: ["aria", "samantha", "female"],
+      rate: 0.98,
+      pitch: 1,
+      voiceHints: ["aria", "ava", "emma", "samantha"],
       fallback:
         "I can learn what a visitor needs, recommend the right next step, and capture a qualified lead.",
     },
@@ -95,9 +126,9 @@ function PlayableAgent() {
       tone: "Clear · confident",
       greeting: "Hi, I’m Arlo. Tell me what you’re looking for and I’ll help you find it.",
       colors: ["#ff8a62", "#ffc178", "#e98594"],
-      rate: 0.98,
-      pitch: 0.92,
-      voiceHints: ["guy", "david", "male"],
+      rate: 0.96,
+      pitch: 1,
+      voiceHints: ["guy", "andrew", "brian", "roger", "eric"],
       fallback:
         "Tell me what you are trying to accomplish and I will guide you to the most relevant product information.",
     },
@@ -109,8 +140,8 @@ function PlayableAgent() {
       greeting: "Hi, I’m Mira. How can I help you today?",
       colors: ["#8d7bd1", "#d6b4ec", "#ffb7c8"],
       rate: 0.94,
-      pitch: 1.02,
-      voiceHints: ["zira", "jenny", "female"],
+      pitch: 1,
+      voiceHints: ["jenny", "michelle", "sonia", "aria", "ava"],
       fallback:
         "I can answer common support questions, cite the right documentation, and escalate when human help is needed.",
     },
@@ -127,16 +158,23 @@ function PlayableAgent() {
   const speechTurnRef = useRef(0);
   const voiceMessagesRef = useRef<LandingVoiceMessage[]>([]);
   const voiceRequestRef = useRef<AbortController | null>(null);
+  const browserVoicesRef = useRef<SpeechSynthesisVoice[]>([]);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    const loadVoices = () => {
+      browserVoicesRef.current = window.speechSynthesis?.getVoices() ?? [];
+    };
+    loadVoices();
+    window.speechSynthesis?.addEventListener("voiceschanged", loadVoices);
+
+    return () => {
       conversationActiveRef.current = false;
       voiceRequestRef.current?.abort();
       recognitionRef.current?.abort?.();
       window.speechSynthesis?.cancel();
-    },
-    [],
-  );
+      window.speechSynthesis?.removeEventListener("voiceschanged", loadVoices);
+    };
+  }, []);
 
   const buildAnswer = (agent: VoiceAgent, spoken: string) => {
     const question = spoken.toLowerCase();
@@ -271,16 +309,17 @@ function PlayableAgent() {
 
     const speechTurn = ++speechTurnRef.current;
     const utterance = new SpeechSynthesisUtterance(answer);
-    const availableVoices = window.speechSynthesis
-      .getVoices()
-      .filter((voice) => voice.lang.toLowerCase().startsWith("en"));
-    const preferredVoice = agent.voiceHints
-      .map((hint) =>
-        availableVoices.find((voice) => voice.name.toLowerCase().includes(hint.toLowerCase())),
-      )
-      .find((voice): voice is SpeechSynthesisVoice => Boolean(voice));
+    const availableVoices = (
+      browserVoicesRef.current.length
+        ? browserVoicesRef.current
+        : window.speechSynthesis.getVoices()
+    ).filter((voice) => voice.lang.toLowerCase().startsWith("en"));
+    const preferredVoice = chooseHumanBrowserVoice(agent, availableVoices);
 
-    if (preferredVoice) utterance.voice = preferredVoice;
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+      utterance.lang = preferredVoice.lang;
+    }
     utterance.rate = agent.rate;
     utterance.pitch = agent.pitch;
     utterance.onstart = () => {
