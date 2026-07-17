@@ -254,6 +254,25 @@ to one vendor. Live calls should use persistent WebSockets, streaming transcript
 handling, streamed LLM tokens, and streamed audio playback. Provider selection should be measured
 per language using time-to-first-audio, interruption recovery, quality, error rate, and cost.
 
+### Real-time engine reference
+
+Dograh's public voice engine validates the architecture Obseri should adopt without importing its
+workflow-builder product. The useful pattern is a long-lived WebRTC media session feeding a
+Pipecat-style frame pipeline, with streaming STT, streamed LLM tokens, incremental TTS audio,
+server-side turn tracking, and immediate cancellation when the visitor interrupts. Its cascade uses
+roughly 200 ms Silero VAD endpointing and can add a learned Smart Turn analyzer; its realtime mode
+removes the separate STT and TTS hops by using a speech-to-speech provider. Predictable openings can
+be pre-generated or human-recorded and cached, while dynamic turns continue through TTS.
+
+Obseri will follow that boundary:
+
+- WebRTC carries microphone and speaker audio; HTTP is reserved for setup, configuration, and text chat.
+- The call worker owns VAD, turn detection, barge-in, cancellation, and latency telemetry.
+- Website retrieval runs beside the call worker and returns a compact evidence context before the model turn.
+- Native speech-to-speech is the lowest-latency premium route; streamed STT + LLM + TTS is the portable route.
+- Supertonic remains a preview, fallback, and private-deployment voice until it exposes true incremental audio.
+- Cached greetings and common confirmations hide predictable inference without pretending cached audio is a live model.
+
 Do not buy permanent GPU capacity until production traffic demonstrates that provider spend is
 consistently higher than the complete self-hosted cost. That calculation must include idle time,
 replicas, regional capacity, autoscaling, monitoring, engineering, and failure recovery—not only
