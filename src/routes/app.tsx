@@ -33,9 +33,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
-  Smartphone,
   Trash2,
-  Tablet,
   Upload,
   UserRound,
   WandSparkles,
@@ -3004,7 +3002,6 @@ function PlaygroundView({
   onMessagesChange: (messages: SoulMessage[], leadIntent: ChatResponse["leadIntent"]) => void;
   onIntegrate: () => void;
 }) {
-  const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
   const [assistantMode, setAssistantMode] = useState<"closed" | "chat" | "voice">("closed");
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [address, setAddress] = useState(soul.siteUrl);
@@ -3022,8 +3019,6 @@ function PlaygroundView({
     { id: "glass", label: "Glass", detail: "Soft and translucent" },
   ];
   const accents = ["#b6ff60", "#8fbd5b", "#7dd3fc", "#c4b5fd", "#fda4af", "#fbbf24"];
-  const frameWidth =
-    device === "mobile" ? "max-w-[390px]" : device === "tablet" ? "max-w-[820px]" : "max-w-none";
   const updateAppearance = (patch: Partial<Soul["appearance"]>) =>
     onUpdate((current) => ({
       ...current,
@@ -3066,48 +3061,8 @@ function PlaygroundView({
   return (
     <div className="relative h-full min-h-[560px] overflow-hidden bg-[#e8eae5]">
       <section className="absolute inset-0 flex min-w-0 flex-col overflow-hidden bg-[#e9ebe6]">
-        <div className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full border border-black/10 bg-white/92 px-2 py-1.5 shadow-md backdrop-blur-xl">
-          <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-[#30332f]">
-              <span
-                className={`h-2 w-2 rounded-full ${frameLoading ? "animate-pulse bg-[#e5a94b]" : "bg-[#6fa447]"}`}
-              />
-              {frameLoading ? "Loading website" : "Live website"}
-            </span>
-            <span className="hidden text-xs text-[#949890] sm:inline">
-              · {safeHost(previewUrl)}
-            </span>
-          </div>
-          <div className="flex rounded-full bg-[#f5f6f3] p-1">
-            {(
-              [
-                { id: "desktop", label: "Desktop", icon: <Monitor className="h-3.5 w-3.5" /> },
-                { id: "tablet", label: "Tablet", icon: <Tablet className="h-3.5 w-3.5" /> },
-                { id: "mobile", label: "Mobile", icon: <Smartphone className="h-3.5 w-3.5" /> },
-              ] as const
-            ).map((option) => (
-              <button
-                key={option.id}
-                onClick={() => setDevice(option.id)}
-                aria-label={`${option.label} preview`}
-                title={`${option.label} preview`}
-                className={`flex h-8 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium transition ${
-                  device === option.id
-                    ? "bg-[#1c1f1b] text-white shadow-sm"
-                    : "text-[#858a82] hover:text-[#343832]"
-                }`}
-              >
-                {option.icon}
-                <span className="hidden xl:inline">{option.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
         <div className="absolute inset-0 flex items-stretch justify-center overflow-hidden p-0">
-          <div
-            className={`flex h-full min-h-[560px] w-full flex-col overflow-hidden bg-white transition-[max-width,border-radius] duration-300 ${frameWidth} ${device === "desktop" ? "" : "my-3 max-h-[calc(100%-24px)] rounded-2xl border border-black/15 shadow-[0_24px_70px_rgba(25,31,23,.2)]"}`}
-          >
+          <div className="flex h-full min-h-[560px] w-full flex-col overflow-hidden bg-white">
             <div className="hidden h-11 shrink-0 items-center gap-3 border-b border-[#e7e9e4] bg-[#f8f8f6] px-3">
               <div className="hidden gap-1.5 sm:flex">
                 <span className="h-2.5 w-2.5 rounded-full bg-[#ff6b61]" />
@@ -3230,13 +3185,6 @@ function PlaygroundView({
         >
           <ExternalLink className="h-4 w-4" />
         </a>
-        <button
-          onClick={() => setCustomizeOpen(true)}
-          className="flex h-10 items-center gap-2 rounded-full border border-black/10 bg-[#1c1f1b] px-4 text-xs font-semibold text-white shadow-md hover:bg-black"
-        >
-          <WandSparkles className="h-4 w-4" />
-          <span className="hidden sm:inline">Customize</span>
-        </button>
       </div>
 
       {customizeOpen && (
@@ -3401,11 +3349,14 @@ function PlaygroundView({
 
       <button
         onClick={() => setCustomizeOpen((current) => !current)}
-        className={`absolute top-1/2 z-[55] flex h-16 w-7 -translate-y-1/2 items-center justify-center rounded-l-xl border border-r-0 border-black/10 bg-white text-[#5e635b] shadow-lg transition-[right] duration-300 hover:bg-[#f5f6f3] ${
+        className={`absolute top-1/2 z-[55] flex h-12 -translate-y-1/2 items-center justify-center gap-2 rounded-l-xl border border-r-0 border-black/10 bg-white px-3 text-sm font-semibold text-[#343832] shadow-lg transition-[right,background-color] duration-300 hover:bg-[#f5f6f3] ${
           customizeOpen ? "right-[330px]" : "right-0"
         }`}
         aria-label={customizeOpen ? "Close customization drawer" : "Open customization drawer"}
+        title="Customize visitor experience"
       >
+        <WandSparkles className="h-4 w-4 text-[#6f9948]" />
+        <span>Customize</span>
         {customizeOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
       </button>
     </div>
