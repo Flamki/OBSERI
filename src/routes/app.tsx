@@ -3165,28 +3165,6 @@ function PlaygroundView({
         </div>
       </section>
 
-      <div className="absolute right-4 top-3 z-30 flex items-center gap-2">
-        <button
-          onClick={() => {
-            setFrameLoading(true);
-            setFrameKey((current) => current + 1);
-          }}
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white/92 text-[#555a52] shadow-md backdrop-blur-xl hover:bg-white"
-          aria-label="Reload website preview"
-        >
-          <RefreshCw className={`h-4 w-4 ${frameLoading ? "animate-spin" : ""}`} />
-        </button>
-        <a
-          href={previewUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="hidden h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white/92 text-[#555a52] shadow-md backdrop-blur-xl hover:bg-white sm:flex"
-          aria-label="Open website in a new tab"
-        >
-          <ExternalLink className="h-4 w-4" />
-        </a>
-      </div>
-
       {customizeOpen && (
         <button
           aria-label="Close customization drawer"
@@ -3347,18 +3325,47 @@ function PlaygroundView({
         </div>
       </aside>
 
-      <button
-        onClick={() => setCustomizeOpen((current) => !current)}
-        className={`absolute top-1/2 z-[55] flex h-12 -translate-y-1/2 items-center justify-center gap-2 rounded-l-xl border border-r-0 border-black/10 bg-white px-3 text-sm font-semibold text-[#343832] shadow-lg transition-[right,background-color] duration-300 hover:bg-[#f5f6f3] ${
+      <div
+        className={`absolute top-1/2 z-[55] flex -translate-y-1/2 items-center overflow-hidden rounded-l-2xl border border-r-0 border-black/10 bg-white/95 shadow-[0_12px_32px_rgba(20,24,18,.16)] backdrop-blur-xl transition-[right] duration-300 ${
           customizeOpen ? "right-[330px]" : "right-0"
         }`}
-        aria-label={customizeOpen ? "Close customization drawer" : "Open customization drawer"}
-        title="Customize visitor experience"
       >
-        <WandSparkles className="h-4 w-4 text-[#6f9948]" />
-        <span>Customize</span>
-        {customizeOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-      </button>
+        <button
+          onClick={() => setCustomizeOpen((current) => !current)}
+          className="flex h-12 items-center justify-center gap-2 px-4 text-sm font-semibold text-[#343832] transition hover:bg-[#f3f5f0]"
+          aria-label={customizeOpen ? "Close customization drawer" : "Open customization drawer"}
+          title="Customize visitor experience"
+        >
+          <WandSparkles className="h-4 w-4 text-[#6f9948]" />
+          <span>Customize</span>
+          {customizeOpen ? (
+            <ChevronRight className="h-4 w-4" />
+          ) : (
+            <ChevronLeft className="h-4 w-4" />
+          )}
+        </button>
+        <button
+          onClick={() => {
+            setFrameLoading(true);
+            setFrameKey((current) => current + 1);
+          }}
+          className="flex h-12 w-11 items-center justify-center border-l border-black/10 text-[#555a52] transition hover:bg-[#f3f5f0]"
+          aria-label="Refresh website preview"
+          title="Refresh website"
+        >
+          <RefreshCw className={`h-4 w-4 ${frameLoading ? "animate-spin" : ""}`} />
+        </button>
+        <a
+          href={previewUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="flex h-12 w-11 items-center justify-center border-l border-black/10 text-[#555a52] transition hover:bg-[#f3f5f0]"
+          aria-label="Open website in a new tab"
+          title="Open website"
+        >
+          <ExternalLink className="h-4 w-4" />
+        </a>
+      </div>
     </div>
   );
 }
