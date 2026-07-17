@@ -22,7 +22,7 @@ OBSERI_SUPERTONIC_API_KEY=replace-with-a-long-random-secret
 ## Production shape
 
 - Deploy this directory as a container on Cloud Run, ECS/Fargate, Fly, Railway, or another service that supports at least one warm instance.
-- Allocate at least 2 vCPU and 2 GiB RAM initially; benchmark with representative call traffic before changing it.
+- Allocate at least 2 vCPU and 4 GiB RAM initially; benchmark with representative call traffic before changing it.
 - Keep minimum instances at 1. Scale horizontally because the official server serializes inference per process.
 - Put the service in the same region as the Obseri web API. Do not call it directly from browsers.
 - Set the same strong `OBSERI_SUPERTONIC_API_KEY` secret on this service and on the Obseri web application.
