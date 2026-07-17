@@ -45,6 +45,8 @@ let readyRuntime: Runtime | null = null;
 let activeAudio: HTMLAudioElement | null = null;
 let activeAudioUrl = "";
 let speechGeneration = 0;
+const cloudAudioCache = new Map<string, Promise<Blob>>();
+const CLOUD_AUDIO_CACHE_LIMIT = 32;
 
 export function canUseSupertonic() {
   return typeof window !== "undefined" && typeof WebAssembly !== "undefined";
@@ -166,10 +168,9 @@ export async function speakSupertonic(
   text: string,
   options: NonNullable<Parameters<typeof synthesizeSupertonic>[1]> = {},
 ) {
-  const generation = ++speechGeneration;
   let blob: Blob;
   try {
-    blob = await fetchCloudSupertonic(text, options);
+    blob = await fetchSupertonicAudio(text, options);
   } catch (cloudError) {
     // Never make a visitor download the large model during a live call. An
     // already-warm local runtime may rescue a cloud request; otherwise the
@@ -177,6 +178,39 @@ export async function speakSupertonic(
     if (!readyRuntime) throw cloudError;
     blob = await synthesizeSupertonic(text, options);
   }
+  await playSupertonicAudio(blob);
+}
+
+export function fetchSupertonicAudio(
+  text: string,
+  options: NonNullable<Parameters<typeof synthesizeSupertonic>[1]> = {},
+) {
+  const normalizedText = normalizeSpeechText(text);
+  const request = {
+    text: normalizedText,
+    voice: options.voice ?? "F1",
+    language: normalizeLanguage(options.language),
+    speed: options.speed ?? 1.03,
+    qualitySteps: Math.min(8, Math.max(2, options.qualitySteps ?? 4)),
+  };
+  const cacheKey = JSON.stringify(request);
+  const cached = cloudAudioCache.get(cacheKey);
+  if (cached) return cached;
+  const audio = fetchCloudSupertonic(request).catch((error) => {
+    cloudAudioCache.delete(cacheKey);
+    throw error;
+  });
+  cloudAudioCache.set(cacheKey, audio);
+  while (cloudAudioCache.size > CLOUD_AUDIO_CACHE_LIMIT) {
+    const oldest = cloudAudioCache.keys().next().value;
+    if (typeof oldest !== "string") break;
+    cloudAudioCache.delete(oldest);
+  }
+  return audio;
+}
+
+export async function playSupertonicAudio(blob: Blob) {
+  const generation = ++speechGeneration;
   if (generation !== speechGeneration) throw new DOMException("Speech stopped", "AbortError");
   clearActiveAudio();
   const href = URL.createObjectURL(blob);
@@ -201,19 +235,23 @@ export async function speakSupertonic(
   });
 }
 
-async function fetchCloudSupertonic(
-  text: string,
-  options: NonNullable<Parameters<typeof synthesizeSupertonic>[1]>,
-) {
+async function fetchCloudSupertonic(request: {
+  text: string;
+  voice: SupertonicVoiceId;
+  language: string;
+  speed: number;
+  qualitySteps: number;
+}) {
   const response = await fetch("/api/voice/speak", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       provider: "supertonic",
-      text: normalizeSpeechText(text),
-      profileId: options.voice ?? "F1",
-      language: normalizeLanguage(options.language),
-      speed: options.speed ?? 1.03,
+      text: request.text,
+      profileId: request.voice,
+      language: request.language,
+      speed: request.speed,
+      qualitySteps: request.qualitySteps,
     }),
     // A live call must fail over quickly instead of leaving dead air. A warm
     // regional service should answer well inside this ceiling.

@@ -19,7 +19,13 @@ import {
 } from "lucide-react";
 import { rankKnowledgeChunks, type ChatResponse } from "@/lib/conversation";
 import type { KnowledgeChunk, Soul, SoulMessage } from "@/lib/soul";
-import { speakSupertonic, stopSupertonic, type SupertonicVoiceId } from "@/lib/supertonic";
+import {
+  fetchSupertonicAudio,
+  playSupertonicAudio,
+  speakSupertonic,
+  stopSupertonic,
+  type SupertonicVoiceId,
+} from "@/lib/supertonic";
 
 const VOICE_LANGUAGES = [
   { code: "en-US", name: "English", flag: "US" },
@@ -136,6 +142,26 @@ export default function SoulChat({
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, sending]);
+
+  useEffect(() => {
+    if (!voiceMode || soul.voice.provider !== "supertonic") return;
+    // Generate the predictable opening line while the visitor is looking at
+    // the call panel. Clicking Call can then begin with human speech instead
+    // of a cold HTTP + inference pause.
+    void fetchSupertonicAudio(soul.personality.greeting, {
+      voice: (soul.voice.profileId || "F1") as SupertonicVoiceId,
+      language: callLanguage,
+      speed: soul.voice.speed,
+      qualitySteps: 4,
+    }).catch(() => undefined);
+  }, [
+    voiceMode,
+    soul.voice.provider,
+    soul.voice.profileId,
+    soul.voice.speed,
+    soul.personality.greeting,
+    callLanguage,
+  ]);
 
   async function sendMessage(text = value, continueVoiceCall = false) {
     const question = text.trim();
@@ -304,7 +330,7 @@ export default function SoulChat({
         voice: (soul.voice.profileId || "F1") as SupertonicVoiceId,
         language: callLanguage,
         speed: soul.voice.speed,
-        qualitySteps: 4,
+        qualitySteps: 2,
       });
       return;
     }
@@ -317,6 +343,7 @@ export default function SoulChat({
 
   function createStreamingSpeaker() {
     let pendingText = "";
+    let synthesis = Promise.resolve();
     let playback = Promise.resolve();
     window.speechSynthesis?.cancel();
     audioRef.current?.pause();
@@ -335,16 +362,24 @@ export default function SoulChat({
           else await speakBrowserSegment(segment);
         });
       } else if (soul.voice.provider === "supertonic") {
-        playback = playback.then(() =>
-          voiceCallActiveRef.current
-            ? speakSupertonic(segment, {
-                voice: (soul.voice.profileId || "F1") as SupertonicVoiceId,
-                language: callLanguage,
-                speed: soul.voice.speed,
-                qualitySteps: 4,
-              }).catch(() => speakBrowserSegment(segment))
-            : Promise.resolve(),
+        // Keep inference serialized on the small voice host, but start the
+        // next synthesis while the previous phrase is playing. This removes
+        // the dead-air gap between phrases without stampeding the model.
+        const audio = synthesis.then(() =>
+          fetchSupertonicAudio(segment, {
+            voice: (soul.voice.profileId || "F1") as SupertonicVoiceId,
+            language: callLanguage,
+            speed: soul.voice.speed,
+            qualitySteps: 2,
+          }).catch(() => null),
         );
+        synthesis = audio.then(() => undefined);
+        playback = playback.then(async () => {
+          if (!voiceCallActiveRef.current) return;
+          const blob = await audio;
+          if (blob) await playSupertonicAudio(blob);
+          else await speakBrowserSegment(segment);
+        });
       } else {
         playback = playback.then(() =>
           voiceCallActiveRef.current ? speakBrowserSegment(segment) : Promise.resolve(),
@@ -479,7 +514,7 @@ export default function SoulChat({
         return;
       }
       if (endpointTimer) window.clearTimeout(endpointTimer);
-      endpointTimer = window.setTimeout(() => recognition.stop(), 520);
+      endpointTimer = window.setTimeout(() => recognition.stop(), 320);
     };
     recognition.onerror = (event) => {
       if (endpointTimer) window.clearTimeout(endpointTimer);
@@ -535,7 +570,16 @@ export default function SoulChat({
     setVoiceCallActive(true);
     const greeting = soul.personality.greeting.trim();
     setVoiceStatus("speaking");
-    void speak(greeting)
+    const opening =
+      soul.voice.provider === "supertonic"
+        ? fetchSupertonicAudio(greeting, {
+            voice: (soul.voice.profileId || "F1") as SupertonicVoiceId,
+            language: callLanguage,
+            speed: soul.voice.speed,
+            qualitySteps: 4,
+          }).then(playSupertonicAudio)
+        : speak(greeting);
+    void opening
       .catch(() => speakBrowserSegment(greeting))
       .then(() => {
         if (voiceCallActiveRef.current) startListening(true);
@@ -1010,14 +1054,14 @@ type SpeechRecognitionInstance = {
 type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
 
 function findSpeechBoundary(text: string) {
-  if (text.length < 24) return -1;
-  const sentence = text.match(/^[\s\S]{24,}?[.!?](?:["')\]]*)\s/);
+  if (text.length < 16) return -1;
+  const sentence = text.match(/^[\s\S]{16,}?[.!?](?:["')\]]*)\s/);
   if (sentence) return sentence[0].length;
-  if (text.length < 110) return -1;
-  const comma = text.slice(45, 100).lastIndexOf(", ");
-  if (comma >= 0) return 45 + comma + 2;
-  const space = text.lastIndexOf(" ", 92);
-  return space >= 45 ? space + 1 : -1;
+  if (text.length < 76) return -1;
+  const comma = text.slice(30, 72).lastIndexOf(", ");
+  if (comma >= 0) return 30 + comma + 2;
+  const space = text.lastIndexOf(" ", 68);
+  return space >= 30 ? space + 1 : -1;
 }
 
 function prepareVoiceChunks(question: string, soul: Soul): KnowledgeChunk[] {

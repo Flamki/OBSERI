@@ -19,6 +19,7 @@ const schema = z.object({
     ])
     .optional(),
   speed: z.number().min(0.5).max(2).optional(),
+  qualitySteps: z.number().int().min(2).max(8).optional(),
 });
 
 type CachedAudio = {
@@ -68,7 +69,7 @@ export const Route = createFileRoute("/api/voice/speak")({
               text: parsed.data.text,
               voice: parsed.data.profileId ?? "F1",
               lang: normalizeLanguage(parsed.data.language),
-              steps: 4,
+              steps: parsed.data.qualitySteps ?? 4,
               speed: parsed.data.speed ?? 1.03,
               response_format: "wav",
             } satisfies SupertonicGenerationRequest;
