@@ -12,6 +12,13 @@ import {
   ShieldCheck,
   Webhook,
 } from "lucide-react";
+import {
+  isSupertonicReady,
+  preloadSupertonic,
+  speakSupertonic,
+  stopSupertonic,
+  type SupertonicVoiceId,
+} from "@/lib/supertonic";
 
 const displayFont =
   "[font-family:Baskerville,'Iowan_Old_Style','Palatino_Linotype','Times_New_Roman',serif]";
@@ -42,6 +49,7 @@ type VoiceAgent = {
   pitch: number;
   voiceHints: string[];
   fallback: string;
+  neuralVoice: SupertonicVoiceId;
 };
 
 type BrowserRecognition = {
@@ -118,6 +126,7 @@ function PlayableAgent() {
       voiceHints: ["aria", "ava", "emma", "samantha"],
       fallback:
         "I can learn what a visitor needs, recommend the right next step, and capture a qualified lead.",
+      neuralVoice: "F1",
     },
     {
       id: "arlo",
@@ -131,6 +140,7 @@ function PlayableAgent() {
       voiceHints: ["guy", "andrew", "brian", "roger", "eric"],
       fallback:
         "Tell me what you are trying to accomplish and I will guide you to the most relevant product information.",
+      neuralVoice: "M1",
     },
     {
       id: "mira",
@@ -144,6 +154,7 @@ function PlayableAgent() {
       voiceHints: ["jenny", "michelle", "sonia", "aria", "ava"],
       fallback:
         "I can answer common support questions, cite the right documentation, and escalate when human help is needed.",
+      neuralVoice: "F3",
     },
   ];
   const [activeAgent, setActiveAgent] = useState<string | null>(null);
@@ -300,52 +311,79 @@ function PlayableAgent() {
     resumeListening = true,
     speakingNotice = agent.name + " is answering",
   ) => {
-    if (!("speechSynthesis" in window)) {
-      conversationActiveRef.current = false;
-      setVoiceStatus("error");
-      setNotice("Voice playback is not available in this browser.");
-      return;
-    }
-
     const speechTurn = ++speechTurnRef.current;
-    const utterance = new SpeechSynthesisUtterance(answer);
-    const availableVoices = (
-      browserVoicesRef.current.length
-        ? browserVoicesRef.current
-        : window.speechSynthesis.getVoices()
-    ).filter((voice) => voice.lang.toLowerCase().startsWith("en"));
-    const preferredVoice = chooseHumanBrowserVoice(agent, availableVoices);
-
-    if (preferredVoice) {
-      utterance.voice = preferredVoice;
-      utterance.lang = preferredVoice.lang;
-    }
-    utterance.rate = agent.rate;
-    utterance.pitch = agent.pitch;
-    utterance.onstart = () => {
-      setVoiceStatus("speaking");
-      setNotice(speakingNotice);
-    };
-    utterance.onend = () => {
+    const finishTurn = () => {
       if (speechTurn !== speechTurnRef.current) return;
-
       if (resumeListening && conversationActiveRef.current) {
         setNotice("Your turn — speak naturally");
-        window.setTimeout(() => beginListening(agent), 220);
+        window.setTimeout(() => beginListening(agent), 140);
         return;
       }
-
       setVoiceStatus("idle");
       setNotice("Call ended");
     };
-    utterance.onerror = () => {
-      if (speechTurn !== speechTurnRef.current) return;
-      conversationActiveRef.current = false;
-      setVoiceStatus("error");
-      setNotice("Voice playback stopped. Try again.");
-    };
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
+
+    if (isSupertonicReady()) {
+      setVoiceStatus("speaking");
+      setNotice(speakingNotice);
+      void speakSupertonic(answer, {
+        voice: agent.neuralVoice,
+        language: "en",
+        speed: agent.rate,
+        qualitySteps: 4,
+      })
+        .then(finishTurn)
+        .catch(() => speakBrowserReply());
+      return;
+    }
+
+    // Keep the first greeting instant while the consistent neural model warms in
+    // the background. Every later turn automatically upgrades to Supertonic.
+    void preloadSupertonic((stage) => {
+      if (stage.phase === "loading" && conversationActiveRef.current) {
+        setNotice(`${speakingNotice} · natural voice ${Math.round(stage.progress * 100)}%`);
+      }
+    }).catch(() => undefined);
+    speakBrowserReply();
+
+    function speakBrowserReply() {
+      if (!("speechSynthesis" in window)) {
+        conversationActiveRef.current = false;
+        setVoiceStatus("error");
+        setNotice("Voice playback is not available in this browser.");
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(answer);
+      const availableVoices = (
+        browserVoicesRef.current.length
+          ? browserVoicesRef.current
+          : window.speechSynthesis.getVoices()
+      ).filter((voice) => voice.lang.toLowerCase().startsWith("en"));
+      const preferredVoice = chooseHumanBrowserVoice(agent, availableVoices);
+
+      if (preferredVoice) {
+        utterance.voice = preferredVoice;
+        utterance.lang = preferredVoice.lang;
+      }
+      utterance.rate = agent.rate;
+      utterance.pitch = agent.pitch;
+      utterance.onstart = () => {
+        setVoiceStatus("speaking");
+        setNotice(speakingNotice);
+      };
+      utterance.onend = () => {
+        finishTurn();
+      };
+      utterance.onerror = () => {
+        if (speechTurn !== speechTurnRef.current) return;
+        conversationActiveRef.current = false;
+        setVoiceStatus("error");
+        setNotice("Voice playback stopped. Try again.");
+      };
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    }
   };
 
   function beginListening(agent: VoiceAgent) {
@@ -451,6 +489,7 @@ function PlayableAgent() {
     recognitionRef.current?.abort?.();
     recognitionRef.current = null;
     window.speechSynthesis?.cancel();
+    stopSupertonic();
     setVoiceStatus("idle");
     setNotice("Conversation stopped");
   };
@@ -464,6 +503,7 @@ function PlayableAgent() {
     conversationActiveRef.current = false;
     recognitionRef.current?.abort?.();
     window.speechSynthesis?.cancel();
+    stopSupertonic();
     setActiveAgent(agent.id);
     setVoiceStatus("thinking");
     setTranscript("Call connected");
@@ -496,7 +536,7 @@ function PlayableAgent() {
           </div>
           <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-black/38">
             <span className="h-2 w-2 rounded-full bg-[#ff5c7a] shadow-[0_0_14px_rgba(255,92,122,.65)]" />
-            Browser voice ready
+            Consistent neural voice
           </div>
         </div>
 

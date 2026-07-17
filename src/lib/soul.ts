@@ -115,7 +115,7 @@ export type PersonalityConfig = {
 
 export type VoiceConfig = {
   enabled: boolean;
-  provider: "browser" | "voicebox";
+  provider: "browser" | "voicebox" | "supertonic";
   profileId: string;
   profileName: string;
   browserVoiceName: string;
@@ -288,6 +288,12 @@ export function normalizeWorkspace(workspace: SoulWorkspace): SoulWorkspace {
       appearance: {
         ...soul.appearance,
         theme: soul.appearance.theme ?? "light",
+      },
+      voice: {
+        ...soul.voice,
+        provider: soul.voice.provider ?? "browser",
+        profileId: soul.voice.profileId ?? "",
+        profileName: soul.voice.profileName ?? "Natural",
       },
     })),
   };

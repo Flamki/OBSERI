@@ -59,6 +59,12 @@ import {
 import { rankKnowledgeChunks, type ChatResponse } from "@/lib/conversation";
 import { streamWebsiteCrawl } from "@/lib/crawl-client";
 import type { CrawlProgressEvent } from "@/lib/knowledge";
+import {
+  speakSupertonic,
+  stopSupertonic,
+  supertonicVoices,
+  type SupertonicVoiceId,
+} from "@/lib/supertonic";
 
 export const Route = createFileRoute("/app")({
   head: () => ({
@@ -2170,12 +2176,13 @@ type StudioVoice = {
   name: string;
   detail: string;
   language: string;
-  provider: "browser" | "voicebox";
+  provider: "browser" | "voicebox" | "supertonic";
   browserVoiceName?: string;
   profileId?: string;
   presetEngine?: "kokoro" | "qwen_custom_voice";
   presetVoiceId?: string;
   gender?: string;
+  neuralVoiceId?: SupertonicVoiceId;
 };
 
 const VOICE_GRADIENTS = [
@@ -2275,6 +2282,7 @@ function VoiceView({
       previewRequestRef.current?.abort();
       previewRequestRef.current = null;
       window.speechSynthesis?.cancel();
+      stopSupertonic();
       if (audioRef.current) {
         audioRef.current.audio.pause();
         URL.revokeObjectURL(audioRef.current.url);
@@ -2343,10 +2351,20 @@ function VoiceView({
       browserVoiceName: voice.name,
     })),
   ];
-  const exploreVoices: StudioVoice[] =
-    soul.voice.provider === "browser" || !voicebox.connected || !presetVoices.length
-      ? deviceVoices
-      : presetVoices;
+  const neuralVoices: StudioVoice[] = supertonicVoices.map((voice) => ({
+    id: `supertonic:${voice.id}`,
+    name: voice.name,
+    detail: `${voice.description} · On-device neural`,
+    language: "en",
+    provider: "supertonic" as const,
+    neuralVoiceId: voice.id,
+    gender: voice.gender,
+  }));
+  const exploreVoices: StudioVoice[] = [
+    ...neuralVoices,
+    ...(voicebox.connected ? presetVoices : []),
+    ...deviceVoices,
+  ];
   const activeVoice =
     soul.voice.provider === "voicebox"
       ? (customVoices.find((voice) => voice.profileId === soul.voice.profileId) ?? {
@@ -2357,8 +2375,11 @@ function VoiceView({
           provider: "voicebox" as const,
           profileId: soul.voice.profileId,
         })
-      : (deviceVoices.find((voice) => voice.browserVoiceName === soul.voice.browserVoiceName) ??
-        defaultVoice);
+      : soul.voice.provider === "supertonic"
+        ? (neuralVoices.find((voice) => voice.neuralVoiceId === soul.voice.profileId) ??
+          neuralVoices[0])
+        : (deviceVoices.find((voice) => voice.browserVoiceName === soul.voice.browserVoiceName) ??
+          defaultVoice);
   const mineVoices = Array.from(
     new Map<string, StudioVoice>([
       [activeVoice.id, activeVoice] as const,
@@ -2411,6 +2432,7 @@ function VoiceView({
     previewRequestRef.current?.abort();
     previewRequestRef.current = null;
     window.speechSynthesis?.cancel();
+    stopSupertonic();
     if (audioRef.current) {
       audioRef.current.audio.pause();
       URL.revokeObjectURL(audioRef.current.url);
@@ -2462,6 +2484,29 @@ function VoiceView({
     stopPreview();
     const token = previewTokenRef.current;
     setPlayingId(voice.id);
+
+    if (voice.provider === "supertonic" && voice.neuralVoiceId) {
+      setPreparingId(voice.id);
+      try {
+        await speakSupertonic(previewText, {
+          voice: voice.neuralVoiceId,
+          language: voice.language,
+          speed: soul.voice.speed,
+          qualitySteps: 5,
+          onProgress: (stage) => {
+            if (stage.phase === "loading") {
+              onNotice(`${stage.label} · ${Math.round(stage.progress * 100)}%`);
+            }
+          },
+        });
+      } catch {
+        onNotice("This device could not start the neural voice. Device voices still work.");
+      } finally {
+        setPreparingId(null);
+        setPlayingId(null);
+      }
+      return;
+    }
 
     let playableVoice = voice;
     if (voice.provider === "voicebox" && !voice.profileId) {
@@ -2563,6 +2608,15 @@ function VoiceView({
         provider: "voicebox",
         profileId: selectedVoice.profileId ?? "",
         profileName: selectedVoice.name,
+        language: selectedVoice.language,
+      });
+    } else if (selectedVoice.provider === "supertonic") {
+      update({
+        enabled: true,
+        provider: "supertonic",
+        profileId: selectedVoice.neuralVoiceId ?? "F1",
+        profileName: selectedVoice.name,
+        browserVoiceName: "",
         language: selectedVoice.language,
       });
     } else {
@@ -2678,10 +2732,18 @@ function VoiceView({
                 <div>
                   <p className="text-sm font-medium">Voice engine</p>
                   <p className="mt-1 text-xs text-[#7b7f78]">
-                    Browser voices are instant. Voicebox unlocks custom profiles.
+                    Neural voices stay consistent across devices. Browser voices start instantly.
                   </p>
                 </div>
                 <div className="flex rounded-xl bg-[#f1f2ef] p-1 text-xs font-semibold">
+                  <button
+                    onClick={() => {
+                      if (neuralVoices[0]) void selectVoice(neuralVoices[0]);
+                    }}
+                    className={`rounded-lg px-3 py-2 transition ${soul.voice.provider === "supertonic" ? "bg-white shadow-sm" : "text-[#777b74]"}`}
+                  >
+                    Neural
+                  </button>
                   <button
                     onClick={() => void selectVoice(defaultVoice)}
                     className={`rounded-lg px-3 py-2 transition ${soul.voice.provider === "browser" ? "bg-white shadow-sm" : "text-[#777b74]"}`}
@@ -2829,6 +2891,11 @@ function VoiceView({
                                   : voice.presetEngine === "qwen_custom_voice"
                                     ? "Qwen"
                                     : "Custom"}
+                              </span>
+                            )}
+                            {voice.provider === "supertonic" && (
+                              <span className="shrink-0 rounded-full bg-[#ffe5eb] px-1.5 py-0.5 text-[9px] font-semibold text-[#a43f58]">
+                                Neural
                               </span>
                             )}
                           </span>

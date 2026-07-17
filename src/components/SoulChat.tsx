@@ -19,6 +19,13 @@ import {
 } from "lucide-react";
 import { rankKnowledgeChunks, type ChatResponse } from "@/lib/conversation";
 import type { KnowledgeChunk, Soul, SoulMessage } from "@/lib/soul";
+import {
+  isSupertonicReady,
+  preloadSupertonic,
+  speakSupertonic,
+  stopSupertonic,
+  type SupertonicVoiceId,
+} from "@/lib/supertonic";
 
 const VOICE_LANGUAGES = [
   { code: "en-US", name: "English", flag: "US" },
@@ -127,6 +134,7 @@ export default function SoulChat({
       recognitionRef.current?.abort();
       audioRef.current?.pause();
       window.speechSynthesis?.cancel();
+      stopSupertonic();
     },
     [],
   );
@@ -297,6 +305,16 @@ export default function SoulChat({
       return;
     }
 
+    if (soul.voice.provider === "supertonic" && isSupertonicReady()) {
+      await speakSupertonic(text, {
+        voice: (soul.voice.profileId || "F1") as SupertonicVoiceId,
+        language: callLanguage,
+        speed: soul.voice.speed,
+        qualitySteps: 4,
+      });
+      return;
+    }
+
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
       await speakBrowserSegment(text);
@@ -322,6 +340,17 @@ export default function SoulChat({
           if (blob) await playAudioBlob(blob);
           else await speakBrowserSegment(segment);
         });
+      } else if (soul.voice.provider === "supertonic" && isSupertonicReady()) {
+        playback = playback.then(() =>
+          voiceCallActiveRef.current
+            ? speakSupertonic(segment, {
+                voice: (soul.voice.profileId || "F1") as SupertonicVoiceId,
+                language: callLanguage,
+                speed: soul.voice.speed,
+                qualitySteps: 4,
+              }).catch(() => speakBrowserSegment(segment))
+            : Promise.resolve(),
+        );
       } else {
         playback = playback.then(() =>
           voiceCallActiveRef.current ? speakBrowserSegment(segment) : Promise.resolve(),
@@ -510,7 +539,20 @@ export default function SoulChat({
     setSoundEnabled(true);
     voiceCallActiveRef.current = true;
     setVoiceCallActive(true);
-    startListening(true);
+    const greeting = soul.personality.greeting.trim();
+    if (soul.voice.provider === "supertonic" && !isSupertonicReady()) {
+      void preloadSupertonic().catch(() => undefined);
+      void speakBrowserSegment(greeting).then(() => {
+        if (voiceCallActiveRef.current) startListening(true);
+      });
+      return;
+    }
+    setVoiceStatus("speaking");
+    void speak(greeting)
+      .catch(() => undefined)
+      .then(() => {
+        if (voiceCallActiveRef.current) startListening(true);
+      });
   }
 
   function stopVoiceCall() {
@@ -522,6 +564,7 @@ export default function SoulChat({
     audioRef.current?.pause();
     audioRef.current = null;
     window.speechSynthesis?.cancel();
+    stopSupertonic();
     setListening(false);
     setVoiceCallActive(false);
     setVoiceStatus("idle");
@@ -533,6 +576,7 @@ export default function SoulChat({
     setMessages(greeting);
     setError("");
     window.speechSynthesis?.cancel();
+    stopSupertonic();
   }
 
   async function toggleFullscreen() {

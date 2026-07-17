@@ -30,7 +30,8 @@ self-serve customers.
 | Website ingestion                | Done and live             | Same-origin discovery, robots and sitemap support, bounded depth/page limits, canonicalization, deduplication, revisions, refresh validators, and visible crawl progress |
 | Retrieval and chat               | Done and live             | Source-grounded answers, visible citations, deterministic fallback, and an OpenAI-compatible hosted provider                                                             |
 | Personality                      | Done and live             | Name, role, purpose, tone, traits, greeting, instructions, unknown response, and guardrails                                                                              |
-| Browser voice                    | Done and live             | Instant device speech synthesis and speech recognition without hosted voice infrastructure                                                                               |
+| On-device neural voice           | Done, ready to publish    | Ten consistent Supertonic presets run in-browser through WebGPU with WASM fallback; the first greeting stays instant while the pinned model warms and caches             |
+| Browser voice                    | Done and live             | Instant device speech synthesis and speech recognition remains the zero-download fallback                                                                                |
 | Voicebox presets                 | Done locally              | 50 Kokoro voices verified across English, Spanish, French, Hindi, Italian, Japanese, Portuguese, and Chinese                                                             |
 | Voice cloning                    | Done locally              | Consent-gated Voicebox profile and sample workflow with `self`, `permission`, or `licensed` rights basis                                                                 |
 | Voice preview cache              | Done locally              | Repeated generated previews are served from cache instead of regenerating audio                                                                                          |
@@ -63,6 +64,8 @@ self-serve customers.
 - Deterministic source-grounded answers when no hosted model is configured
 - Fireworks-compatible production conversation and analysis configuration
 - Browser text-to-speech and speech-to-text fallback
+- Ten consistent Supertonic 3 neural presets with lazy model loading, WebGPU/WASM routing,
+  immutable model revision pinning, per-style loading, and native-voice failover
 - Voicebox preset discovery, profile creation, cached speech generation, speed control, and cloning
   consent
 
@@ -76,7 +79,7 @@ self-serve customers.
 
 ## Verified release checks
 
-Last verified on **15 July 2026**:
+Last verified on **17 July 2026**:
 
 - Full production build passes
 - Repository lint passes with zero errors
@@ -87,6 +90,8 @@ Last verified on **15 July 2026**:
 - A private-network scan target is rejected with HTTP `400`
 - Local Voicebox container reports healthy with zero restarts and no OOM failure
 - All 50 enabled Kokoro preset voices return valid WAV audio locally
+- Supertonic loads its pinned ONNX assets in Chrome, generates and plays a 44.1 kHz preview, and
+  exposes the same ten preset identities across devices
 - No API keys or local environment files are tracked by Git
 
 ## Search and discovery
@@ -190,8 +195,29 @@ clips can take roughly 10–20 seconds, while cached clips are effectively immed
 pre-warmed GPU worker is therefore required for managed production voices, interruption-aware live
 calls, Qwen voices, and scalable cloning.
 
-Until that worker exists, production intentionally exposes browser voices instead of advertising a
-Voicebox catalogue that cannot generate audio.
+Until that worker exists, production exposes on-device Supertonic and browser voices instead of
+advertising a Voicebox catalogue that cannot generate audio.
+
+## On-device neural voice
+
+Supertonic 3 is Obseri's consistent no-server-GPU voice layer. Its ~99M-parameter ONNX model runs
+inside the visitor's browser: WebGPU is preferred and ONNX Runtime automatically falls back to
+WebAssembly. Obseri exposes ten stable presets in Studio, so a selected voice does not change merely
+because the visitor moved from laptop to mobile.
+
+The model is not shipped in the initial JavaScript bundle. After explicit voice interaction, Obseri
+loads the four ONNX sessions from an immutable Hugging Face revision, loads only the selected style,
+and lets the browser cache those assets. During the first cold start, Obseri speaks the greeting with
+the best native device voice while warming Supertonic in the background. Later turns use the selected
+neural preset. Unsupported, low-capability, offline, or failed devices continue through the native
+voice path rather than losing the call.
+
+Supertonic improves consistency and removes server GPU cost, but it does not replace a managed
+streaming provider for every production call. Cold downloads are substantial, WASM-only devices can
+have slower synthesis, and browser speech recognition is still platform-dependent. Paid traffic
+should therefore retain managed STT/TTS adapters for strict time-to-first-audio SLAs, while
+Supertonic provides privacy-friendly on-device speech and cost control. Licensing and attribution are
+recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Voice platform decision
 
@@ -207,7 +233,8 @@ The production routing target is:
 
 - **Sarvam** for Indian languages, Indian English, and code-switched conversations
 - **ElevenLabs** for premium global voices, low-latency English, and managed voice cloning
-- **Browser speech** as the instant, zero-infrastructure demo and availability fallback
+- **Supertonic** for consistent, private, on-device neural speech without server GPU capacity
+- **Browser speech** as the instant, zero-download greeting and availability fallback
 - **Self-hosted open models through Voicebox** for private deployments, experiments, batch work,
   and a future cost-control path
 
