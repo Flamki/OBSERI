@@ -25,7 +25,9 @@ import { Route as ApiSoulsPublishRouteImport } from './routes/api.souls.publish'
 import { Route as ApiSoulsSoulIdRouteImport } from './routes/api.souls.$soulId'
 import { Route as ApiIngestStreamRouteImport } from './routes/api.ingest.stream'
 import { Route as ApiChatStreamRouteImport } from './routes/api.chat.stream'
+import { Route as ApiWidgetsSoulIdSessionRouteImport } from './routes/api.widgets.$soulId.session'
 import { Route as ApiSoulsSoulIdEventsRouteImport } from './routes/api.souls.$soulId.events'
+import { Route as ApiInternalWebhooksDrainRouteImport } from './routes/api.internal.webhooks.drain'
 
 const AppRoute = AppRouteImport.update({
   id: '/app',
@@ -108,11 +110,22 @@ const ApiChatStreamRoute = ApiChatStreamRouteImport.update({
   path: '/stream',
   getParentRoute: () => ApiChatRoute,
 } as any)
+const ApiWidgetsSoulIdSessionRoute = ApiWidgetsSoulIdSessionRouteImport.update({
+  id: '/api/widgets/$soulId/session',
+  path: '/api/widgets/$soulId/session',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSoulsSoulIdEventsRoute = ApiSoulsSoulIdEventsRouteImport.update({
   id: '/events',
   path: '/events',
   getParentRoute: () => ApiSoulsSoulIdRoute,
 } as any)
+const ApiInternalWebhooksDrainRoute =
+  ApiInternalWebhooksDrainRouteImport.update({
+    id: '/api/internal/webhooks/drain',
+    path: '/api/internal/webhooks/drain',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -131,7 +144,9 @@ export interface FileRoutesByFullPath {
   '/api/voice/profiles': typeof ApiVoiceProfilesRoute
   '/api/voice/speak': typeof ApiVoiceSpeakRoute
   '/api/webhooks/test': typeof ApiWebhooksTestRoute
+  '/api/internal/webhooks/drain': typeof ApiInternalWebhooksDrainRoute
   '/api/souls/$soulId/events': typeof ApiSoulsSoulIdEventsRoute
+  '/api/widgets/$soulId/session': typeof ApiWidgetsSoulIdSessionRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -150,7 +165,9 @@ export interface FileRoutesByTo {
   '/api/voice/profiles': typeof ApiVoiceProfilesRoute
   '/api/voice/speak': typeof ApiVoiceSpeakRoute
   '/api/webhooks/test': typeof ApiWebhooksTestRoute
+  '/api/internal/webhooks/drain': typeof ApiInternalWebhooksDrainRoute
   '/api/souls/$soulId/events': typeof ApiSoulsSoulIdEventsRoute
+  '/api/widgets/$soulId/session': typeof ApiWidgetsSoulIdSessionRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -170,7 +187,9 @@ export interface FileRoutesById {
   '/api/voice/profiles': typeof ApiVoiceProfilesRoute
   '/api/voice/speak': typeof ApiVoiceSpeakRoute
   '/api/webhooks/test': typeof ApiWebhooksTestRoute
+  '/api/internal/webhooks/drain': typeof ApiInternalWebhooksDrainRoute
   '/api/souls/$soulId/events': typeof ApiSoulsSoulIdEventsRoute
+  '/api/widgets/$soulId/session': typeof ApiWidgetsSoulIdSessionRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -191,7 +210,9 @@ export interface FileRouteTypes {
     | '/api/voice/profiles'
     | '/api/voice/speak'
     | '/api/webhooks/test'
+    | '/api/internal/webhooks/drain'
     | '/api/souls/$soulId/events'
+    | '/api/widgets/$soulId/session'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -210,7 +231,9 @@ export interface FileRouteTypes {
     | '/api/voice/profiles'
     | '/api/voice/speak'
     | '/api/webhooks/test'
+    | '/api/internal/webhooks/drain'
     | '/api/souls/$soulId/events'
+    | '/api/widgets/$soulId/session'
   id:
     | '__root__'
     | '/'
@@ -229,7 +252,9 @@ export interface FileRouteTypes {
     | '/api/voice/profiles'
     | '/api/voice/speak'
     | '/api/webhooks/test'
+    | '/api/internal/webhooks/drain'
     | '/api/souls/$soulId/events'
+    | '/api/widgets/$soulId/session'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -247,6 +272,8 @@ export interface RootRouteChildren {
   ApiVoiceProfilesRoute: typeof ApiVoiceProfilesRoute
   ApiVoiceSpeakRoute: typeof ApiVoiceSpeakRoute
   ApiWebhooksTestRoute: typeof ApiWebhooksTestRoute
+  ApiInternalWebhooksDrainRoute: typeof ApiInternalWebhooksDrainRoute
+  ApiWidgetsSoulIdSessionRoute: typeof ApiWidgetsSoulIdSessionRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -363,12 +390,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiChatStreamRouteImport
       parentRoute: typeof ApiChatRoute
     }
+    '/api/widgets/$soulId/session': {
+      id: '/api/widgets/$soulId/session'
+      path: '/api/widgets/$soulId/session'
+      fullPath: '/api/widgets/$soulId/session'
+      preLoaderRoute: typeof ApiWidgetsSoulIdSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/souls/$soulId/events': {
       id: '/api/souls/$soulId/events'
       path: '/events'
       fullPath: '/api/souls/$soulId/events'
       preLoaderRoute: typeof ApiSoulsSoulIdEventsRouteImport
       parentRoute: typeof ApiSoulsSoulIdRoute
+    }
+    '/api/internal/webhooks/drain': {
+      id: '/api/internal/webhooks/drain'
+      path: '/api/internal/webhooks/drain'
+      fullPath: '/api/internal/webhooks/drain'
+      preLoaderRoute: typeof ApiInternalWebhooksDrainRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -423,6 +464,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiVoiceProfilesRoute: ApiVoiceProfilesRoute,
   ApiVoiceSpeakRoute: ApiVoiceSpeakRoute,
   ApiWebhooksTestRoute: ApiWebhooksTestRoute,
+  ApiInternalWebhooksDrainRoute: ApiInternalWebhooksDrainRoute,
+  ApiWidgetsSoulIdSessionRoute: ApiWidgetsSoulIdSessionRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

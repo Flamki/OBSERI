@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { publishSoul } from "@/lib/published-souls";
+import { readBearerToken } from "@/lib/integration-security";
+import type { Soul } from "@/lib/soul";
 
 export const Route = createFileRoute("/api/souls/publish")({
   server: {
@@ -8,7 +10,12 @@ export const Route = createFileRoute("/api/souls/publish")({
         try {
           const length = Number(request.headers.get("content-length") ?? "0");
           if (length > 900_000) return responseError("Soul payload is too large.", 413);
-          const record = publishSoul(await request.json());
+          const value = (await request.json()) as Partial<Soul>;
+          const record = await publishSoul({
+            value,
+            ownerKey: readBearerToken(request),
+            widgetToken: value.channels?.widgetToken ?? "",
+          });
           return Response.json(
             {
               soulId: record.soul.id,
@@ -20,7 +27,11 @@ export const Route = createFileRoute("/api/souls/publish")({
         } catch (error) {
           return responseError(
             error instanceof Error ? error.message : "The soul could not be published.",
-            error instanceof SyntaxError ? 400 : 422,
+            error instanceof SyntaxError
+              ? 400
+              : typeof error === "object" && error && "status" in error
+                ? Number(error.status)
+                : 422,
           );
         }
       },

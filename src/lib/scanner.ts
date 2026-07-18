@@ -284,6 +284,27 @@ export function assertPublicHttpUrl(value: string): string {
   return parsed.toString();
 }
 
+export async function assertPublicHttpUrlResolved(value: string): Promise<string> {
+  const safeUrl = assertPublicHttpUrl(value);
+  const hostname = new URL(safeUrl).hostname;
+  const addresses = await lookup(hostname, { all: true, verbatim: true });
+  if (!addresses.length) {
+    throw new ScanError("The destination hostname did not resolve.", 400, "unresolved_url");
+  }
+  if (
+    addresses.some(({ address }) =>
+      address.includes(":") ? isPrivateIpv6(address) : isPrivateIpv4(address),
+    )
+  ) {
+    throw new ScanError(
+      "The destination resolves to a private or local network address.",
+      400,
+      "private_url",
+    );
+  }
+  return safeUrl;
+}
+
 function isPrivateIpv4(hostname: string): boolean {
   if (!/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) return false;
   const parts = hostname.split(".").map(Number);
@@ -769,3 +790,4 @@ function shouldSkipDiscoveredUrl(url: URL): boolean {
   );
 }
 import { getRuntimeEnvironment } from "@/lib/runtime-env";
+import { lookup } from "node:dns/promises";

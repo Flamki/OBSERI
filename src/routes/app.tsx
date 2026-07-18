@@ -3399,7 +3399,7 @@ function DeployView({
   const [busy, setBusy] = useState(false);
   const [previewMode, setPreviewMode] = useState<"closed" | "chat" | "voice">("closed");
   const origin = typeof window === "undefined" ? "https://app.obseri.com" : window.location.origin;
-  const code = `<script\n  src="${origin}/obseri-widget.js"\n  data-soul-id="${soul.id}"\n  data-position="${soul.appearance.position}"\n  data-accent="${soul.appearance.accent}"\n  async\n></script>`;
+  const code = `<script\n  src="${origin}/obseri-widget.js"\n  data-soul-id="${soul.id}"\n  data-widget-token="${soul.channels.widgetToken}"\n  data-position="${soul.appearance.position}"\n  data-accent="${soul.appearance.accent}"\n  async\n></script>`;
   const updateAppearance = (patch: Partial<Soul["appearance"]>) =>
     onUpdate((current) => ({ ...current, appearance: { ...current.appearance, ...patch } }));
   const updateChannels = (patch: Partial<Soul["channels"]>) =>
@@ -3413,7 +3413,10 @@ function DeployView({
     try {
       const response = await fetch("/api/souls/publish", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${soul.channels.publishKey}`,
+        },
         body: JSON.stringify(soul),
       });
       const payload = (await response.json()) as { error?: { message?: string } };
@@ -3432,11 +3435,12 @@ function DeployView({
     try {
       const response = await fetch("/api/webhooks/test", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${soul.channels.publishKey}`,
+        },
         body: JSON.stringify({
           soulId: soul.id,
-          url: soul.channels.webhookUrl,
-          secret: soul.channels.webhookSecret,
         }),
       });
       const payload = (await response.json()) as { error?: { message?: string } };
@@ -4534,6 +4538,10 @@ const DEMO_SOUL: Soul = {
     allowedDomains: ["obseri.com"],
     webhookUrl: "",
     webhookSecret: "whsec_demo_only_replace_in_production",
+    publishKey:
+      "obspub_demo_only_replace_in_production_0000000000000000000000000000000000000000000000000000000000000000",
+    widgetToken:
+      "obswgt_demo_only_replace_in_production_0000000000000000000000000000000000000000000000000000000000000000",
   },
   conversations: [],
 };

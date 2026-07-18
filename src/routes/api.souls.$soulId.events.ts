@@ -1,9 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { getPublishedSoul } from "@/lib/published-souls";
-import { createWebhookEvent, deliverWebhook } from "@/lib/webhooks";
+import {
+  consumeRateLimit,
+  deliverQueuedWebhook,
+  persistConversation,
+} from "@/lib/integration-store";
+import { readBearerToken, verifyWidgetSession } from "@/lib/integration-security";
 
 const schema = z.object({
+  conversationId: z.string().uuid(),
   leadIntent: z.enum(["none", "low", "medium", "high"]),
   messages: z
     .array(
@@ -23,26 +28,35 @@ export const Route = createFileRoute("/api/souls/$soulId/events")({
     handlers: {
       POST: async ({ request, params }) => {
         try {
-          const record = getPublishedSoul(params.soulId);
-          if (!record) return responseError("This soul is not published.", 404);
+          const session = verifyWidgetSession(readBearerToken(request), params.soulId);
+          const allowed = await consumeRateLimit(
+            `events:${params.soulId}:${session.origin}`,
+            120,
+            60,
+          );
+          if (!allowed) return responseError("Too many widget events. Try again shortly.", 429);
           const parsed = schema.safeParse(await request.json());
           if (!parsed.success) return responseError("The conversation event is invalid.", 400);
-          if (!record.webhook.enabled || !record.webhook.url) {
-            return Response.json({ accepted: true, delivered: false, reason: "disabled" });
-          }
-          const event = createWebhookEvent(
-            parsed.data.leadIntent === "high" ? "lead.detected" : "conversation.updated",
-            params.soulId,
-            parsed.data,
-          );
-          const delivery = await deliverWebhook({
-            url: record.webhook.url,
-            secret: record.webhook.secret,
-            event,
+          const now = new Date().toISOString();
+          const eventId = await persistConversation({
+            soulId: params.soulId,
+            origin: session.origin,
+            conversation: {
+              id: parsed.data.conversationId,
+              startedAt: parsed.data.messages[0]?.createdAt ?? now,
+              updatedAt: now,
+              channel: "widget",
+              visitorLabel: "Website visitor",
+              leadIntent: parsed.data.leadIntent,
+              messages: parsed.data.messages,
+            },
           });
-          return Response.json({ accepted: true, delivered: true, eventId: event.id, delivery });
+          const delivery = eventId ? await deliverQueuedWebhook(eventId) : null;
+          return Response.json({ accepted: true, eventId, delivery });
         } catch (error) {
-          return responseError(error instanceof Error ? error.message : "Delivery failed.", 502);
+          const status =
+            typeof error === "object" && error && "status" in error ? Number(error.status) : 502;
+          return responseError(error instanceof Error ? error.message : "Delivery failed.", status);
         }
       },
     },

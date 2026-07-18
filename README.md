@@ -22,26 +22,26 @@ self-serve customers.
 
 ## Release status
 
-| Area                             | Status                    | Current behavior                                                                                                                                                         |
-| -------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Landing experience               | Done and live             | Responsive premium landing page with optimized WebGL effects and quick-start URL entry                                                                                   |
-| Soul Studio                      | Done and live             | Knowledge, personality, voice, live website simulation, integration, conversations, and settings in one workspace                                                        |
-| Visitor experience simulator     | Done and live             | Renders the website behind the real assistant with desktop, tablet, mobile, theme, launcher, accent, and placement controls                                              |
-| Website ingestion                | Done and live             | Same-origin discovery, robots and sitemap support, bounded depth/page limits, canonicalization, deduplication, revisions, refresh validators, and visible crawl progress |
-| Retrieval and chat               | Done and live             | Source-grounded answers, visible citations, deterministic fallback, and an OpenAI-compatible hosted provider                                                             |
-| Personality                      | Done and live             | Name, role, purpose, tone, traits, greeting, instructions, unknown response, and guardrails                                                                              |
-| Consistent neural voice          | Done and live             | Ten Supertonic presets route through the authenticated Mumbai voice service; a selected voice never changes silently during a call                                       |
-| Browser voice                    | Done and live             | Instant device speech synthesis remains an explicit engine choice, while device speech recognition handles voice input                                                   |
-| Voicebox presets                 | Done locally              | 50 Kokoro voices verified across English, Spanish, French, Hindi, Italian, Japanese, Portuguese, and Chinese                                                             |
-| Voice cloning                    | Done locally              | Consent-gated Voicebox profile and sample workflow with `self`, `permission`, or `licensed` rights basis                                                                 |
-| Voice preview cache              | Done locally              | Repeated generated previews are served from cache instead of regenerating audio                                                                                          |
-| Public Voicebox service          | Waiting on infrastructure | Requires a public GPU worker; unavailable voices fail clearly instead of substituting a different speaker                                                               |
-| Widget                           | Done and live             | Responsive isolated widget loader from `public/obseri-widget.js`                                                                                                         |
-| Webhooks                         | Done                      | HMAC-SHA256 signatures, timestamps, event IDs, test delivery, and idempotency keys                                                                                       |
-| Production schema                | Done, not provisioned     | Supabase/Postgres migrations cover accounts, workspaces, Souls, knowledge, conversations, voice consent, jobs, and webhook delivery                                      |
-| Durable accounts and Studio data | Waiting on infrastructure | Studio currently persists in the browser; Supabase needs one additional active project slot                                                                              |
-| Billing                          | Planned                   | Stripe adapters and self-serve plan enforcement are not connected                                                                                                        |
-| Observability and abuse controls | Planned                   | Production rate limiting, owner API authentication, allowed-domain verification, queues, and monitoring remain required                                                  |
+| Area                             | Status                               | Current behavior                                                                                                                                                         |
+| -------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Landing experience               | Done and live                        | Responsive premium landing page with optimized WebGL effects and quick-start URL entry                                                                                   |
+| Soul Studio                      | Done and live                        | Knowledge, personality, voice, live website simulation, integration, conversations, and settings in one workspace                                                        |
+| Visitor experience simulator     | Done and live                        | Renders the website behind the real assistant with desktop, tablet, mobile, theme, launcher, accent, and placement controls                                              |
+| Website ingestion                | Done and live                        | Same-origin discovery, robots and sitemap support, bounded depth/page limits, canonicalization, deduplication, revisions, refresh validators, and visible crawl progress |
+| Retrieval and chat               | Done and live                        | Source-grounded answers, visible citations, deterministic fallback, and an OpenAI-compatible hosted provider                                                             |
+| Personality                      | Done and live                        | Name, role, purpose, tone, traits, greeting, instructions, unknown response, and guardrails                                                                              |
+| Consistent neural voice          | Done and live                        | Ten Supertonic presets route through the authenticated Mumbai voice service; a selected voice never changes silently during a call                                       |
+| Browser voice                    | Done and live                        | Instant device speech synthesis remains an explicit engine choice, while device speech recognition handles voice input                                                   |
+| Voicebox presets                 | Done locally                         | 50 Kokoro voices verified across English, Spanish, French, Hindi, Italian, Japanese, Portuguese, and Chinese                                                             |
+| Voice cloning                    | Done locally                         | Consent-gated Voicebox profile and sample workflow with `self`, `permission`, or `licensed` rights basis                                                                 |
+| Voice preview cache              | Done locally                         | Repeated generated previews are served from cache instead of regenerating audio                                                                                          |
+| Public Voicebox service          | Waiting on infrastructure            | Requires a public GPU worker; unavailable voices fail clearly instead of substituting a different speaker                                                                |
+| Widget integration               | Code complete, provisioning required | Per-Soul publisher keys, opaque widget tokens, short-lived signed sessions, origin allowlists, durable rate limits, and a responsive isolated loader                     |
+| Webhooks                         | Code complete, provisioning required | Encrypted secrets, authenticated tests, DNS/private-network checks, durable delivery jobs, exponential retries, HMAC-SHA256 signatures, timestamps, and idempotency keys |
+| Production schema                | Done, not provisioned                | Supabase/Postgres migrations cover accounts, workspaces, Souls, knowledge, conversations, voice consent, jobs, and webhook delivery                                      |
+| Durable accounts and Studio data | Waiting on infrastructure            | Studio currently persists in the browser; Supabase needs one additional active project slot                                                                              |
+| Billing                          | Planned                              | Stripe adapters and self-serve plan enforcement are not connected                                                                                                        |
+| Integration abuse controls       | Done in code                         | Durable rate limiting, publisher authentication, allowed-domain enforcement, signed widget sessions, conversation persistence, and retryable webhook jobs                |
 
 ## What is implemented
 
@@ -71,11 +71,20 @@ self-serve customers.
 
 ### Delivery
 
-- Public widget route and embeddable asynchronous loader
+- Publisher-authenticated, tenant-scoped Soul publishing backed by Postgres
+- Opaque per-Soul widget tokens exchanged for 15-minute origin-bound sessions
+- Public widget route and embeddable asynchronous loader with no bearer token in iframe URLs
 - Widget appearance, launcher position, accent, and welcome-label controls
-- Signed webhook events for conversation updates and detected leads
+- Exact and wildcard subdomain allowlists enforced before widget startup
+- Durable widget conversations and rate-limit counters
+- Signed webhook events for conversation updates and detected leads, with persistent jobs and exponential retry
+- Webhook destinations reject private/local literals and DNS resolutions
 - JSON workspace export for local backup
 - Vercel deployment with `obseri.com`, `www.obseri.com`, and the project alias
+
+The integration layer has no in-memory or demo fallback. Publishing returns HTTP `503` until the
+database migration and production secrets below are connected. This is deliberate: a launch build
+must never claim that a site is published when its state cannot survive a restart.
 
 ## Verified release checks
 
@@ -152,27 +161,46 @@ to connect hosted services. Never commit `.env.local` or provider credentials.
 
 ## Environment
 
-| Variable                    | Purpose                                                          |
-| --------------------------- | ---------------------------------------------------------------- |
-| `VITE_SUPABASE_URL`         | Hosted Supabase project URL for the durable data phase           |
-| `VITE_SUPABASE_ANON_KEY`    | Browser-safe Supabase anonymous key                              |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server-only Supabase administration; never expose to the browser |
-| `OBSERI_CRAWLER_API_URL`    | Optional isolated browser crawler for JavaScript-heavy websites  |
-| `OBSERI_CRAWLER_API_KEY`    | Server-only crawler credential                                   |
-| `OBSERI_AI_API_URL`         | OpenAI-compatible analysis endpoint                              |
-| `OBSERI_AI_API_KEY`         | Server-only analysis credential                                  |
-| `OBSERI_AI_MODEL`           | Analysis model identifier                                        |
-| `OBSERI_CHAT_API_URL`       | Optional dedicated grounded-chat endpoint                        |
-| `OBSERI_CHAT_API_KEY`       | Server-only grounded-chat credential                             |
-| `OBSERI_CHAT_MODEL`         | Grounded-chat model identifier                                   |
-| `OBSERI_VOICE_MODEL`        | Optional low-latency model for streamed live voice turns         |
-| `OBSERI_SUPERTONIC_URL`     | Private URL for the pre-warmed Supertonic container              |
-| `OBSERI_SUPERTONIC_API_KEY` | Shared server-only bearer secret for the Supertonic container    |
-| `OBSERI_VOICEBOX_URL`       | Public or local Voicebox REST base URL                           |
-| `OBSERI_ENABLE_QWEN_VOICES` | Enables Qwen presets only when the worker has adequate GPU/RAM   |
+| Variable                       | Purpose                                                                |
+| ------------------------------ | ---------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`            | Hosted Supabase project URL for the durable data phase                 |
+| `VITE_SUPABASE_ANON_KEY`       | Browser-safe Supabase anonymous key                                    |
+| `SUPABASE_SERVICE_ROLE_KEY`    | Server-only Supabase administration; never expose to the browser       |
+| `OBSERI_CRAWLER_API_URL`       | Optional isolated browser crawler for JavaScript-heavy websites        |
+| `OBSERI_CRAWLER_API_KEY`       | Server-only crawler credential                                         |
+| `OBSERI_AI_API_URL`            | OpenAI-compatible analysis endpoint                                    |
+| `OBSERI_AI_API_KEY`            | Server-only analysis credential                                        |
+| `OBSERI_AI_MODEL`              | Analysis model identifier                                              |
+| `OBSERI_CHAT_API_URL`          | Optional dedicated grounded-chat endpoint                              |
+| `OBSERI_CHAT_API_KEY`          | Server-only grounded-chat credential                                   |
+| `OBSERI_CHAT_MODEL`            | Grounded-chat model identifier                                         |
+| `OBSERI_VOICE_MODEL`           | Optional low-latency model for streamed live voice turns               |
+| `OBSERI_SUPERTONIC_URL`        | Private URL for the pre-warmed Supertonic container                    |
+| `OBSERI_SUPERTONIC_API_KEY`    | Shared server-only bearer secret for the Supertonic container          |
+| `OBSERI_VOICEBOX_URL`          | Public or local Voicebox REST base URL                                 |
+| `OBSERI_ENABLE_QWEN_VOICES`    | Enables Qwen presets only when the worker has adequate GPU/RAM         |
+| `DATABASE_URL`                 | Pooled Postgres connection for published Souls and integration events  |
+| `OBSERI_WIDGET_SESSION_SECRET` | Random 32+ byte secret for short-lived origin-bound widget sessions    |
+| `OBSERI_SECRET_ENCRYPTION_KEY` | Random 32+ byte secret used to encrypt webhook signing secrets at rest |
+| `CRON_SECRET`                  | Random bearer secret for the webhook retry worker endpoint             |
 
 Production provider values are stored as sensitive Vercel environment variables, not in this
 repository.
+
+### Production integration provisioning
+
+1. Create a pooled Postgres database reachable from the Vercel Node runtime.
+2. Run [`db/migrations/001_production_integrations.sql`](db/migrations/001_production_integrations.sql).
+3. Add `DATABASE_URL`, `OBSERI_WIDGET_SESSION_SECRET`, `OBSERI_SECRET_ENCRYPTION_KEY`, and
+   `CRON_SECRET` to Vercel Production, Preview, and Development as appropriate.
+4. Invoke `POST /api/internal/webhooks/drain` every minute with
+   `Authorization: Bearer $CRON_SECRET` from the production scheduler.
+5. Republish every existing Soul once. The new embed includes `data-widget-token`; legacy snippets
+   intentionally stop instead of bypassing domain enforcement.
+
+Do not rotate publisher keys or widget tokens by editing the database. Rotate them in Studio and
+republish, then replace the embed snippet. Rotate encryption keys only through a documented
+decrypt/re-encrypt migration.
 
 ## Voicebox
 

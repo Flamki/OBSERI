@@ -1,4 +1,4 @@
-import { assertPublicHttpUrl } from "@/lib/scanner";
+import { assertPublicHttpUrlResolved } from "@/lib/scanner";
 
 export type ObseriWebhookEvent = {
   id: string;
@@ -13,7 +13,7 @@ export async function deliverWebhook(input: {
   secret: string;
   event: ObseriWebhookEvent;
 }) {
-  const url = assertPublicHttpUrl(input.url);
+  const url = await assertPublicHttpUrlResolved(input.url);
   if (!input.secret.startsWith("whsec_") || input.secret.length < 20) {
     throw new Error("The webhook signing secret is invalid.");
   }

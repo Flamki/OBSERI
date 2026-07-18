@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, Orbit } from "lucide-react";
 import SoulChat from "@/components/SoulChat";
 import type { Soul } from "@/lib/soul";
@@ -19,10 +19,19 @@ function EmbeddedSoul() {
   const { mode } = Route.useSearch();
   const [soul, setSoul] = useState<Soul | null>(null);
   const [error, setError] = useState("");
+  const conversationId = useRef(crypto.randomUUID());
+  const context = readWidgetContext();
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetch(`/api/souls/${encodeURIComponent(soulId)}`, { signal: controller.signal })
+    if (!context.session) {
+      setError("This widget session is invalid.");
+      return () => controller.abort();
+    }
+    void fetch(`/api/souls/${encodeURIComponent(soulId)}`, {
+      signal: controller.signal,
+      headers: { authorization: `Bearer ${context.session}` },
+    })
       .then(async (response) => {
         if (!response.ok) throw new Error("This website soul is not published yet.");
         return (await response.json()) as { soul: Soul };
@@ -33,7 +42,7 @@ function EmbeddedSoul() {
         setError(cause instanceof Error ? cause.message : "The soul is unavailable.");
       });
     return () => controller.abort();
-  }, [soulId]);
+  }, [context.session, soulId]);
 
   return (
     <main className="min-h-screen bg-transparent p-2 font-sans text-foreground">
@@ -42,13 +51,26 @@ function EmbeddedSoul() {
           soul={soul}
           compact
           voiceMode
+          sessionToken={context.session}
           initialPanelMode={mode}
-          onClose={() => window.parent.postMessage({ type: "obseri:close" }, "*")}
+          onClose={() =>
+            window.parent.postMessage(
+              { type: "obseri:close" },
+              context.parentOrigin || window.location.origin,
+            )
+          }
           onMessagesChange={(messages, leadIntent) => {
             void fetch(`/api/souls/${encodeURIComponent(soul.id)}/events`, {
               method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ messages, leadIntent }),
+              headers: {
+                "content-type": "application/json",
+                authorization: `Bearer ${context.session}`,
+              },
+              body: JSON.stringify({
+                conversationId: conversationId.current,
+                messages,
+                leadIntent,
+              }),
               keepalive: true,
             });
           }}
@@ -74,4 +96,17 @@ function EmbeddedSoul() {
       )}
     </main>
   );
+}
+
+function readWidgetContext(): { session: string; parentOrigin: string } {
+  if (typeof window === "undefined") return { session: "", parentOrigin: "" };
+  try {
+    const value = JSON.parse(window.name) as { session?: unknown; parentOrigin?: unknown };
+    return {
+      session: typeof value.session === "string" ? value.session : "",
+      parentOrigin: typeof value.parentOrigin === "string" ? value.parentOrigin : "",
+    };
+  } catch {
+    return { session: "", parentOrigin: "" };
+  }
 }

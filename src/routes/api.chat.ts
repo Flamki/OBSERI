@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { answerSoulQuestion } from "@/lib/conversation";
 import type { ChatRequest } from "@/lib/conversation";
+import { ChatAccessError, resolveChatRequest } from "@/lib/chat-access";
 
 const messageSchema = z.object({
   role: z.enum(["visitor", "assistant"]),
@@ -47,13 +48,16 @@ export const Route = createFileRoute("/api/chat")({
           const parsed = schema.safeParse(await request.json());
           if (!parsed.success)
             return errorResponse("Invalid conversation request.", 400, "invalid_request");
-          const result = await answerSoulQuestion(parsed.data as ChatRequest);
+          const input = await resolveChatRequest(request, parsed.data as ChatRequest);
+          const result = await answerSoulQuestion(input);
           return Response.json(result, {
             headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" },
           });
         } catch (error) {
           if (error instanceof SyntaxError)
             return errorResponse("Request body must be JSON.", 400, "invalid_json");
+          if (error instanceof ChatAccessError)
+            return errorResponse(error.message, error.status, "chat_access_denied");
           console.error("soul_chat_failed", error);
           return errorResponse("The soul could not answer right now.", 500, "chat_failed");
         }

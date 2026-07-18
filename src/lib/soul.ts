@@ -140,6 +140,8 @@ export type ChannelConfig = {
   allowedDomains: string[];
   webhookUrl: string;
   webhookSecret: string;
+  publishKey: string;
+  widgetToken: string;
 };
 
 export type SoulMessage = {
@@ -236,9 +238,11 @@ export function createSoul(siteUrl: string, name?: string): Soul {
     channels: {
       widgetEnabled: true,
       webhookEnabled: false,
-      allowedDomains: [],
+      allowedDomains: host ? [host] : [],
       webhookUrl: "",
       webhookSecret: createSecret(),
+      publishKey: createCredential("obspub"),
+      widgetToken: createCredential("obswgt"),
     },
     conversations: [],
   };
@@ -294,6 +298,15 @@ export function normalizeWorkspace(workspace: SoulWorkspace): SoulWorkspace {
         provider: soul.voice.provider ?? "browser",
         profileId: soul.voice.profileId ?? "",
         profileName: soul.voice.profileName ?? "Natural",
+      },
+      channels: {
+        ...soul.channels,
+        allowedDomains:
+          soul.channels.allowedDomains?.length > 0
+            ? soul.channels.allowedDomains
+            : [safeHostname(soul.siteUrl)].filter(Boolean),
+        publishKey: soul.channels.publishKey || createCredential("obspub"),
+        widgetToken: soul.channels.widgetToken || createCredential("obswgt"),
       },
     })),
   };
@@ -453,4 +466,10 @@ function titleFromHostname(hostname: string): string {
 function createSecret(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(18));
   return `whsec_${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function createCredential(prefix: "obspub" | "obswgt"): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  const value = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${prefix}_${value}`;
 }

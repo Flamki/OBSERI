@@ -54,6 +54,7 @@ export default function SoulChat({
   initialPanelMode = "voice",
   onClose,
   onMessagesChange,
+  sessionToken,
 }: {
   soul: Soul;
   compact?: boolean;
@@ -62,6 +63,7 @@ export default function SoulChat({
   initialPanelMode?: "voice" | "chat";
   onClose?: () => void;
   onMessagesChange?: (messages: SoulMessage[], leadIntent: ChatResponse["leadIntent"]) => void;
+  sessionToken?: string;
 }) {
   const [messages, setMessages] = useState<SoulMessage[]>(() => [
     greetingMessage(soul.id, soul.personality.greeting),
@@ -188,7 +190,10 @@ export default function SoulChat({
       }
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...(sessionToken ? { authorization: `Bearer ${sessionToken}` } : {}),
+        },
         body: JSON.stringify({
           soulId: soul.id,
           personality: soul.personality,
@@ -243,7 +248,10 @@ export default function SoulChat({
     voiceRequestRef.current = requestController;
     const response = await fetch("/api/chat/stream", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(sessionToken ? { authorization: `Bearer ${sessionToken}` } : {}),
+      },
       body: JSON.stringify({
         soulId: soul.id,
         personality: soul.personality,

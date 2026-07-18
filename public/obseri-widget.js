@@ -6,8 +6,15 @@
   script.dataset.obseriMounted = "true";
 
   var soulId = script.dataset.soulId;
+  var widgetToken = script.dataset.widgetToken;
   if (!soulId) {
     console.error("Obseri: data-soul-id is required.");
+    return;
+  }
+  if (!widgetToken) {
+    console.error(
+      "Obseri: data-widget-token is required. Publish again and copy the latest embed code.",
+    );
     return;
   }
 
@@ -56,13 +63,47 @@
     launcher.style.transform = "translateY(0)";
     launcher.style.boxShadow = "0 12px 36px rgba(24,29,20,.12)";
   });
-  launcher.addEventListener("click", function () {
+  launcher.addEventListener("click", async function () {
     if (!frame.src) {
-      frame.src = origin + "/widget/" + encodeURIComponent(soulId) + "?mode=voice";
+      launcher.disabled = true;
+      label.textContent = "Connecting…";
+      try {
+        var response = await fetch(
+          origin +
+            "/api/widgets/" +
+            encodeURIComponent(soulId) +
+            "/session?token=" +
+            encodeURIComponent(widgetToken),
+          {
+            method: "GET",
+            credentials: "omit",
+            cache: "no-store",
+            referrerPolicy: "strict-origin-when-cross-origin",
+          },
+        );
+        var payload = await response.json();
+        if (!response.ok || !payload.session) {
+          throw new Error(
+            (payload && payload.error && payload.error.message) || "Widget unavailable",
+          );
+        }
+        frame.name = JSON.stringify({
+          session: payload.session,
+          parentOrigin: payload.parentOrigin,
+        });
+        frame.src = origin + "/widget/" + encodeURIComponent(soulId) + "?mode=voice";
+      } catch (error) {
+        console.error("Obseri:", error);
+        label.textContent = "Unavailable";
+        launcher.disabled = false;
+        return;
+      }
     }
     frame.style.display = "block";
     launcher.style.display = "none";
     launcher.setAttribute("aria-expanded", "true");
+    launcher.disabled = false;
+    label.textContent = "Voice chat";
   });
 
   window.addEventListener("message", function (event) {
