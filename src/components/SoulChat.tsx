@@ -26,6 +26,7 @@ import {
   stopSupertonic,
   type SupertonicVoiceId,
 } from "@/lib/supertonic";
+import { authFetch } from "@/lib/auth-client";
 
 const VOICE_LANGUAGES = [
   { code: "en-US", name: "English", flag: "US" },
@@ -188,7 +189,7 @@ export default function SoulChat({
         await streamVoiceMessage(nextMessages);
         return;
       }
-      const response = await fetch("/api/chat", {
+      const response = await authFetch("/api/chat", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -246,7 +247,7 @@ export default function SoulChat({
     const requestController = new AbortController();
     voiceRequestRef.current?.abort();
     voiceRequestRef.current = requestController;
-    const response = await fetch("/api/chat/stream", {
+    const response = await authFetch("/api/chat/stream", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -411,7 +412,7 @@ export default function SoulChat({
   }
 
   async function fetchVoiceboxAudio(text: string, signal?: AbortSignal) {
-    const response = await fetch("/api/voice/speak", {
+    const response = await authFetch("/api/voice/speak", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({

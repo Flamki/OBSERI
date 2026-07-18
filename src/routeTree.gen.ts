@@ -14,6 +14,8 @@ import { Route as AiVoiceAgentForWebsiteRouteImport } from './routes/ai-voice-ag
 import { Route as AiChatbotTrainedOnYourWebsiteRouteImport } from './routes/ai-chatbot-trained-on-your-website'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WidgetSoulIdRouteImport } from './routes/widget.$soulId'
+import { Route as AuthPathnameRouteImport } from './routes/auth.$pathname'
+import { Route as ApiWorkspaceRouteImport } from './routes/api.workspace'
 import { Route as ApiScanRouteImport } from './routes/api.scan'
 import { Route as ApiIngestRouteImport } from './routes/api.ingest'
 import { Route as ApiChatRouteImport } from './routes/api.chat'
@@ -53,6 +55,16 @@ const IndexRoute = IndexRouteImport.update({
 const WidgetSoulIdRoute = WidgetSoulIdRouteImport.update({
   id: '/widget/$soulId',
   path: '/widget/$soulId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthPathnameRoute = AuthPathnameRouteImport.update({
+  id: '/auth/$pathname',
+  path: '/auth/$pathname',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
+  id: '/api/workspace',
+  path: '/api/workspace',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiScanRoute = ApiScanRouteImport.update({
@@ -135,6 +147,8 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRouteWithChildren
   '/api/ingest': typeof ApiIngestRouteWithChildren
   '/api/scan': typeof ApiScanRoute
+  '/api/workspace': typeof ApiWorkspaceRoute
+  '/auth/$pathname': typeof AuthPathnameRoute
   '/widget/$soulId': typeof WidgetSoulIdRoute
   '/api/chat/stream': typeof ApiChatStreamRoute
   '/api/ingest/stream': typeof ApiIngestStreamRoute
@@ -156,6 +170,8 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRouteWithChildren
   '/api/ingest': typeof ApiIngestRouteWithChildren
   '/api/scan': typeof ApiScanRoute
+  '/api/workspace': typeof ApiWorkspaceRoute
+  '/auth/$pathname': typeof AuthPathnameRoute
   '/widget/$soulId': typeof WidgetSoulIdRoute
   '/api/chat/stream': typeof ApiChatStreamRoute
   '/api/ingest/stream': typeof ApiIngestStreamRoute
@@ -178,6 +194,8 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRouteWithChildren
   '/api/ingest': typeof ApiIngestRouteWithChildren
   '/api/scan': typeof ApiScanRoute
+  '/api/workspace': typeof ApiWorkspaceRoute
+  '/auth/$pathname': typeof AuthPathnameRoute
   '/widget/$soulId': typeof WidgetSoulIdRoute
   '/api/chat/stream': typeof ApiChatStreamRoute
   '/api/ingest/stream': typeof ApiIngestStreamRoute
@@ -201,6 +219,8 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/ingest'
     | '/api/scan'
+    | '/api/workspace'
+    | '/auth/$pathname'
     | '/widget/$soulId'
     | '/api/chat/stream'
     | '/api/ingest/stream'
@@ -222,6 +242,8 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/ingest'
     | '/api/scan'
+    | '/api/workspace'
+    | '/auth/$pathname'
     | '/widget/$soulId'
     | '/api/chat/stream'
     | '/api/ingest/stream'
@@ -243,6 +265,8 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/ingest'
     | '/api/scan'
+    | '/api/workspace'
+    | '/auth/$pathname'
     | '/widget/$soulId'
     | '/api/chat/stream'
     | '/api/ingest/stream'
@@ -265,6 +289,8 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRouteWithChildren
   ApiIngestRoute: typeof ApiIngestRouteWithChildren
   ApiScanRoute: typeof ApiScanRoute
+  ApiWorkspaceRoute: typeof ApiWorkspaceRoute
+  AuthPathnameRoute: typeof AuthPathnameRoute
   WidgetSoulIdRoute: typeof WidgetSoulIdRoute
   ApiSoulsSoulIdRoute: typeof ApiSoulsSoulIdRouteWithChildren
   ApiSoulsPublishRoute: typeof ApiSoulsPublishRoute
@@ -311,6 +337,20 @@ declare module '@tanstack/react-router' {
       path: '/widget/$soulId'
       fullPath: '/widget/$soulId'
       preLoaderRoute: typeof WidgetSoulIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/$pathname': {
+      id: '/auth/$pathname'
+      path: '/auth/$pathname'
+      fullPath: '/auth/$pathname'
+      preLoaderRoute: typeof AuthPathnameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workspace': {
+      id: '/api/workspace'
+      path: '/api/workspace'
+      fullPath: '/api/workspace'
+      preLoaderRoute: typeof ApiWorkspaceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/scan': {
@@ -457,6 +497,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRouteWithChildren,
   ApiIngestRoute: ApiIngestRouteWithChildren,
   ApiScanRoute: ApiScanRoute,
+  ApiWorkspaceRoute: ApiWorkspaceRoute,
+  AuthPathnameRoute: AuthPathnameRoute,
   WidgetSoulIdRoute: WidgetSoulIdRoute,
   ApiSoulsSoulIdRoute: ApiSoulsSoulIdRouteWithChildren,
   ApiSoulsPublishRoute: ApiSoulsPublishRoute,

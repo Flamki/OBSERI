@@ -1,6 +1,123 @@
 @import "tailwindcss" source(none);
 @source "../src";
+@import "@neondatabase/auth-ui/tailwind";
 @import "tw-animate-css";
+
+.obseri-auth-page {
+  --background: oklch(0.985 0.01 35);
+  --foreground: oklch(0.16 0.015 25);
+  --card: oklch(0.995 0.005 30);
+  --card-foreground: oklch(0.16 0.015 25);
+  --popover: oklch(0.995 0.005 30);
+  --popover-foreground: oklch(0.16 0.015 25);
+  --primary: oklch(0.62 0.22 18);
+  --primary-foreground: oklch(0.99 0.005 30);
+  --secondary: oklch(0.95 0.015 25);
+  --secondary-foreground: oklch(0.22 0.015 25);
+  --muted: oklch(0.95 0.012 25);
+  --muted-foreground: oklch(0.5 0.02 25);
+  --accent: oklch(0.94 0.035 18);
+  --accent-foreground: oklch(0.25 0.04 18);
+  --border: oklch(0.88 0.02 25);
+  --input: oklch(0.88 0.02 25);
+  --ring: oklch(0.68 0.2 18);
+  position: relative;
+  min-height: 100svh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 72% 20%, rgba(255, 92, 122, 0.23), transparent 34%),
+    linear-gradient(145deg, #fffaf7 0%, #f8eeee 54%, #f4f0fb 100%);
+  color: #171315;
+  padding: 32px;
+}
+
+.obseri-auth-glow {
+  position: absolute;
+  inset: auto -12vw -40vh auto;
+  width: 70vw;
+  height: 70vw;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 78, 112, 0.19), transparent 67%);
+  pointer-events: none;
+}
+
+.obseri-auth-brand {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #171315;
+  text-decoration: none;
+  font-size: 24px;
+  letter-spacing: -0.04em;
+}
+
+.obseri-auth-brand img { width: 34px; height: 34px; }
+
+.obseri-auth-shell {
+  position: relative;
+  z-index: 1;
+  width: min(1040px, 100%);
+  min-height: calc(100svh - 128px);
+  margin: 16px auto 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 430px);
+  align-items: center;
+  gap: clamp(48px, 9vw, 112px);
+}
+
+.obseri-auth-copy span {
+  color: #b02f4b;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.22em;
+}
+
+.obseri-auth-copy h1 {
+  max-width: 600px;
+  margin: 20px 0 22px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(48px, 6vw, 82px);
+  font-weight: 400;
+  line-height: 0.96;
+  letter-spacing: -0.055em;
+}
+
+.obseri-auth-copy p {
+  max-width: 480px;
+  color: #6c6266;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.obseri-auth-form > div { width: 100%; }
+
+.obseri-auth-help {
+  position: absolute;
+  z-index: 1;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #766c70;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+@media (max-width: 820px) {
+  .obseri-auth-page { padding: 24px 18px 64px; overflow: auto; }
+  .obseri-auth-shell {
+    min-height: auto;
+    grid-template-columns: 1fr;
+    gap: 32px;
+    margin-top: 56px;
+  }
+  .obseri-auth-copy { text-align: center; }
+  .obseri-auth-copy h1 { margin-inline: auto; font-size: clamp(42px, 14vw, 64px); }
+  .obseri-auth-copy p { margin-inline: auto; }
+  .obseri-auth-form { width: min(430px, 100%); margin-inline: auto; }
+  .obseri-auth-help { position: relative; display: block; bottom: auto; left: auto; transform: none; margin-top: 36px; text-align: center; }
+}
 
 @custom-variant dark (&:is(.dark *));
 

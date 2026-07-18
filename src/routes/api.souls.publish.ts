@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { publishSoul } from "@/lib/published-souls";
-import { readBearerToken } from "@/lib/integration-security";
 import type { Soul } from "@/lib/soul";
+import { requireUser } from "@/lib/user-auth";
 
 export const Route = createFileRoute("/api/souls/publish")({
   server: {
@@ -10,11 +10,13 @@ export const Route = createFileRoute("/api/souls/publish")({
         try {
           const length = Number(request.headers.get("content-length") ?? "0");
           if (length > 900_000) return responseError("Soul payload is too large.", 413);
+          const user = await requireUser(request);
           const value = (await request.json()) as Partial<Soul>;
           const record = await publishSoul({
             value,
-            ownerKey: readBearerToken(request),
+            ownerKey: request.headers.get("x-obseri-publish-key") ?? "",
             widgetToken: value.channels?.widgetToken ?? "",
+            ownerUserId: user.id,
           });
           return Response.json(
             {

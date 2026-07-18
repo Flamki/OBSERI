@@ -47,6 +47,7 @@ export async function publishSoul(input: {
   value: unknown;
   ownerKey: string;
   widgetToken: string;
+  ownerUserId: string;
 }): Promise<PublishedSoulRecord> {
   if (!isSoul(input.value)) {
     throw new IntegrationStoreError("The published soul payload is invalid.", 422, "invalid_soul");
@@ -80,27 +81,31 @@ export async function publishSoul(input: {
   const sql = db();
 
   await sql.begin(async (transaction) => {
-    const existing = await transaction<{ owner_key_hash: string }[]>`
-      select owner_key_hash from obseri_published_souls
+    const existing = await transaction<{ owner_key_hash: string; owner_user_id: string | null }[]>`
+      select owner_key_hash, owner_user_id from obseri_published_souls
       where soul_id = ${publicSoul.id}
       for update
     `;
     if (existing[0] && existing[0].owner_key_hash !== ownerKeyHash) {
       throw new IntegrationStoreError("This soul belongs to another publisher.", 403);
     }
+    if (existing[0]?.owner_user_id && existing[0].owner_user_id !== input.ownerUserId) {
+      throw new IntegrationStoreError("This soul belongs to another account.", 403);
+    }
     await transaction`
       insert into obseri_published_souls (
-        soul_id, workspace_id, owner_key_hash, widget_token_hash, soul,
+        soul_id, workspace_id, owner_user_id, owner_key_hash, widget_token_hash, soul,
         widget_enabled, allowed_domains, webhook_enabled, webhook_url,
         webhook_secret, published_at, updated_at
       ) values (
-        ${publicSoul.id}, ${publicSoul.workspaceId}, ${ownerKeyHash}, ${widgetTokenHash},
+        ${publicSoul.id}, ${publicSoul.workspaceId}, ${input.ownerUserId}, ${ownerKeyHash}, ${widgetTokenHash},
         ${transaction.json(publicSoul)}, ${publicSoul.channels.widgetEnabled},
         ${transaction.json(allowedDomains)}, ${source.channels.webhookEnabled},
         ${source.channels.webhookUrl || null}, ${webhookSecret}, ${now}, ${now}
       )
       on conflict (soul_id) do update set
         workspace_id = excluded.workspace_id,
+        owner_user_id = excluded.owner_user_id,
         widget_token_hash = excluded.widget_token_hash,
         soul = excluded.soul,
         widget_enabled = excluded.widget_enabled,
@@ -134,9 +139,23 @@ export async function getPublishedSoulByWidgetToken(
 export async function getPublishedSoulForOwner(
   soulId: string,
   ownerKey: string,
+  ownerUserId?: string,
 ): Promise<PublishedSoulRecord | null> {
   assertCredential(ownerKey, "obspub_");
-  return readRecord(soulId, "owner_key_hash", sha256(ownerKey));
+  const sql = db();
+  const rows = ownerUserId
+    ? await sql<PublishedRow[]>`
+        select soul, webhook_enabled, webhook_url, webhook_secret, published_at
+        from obseri_published_souls
+        where soul_id = ${soulId} and owner_key_hash = ${sha256(ownerKey)}
+          and owner_user_id = ${ownerUserId}
+      `
+    : await sql<PublishedRow[]>`
+        select soul, webhook_enabled, webhook_url, webhook_secret, published_at
+        from obseri_published_souls
+        where soul_id = ${soulId} and owner_key_hash = ${sha256(ownerKey)}
+      `;
+  return rowToRecord(rows[0]);
 }
 
 export async function getPublishedSoul(soulId: string): Promise<PublishedSoulRecord | null> {

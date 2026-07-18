@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { ingestWebsite, type CrawlProgressEvent } from "@/lib/knowledge";
 import { ScanError } from "@/lib/scanner";
+import { requireUser } from "@/lib/user-auth";
 
 const schema = z.object({
   url: z.string().trim().url().max(2_048),
@@ -25,6 +26,12 @@ export const Route = createFileRoute("/api/ingest/stream")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        try {
+          await requireUser(request);
+        } catch (error) {
+          const status = typeof error === "object" && error && "status" in error ? Number(error.status) : 401;
+          return errorResponse(error instanceof Error ? error.message : "Sign in to continue.", status, "unauthorized");
+        }
         const length = Number(request.headers.get("content-length") ?? "0");
         if (length > 250_000)
           return errorResponse("Request is too large.", 413, "request_too_large");

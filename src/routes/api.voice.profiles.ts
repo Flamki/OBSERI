@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { getRuntimeEnvironment } from "@/lib/runtime-env";
+import { requireUser } from "@/lib/user-auth";
 
 const presetSchema = z.object({
   engine: z.enum(["kokoro", "qwen_custom_voice"]),
@@ -21,7 +22,12 @@ type VoiceboxProfile = {
 export const Route = createFileRoute("/api/voice/profiles")({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
+        try {
+          await requireUser(request);
+        } catch (error) {
+          return Response.json({ error: { message: error instanceof Error ? error.message : "Sign in to continue." } }, { status: 401 });
+        }
         const baseUrl = getRuntimeEnvironment().OBSERI_VOICEBOX_URL?.replace(/\/$/, "");
         if (!baseUrl) {
           return Response.json({
@@ -66,6 +72,11 @@ export const Route = createFileRoute("/api/voice/profiles")({
         }
       },
       POST: async ({ request }) => {
+        try {
+          await requireUser(request);
+        } catch (error) {
+          return Response.json({ error: { message: error instanceof Error ? error.message : "Sign in to continue." } }, { status: 401 });
+        }
         const parsed = presetSchema.safeParse(await request.json());
         if (!parsed.success)
           return Response.json({ error: { message: "Invalid Voicebox preset." } }, { status: 400 });

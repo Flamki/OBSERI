@@ -26,6 +26,7 @@ self-serve customers.
 | -------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Landing experience               | Done and live                        | Responsive premium landing page with optimized WebGL effects and quick-start URL entry                                                                                   |
 | Soul Studio                      | Done and live                        | Knowledge, personality, voice, live website simulation, integration, conversations, and settings in one workspace                                                        |
+| Authentication                   | Done and live                        | Neon Auth email/password and Google OAuth, project-scoped Ed25519 JWT verification, real sign-out, and protected owner APIs                                               |
 | Visitor experience simulator     | Done and live                        | Renders the website behind the real assistant with desktop, tablet, mobile, theme, launcher, accent, and placement controls                                              |
 | Website ingestion                | Done and live                        | Same-origin discovery, robots and sitemap support, bounded depth/page limits, canonicalization, deduplication, revisions, refresh validators, and visible crawl progress |
 | Retrieval and chat               | Done and live                        | Source-grounded answers, visible citations, deterministic fallback, and an OpenAI-compatible hosted provider                                                             |
@@ -38,8 +39,8 @@ self-serve customers.
 | Public Voicebox service          | Waiting on infrastructure            | Requires a public GPU worker; unavailable voices fail clearly instead of substituting a different speaker                                                                |
 | Widget integration               | Code complete, provisioning required | Per-Soul publisher keys, opaque widget tokens, short-lived signed sessions, origin allowlists, durable rate limits, and a responsive isolated loader                     |
 | Webhooks                         | Code complete, provisioning required | Encrypted secrets, authenticated tests, DNS/private-network checks, durable delivery jobs, exponential retries, HMAC-SHA256 signatures, timestamps, and idempotency keys |
-| Production schema                | Done, not provisioned                | Supabase/Postgres migrations cover accounts, workspaces, Souls, knowledge, conversations, voice consent, jobs, and webhook delivery                                      |
-| Durable accounts and Studio data | Waiting on infrastructure            | Studio currently persists in the browser; Supabase needs one additional active project slot                                                                              |
+| Production schema                | Done and live                        | Neon Postgres stores per-user Studio workspaces, published Souls, conversations, rate limits, and webhook delivery                                                        |
+| Durable accounts and Studio data | Done and live                        | Every authenticated user receives an isolated durable workspace keyed by the verified Neon Auth subject                                                                  |
 | Billing                          | Planned                              | Stripe adapters and self-serve plan enforcement are not connected                                                                                                        |
 | Integration abuse controls       | Done in code                         | Durable rate limiting, publisher authentication, allowed-domain enforcement, signed widget sessions, conversation persistence, and retryable webhook jobs                |
 
@@ -88,9 +89,12 @@ must never claim that a site is published when its state cannot survive a restar
 
 ## Verified release checks
 
-Last verified on **17 July 2026**:
+Last verified on **18 July 2026**:
 
 - Full production build passes
+- TypeScript and all automated security tests pass
+- Email/password sign-in, sign-up, and Google OAuth initialization are live
+- Protected workspace, crawler, voice-profile, and cloning APIs reject missing or invalid account tokens
 - Repository lint passes with zero errors
 - Production dependency audit reports zero vulnerabilities
 - Landing, Studio, chat health, ingestion health, and voice-profile endpoints return HTTP `200`
@@ -156,16 +160,16 @@ Open:
 - Ingestion health: `http://127.0.0.1:8080/api/ingest`
 - Chat health: `http://127.0.0.1:8080/api/chat`
 
-The local founder workspace needs no environment variables. Copy `.env.example` to `.env.local`
-to connect hosted services. Never commit `.env.local` or provider credentials.
+The public landing page needs no environment variables. Soul Studio authentication and durable
+workspace storage need the Neon values below. Copy `.env.example` to `.env.local` for local
+development. Never commit `.env.local` or provider credentials.
 
 ## Environment
 
 | Variable                       | Purpose                                                                |
 | ------------------------------ | ---------------------------------------------------------------------- |
-| `VITE_SUPABASE_URL`            | Hosted Supabase project URL for the durable data phase                 |
-| `VITE_SUPABASE_ANON_KEY`       | Browser-safe Supabase anonymous key                                    |
-| `SUPABASE_SERVICE_ROLE_KEY`    | Server-only Supabase administration; never expose to the browser       |
+| `VITE_NEON_AUTH_URL`           | Browser-safe Neon Auth endpoint used by sign-in and OAuth              |
+| `NEON_AUTH_BASE_URL`           | Server-side Neon Auth endpoint used to locate project signing keys     |
 | `OBSERI_CRAWLER_API_URL`       | Optional isolated browser crawler for JavaScript-heavy websites        |
 | `OBSERI_CRAWLER_API_KEY`       | Server-only crawler credential                                         |
 | `OBSERI_AI_API_URL`            | OpenAI-compatible analysis endpoint                                    |
@@ -180,6 +184,7 @@ to connect hosted services. Never commit `.env.local` or provider credentials.
 | `OBSERI_VOICEBOX_URL`          | Public or local Voicebox REST base URL                                 |
 | `OBSERI_ENABLE_QWEN_VOICES`    | Enables Qwen presets only when the worker has adequate GPU/RAM         |
 | `DATABASE_URL`                 | Pooled Postgres connection for published Souls and integration events  |
+| `DATABASE_URL_UNPOOLED`        | Direct Postgres connection used only by production migrations/checks   |
 | `OBSERI_WIDGET_SESSION_SECRET` | Random 32+ byte secret for short-lived origin-bound widget sessions    |
 | `OBSERI_SECRET_ENCRYPTION_KEY` | Random 32+ byte secret used to encrypt webhook signing secrets at rest |
 | `CRON_SECRET`                  | Random bearer secret for the webhook retry worker endpoint             |
@@ -189,10 +194,14 @@ repository.
 
 ### Production integration provisioning
 
-1. Create a pooled Postgres database reachable from the Vercel Node runtime.
-2. Run [`db/migrations/001_production_integrations.sql`](db/migrations/001_production_integrations.sql).
-3. Add `DATABASE_URL`, `OBSERI_WIDGET_SESSION_SECRET`, `OBSERI_SECRET_ENCRYPTION_KEY`, and
-   `CRON_SECRET` to Vercel Production, Preview, and Development as appropriate.
+The production Neon project and both migrations are provisioned. For a new environment:
+
+1. Create a pooled Neon Postgres database and enable Neon Auth with email/password and Google.
+2. Add `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `VITE_NEON_AUTH_URL`,
+   `NEON_AUTH_BASE_URL`, `OBSERI_WIDGET_SESSION_SECRET`,
+   `OBSERI_SECRET_ENCRYPTION_KEY`, and `CRON_SECRET` to the deployment environment.
+3. Run `npm.cmd run db:migrate:production`; it applies all numbered migrations and verifies the
+   expected tables.
 4. Invoke `POST /api/internal/webhooks/drain` every minute with
    `Authorization: Bearer $CRON_SECRET` from the production scheduler.
 5. Republish every existing Soul once. The new embed includes `data-widget-token`; legacy snippets

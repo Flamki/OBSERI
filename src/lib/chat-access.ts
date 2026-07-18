@@ -1,14 +1,16 @@
 import type { ChatRequest } from "@/lib/conversation";
 import { consumeRateLimit, getPublishedSoul } from "@/lib/integration-store";
 import { readBearerToken, verifyWidgetSession } from "@/lib/integration-security";
+import { requireUser } from "@/lib/user-auth";
 
 export async function resolveChatRequest(
   request: Request,
   input: ChatRequest,
 ): Promise<ChatRequest> {
   const authorization = request.headers.get("authorization");
-  if (authorization) {
-    const session = verifyWidgetSession(readBearerToken(request), input.soulId);
+  const bearer = authorization ? readBearerToken(request) : "";
+  if (bearer.startsWith("obss_")) {
+    const session = verifyWidgetSession(bearer, input.soulId);
     const allowed = await consumeRateLimit(`chat:${input.soulId}:${session.origin}`, 30, 60);
     if (!allowed) throw new ChatAccessError("Too many messages. Try again shortly.", 429);
     const record = await getPublishedSoul(input.soulId);
@@ -19,6 +21,13 @@ export async function resolveChatRequest(
       chunks: record.soul.knowledge.pages.flatMap((page) => page.chunks).slice(0, 250),
       messages: input.messages,
     };
+  }
+
+  if (authorization) {
+    const user = await requireUser(request);
+    const allowed = await consumeRateLimit(`studio-chat:${user.id}`, 40, 60);
+    if (!allowed) throw new ChatAccessError("Too many messages. Try again shortly.", 429);
+    return input;
   }
 
   const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();

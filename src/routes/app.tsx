@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useStore } from "@neondatabase/auth/react";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   AudioLines,
@@ -63,6 +64,7 @@ import {
   supertonicVoices,
   type SupertonicVoiceId,
 } from "@/lib/supertonic";
+import { authClient, authFetch } from "@/lib/auth-client";
 
 export const Route = createFileRoute("/app")({
   head: () => ({
@@ -75,7 +77,7 @@ export const Route = createFileRoute("/app")({
       { name: "robots", content: "noindex, nofollow, noarchive" },
     ],
   }),
-  component: SoulStudio,
+  component: AuthenticatedStudio,
 });
 
 type StudioView =
@@ -113,7 +115,27 @@ const PAGE_META: Record<StudioView, { title: string; description: string }> = {
   help: { title: "Help", description: "Get support and find the right next step." },
 };
 
-function SoulStudio() {
+type StudioUser = { id: string; name?: string | null; email?: string | null; image?: string | null };
+
+function AuthenticatedStudio() {
+  const session = useStore(authClient.useSession);
+  useEffect(() => {
+    if (!session.isPending && !session.data?.user) {
+      window.location.replace("/auth/sign-in?redirectTo=/app");
+    }
+  }, [session.data?.user, session.isPending]);
+
+  if (session.isPending || !session.data?.user) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#f7f7f5] text-[#6f746c]">
+        <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Securing your workspace…
+      </div>
+    );
+  }
+  return <SoulStudio user={session.data.user} />;
+}
+
+function SoulStudio({ user }: { user: StudioUser }) {
   const [workspace, setWorkspace] = useState<SoulWorkspace>(DEMO_WORKSPACE);
   const [view, setView] = useState<StudioView>("playground");
   const [hydrated, setHydrated] = useState(false);
@@ -126,16 +148,42 @@ function SoulStudio() {
   const [crawlEvents, setCrawlEvents] = useState<Record<string, CrawlProgressEvent[]>>({});
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) setWorkspace(normalizeWorkspace(JSON.parse(saved) as SoulWorkspace));
-      setSidebarCollapsed(localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true");
-    } catch {
-      // Keep the starter workspace when local data is unavailable.
-    } finally {
-      setHydrated(true);
+    let active = true;
+    const userStorageKey = `${STORAGE_KEY}:${user.id}`;
+    async function hydrateWorkspace() {
+      let localWorkspace = DEMO_WORKSPACE;
+      try {
+        const saved = localStorage.getItem(userStorageKey) ?? localStorage.getItem(STORAGE_KEY);
+        if (saved) localWorkspace = normalizeWorkspace(JSON.parse(saved) as SoulWorkspace);
+        setSidebarCollapsed(localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true");
+        const response = await authFetch("/api/workspace", { cache: "no-store" });
+        if (!response.ok) throw new Error("Workspace could not be loaded.");
+        const payload = (await response.json()) as { workspace: SoulWorkspace | null };
+        if (!active) return;
+        if (payload.workspace) {
+          setWorkspace(normalizeWorkspace(payload.workspace));
+        } else {
+          const createResponse = await authFetch("/api/workspace", {
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(localWorkspace),
+          });
+          if (!createResponse.ok) throw new Error("Workspace could not be created.");
+          const created = (await createResponse.json()) as { workspace: SoulWorkspace };
+          if (active) setWorkspace(normalizeWorkspace(created.workspace));
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      } catch {
+        if (active) setWorkspace(localWorkspace);
+      } finally {
+        if (active) setHydrated(true);
+      }
     }
-  }, []);
+    void hydrateWorkspace();
+    return () => {
+      active = false;
+    };
+  }, [user.id]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -156,8 +204,18 @@ function SoulStudio() {
   }, []);
 
   useEffect(() => {
-    if (hydrated) localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace));
-  }, [hydrated, workspace]);
+    if (!hydrated) return;
+    const userStorageKey = `${STORAGE_KEY}:${user.id}`;
+    localStorage.setItem(userStorageKey, JSON.stringify(workspace));
+    const timer = window.setTimeout(() => {
+      void authFetch("/api/workspace", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(workspace),
+      });
+    }, 650);
+    return () => window.clearTimeout(timer);
+  }, [hydrated, user.id, workspace]);
 
   useEffect(() => {
     if (hydrated) localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarCollapsed));
@@ -944,16 +1002,25 @@ function ProfileMenu({
   soul: Soul | null;
   onNavigate: (view: StudioView) => void;
 }) {
+  const session = useStore(authClient.useSession);
+  const user = session.data?.user;
+  const displayName = user?.name || user?.email?.split("@")[0] || "Obseri user";
+  const initials = displayName
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
   return (
     <div className="absolute right-0 top-12 z-50 w-[310px] overflow-hidden rounded-2xl border border-[#dedfdb] bg-white p-2 shadow-[0_18px_55px_rgba(0,0,0,.14)]">
       <div className="p-3">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#20221f] text-sm font-semibold text-white">
-            BB
+            {initials || "O"}
           </span>
           <div>
-            <p className="text-sm font-semibold">Obseri Founder</p>
-            <p className="text-xs text-[#7b7f78]">Local workspace</p>
+            <p className="text-sm font-semibold">{displayName}</p>
+            <p className="max-w-[210px] truncate text-xs text-[#7b7f78]">{user?.email}</p>
           </div>
         </div>
       </div>
@@ -979,10 +1046,18 @@ function ProfileMenu({
       />
       <MenuRow icon={<Settings />} label="Settings" onClick={() => onNavigate("settings")} />
       <div className="my-2 h-px bg-[#ecece9]" />
-      <div className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[#a1a49e]">
+      <button
+        type="button"
+        onClick={() => {
+          if (user?.id) localStorage.removeItem(`${STORAGE_KEY}:${user.id}`);
+          localStorage.removeItem(STORAGE_KEY);
+          void authClient.signOut().finally(() => window.location.replace("/auth/sign-in"));
+        }}
+        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[#555a53] hover:bg-[#f3f4f1]"
+      >
         <LogOut className="h-4 w-4" />
-        Sign out <span className="ml-auto text-xs">OAuth soon</span>
-      </div>
+        Sign out
+      </button>
     </div>
   );
 }
@@ -2270,7 +2345,7 @@ function VoiceView({
     const load = () => setBrowserVoices(window.speechSynthesis?.getVoices() ?? []);
     load();
     window.speechSynthesis?.addEventListener("voiceschanged", load);
-    void fetch("/api/voice/profiles")
+    void authFetch("/api/voice/profiles")
       .then((response) => response.json())
       .then(
         (data: {
@@ -2415,7 +2490,7 @@ function VoiceView({
     if (activeVoice.provider !== "voicebox" || !activeVoice.profileId) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      void fetch("/api/voice/speak", {
+      void authFetch("/api/voice/speak", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -2462,7 +2537,7 @@ function VoiceView({
 
     setPreparingId(voice.id);
     try {
-      const response = await fetch("/api/voice/profiles", {
+      const response = await authFetch("/api/voice/profiles", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -2550,7 +2625,7 @@ function VoiceView({
       const previewRequest = new AbortController();
       previewRequestRef.current = previewRequest;
       try {
-        const response = await fetch("/api/voice/speak", {
+        const response = await authFetch("/api/voice/speak", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
@@ -3411,11 +3486,11 @@ function DeployView({
   async function publish() {
     setBusy(true);
     try {
-      const response = await fetch("/api/souls/publish", {
+      const response = await authFetch("/api/souls/publish", {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          authorization: `Bearer ${soul.channels.publishKey}`,
+          "x-obseri-publish-key": soul.channels.publishKey,
         },
         body: JSON.stringify(soul),
       });
@@ -3433,11 +3508,11 @@ function DeployView({
     if (!soul.channels.webhookUrl) return onNotice("Add a destination URL first.");
     setBusy(true);
     try {
-      const response = await fetch("/api/webhooks/test", {
+      const response = await authFetch("/api/webhooks/test", {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          authorization: `Bearer ${soul.channels.publishKey}`,
+          "x-obseri-publish-key": soul.channels.publishKey,
         },
         body: JSON.stringify({
           soulId: soul.id,
@@ -3815,6 +3890,15 @@ function ProfileWorkspaceView({
   workspace: SoulWorkspace;
   onWorkspaceNameChange: (name: string) => void;
 }) {
+  const session = useStore(authClient.useSession);
+  const user = session.data?.user;
+  const displayName = user?.name || user?.email?.split("@")[0] || "Obseri user";
+  const initials = displayName
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
   const learnedPages = workspace.souls.reduce(
     (total, workspaceSoul) => total + workspaceSoul.knowledge.pages.length,
     0,
@@ -3828,19 +3912,19 @@ function ProfileWorkspaceView({
             <SectionHeading title="Profile" description="The person who owns this workspace." />
             <div className="mt-6 flex items-center gap-4">
               <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#20221f] font-semibold text-white">
-                BB
+                {initials || "O"}
               </span>
               <div>
-                <p className="font-semibold">Obseri Founder</p>
-                <p className="mt-1 text-sm text-[#777b74]">Local founder mode</p>
+                <p className="font-semibold">{displayName}</p>
+                <p className="mt-1 text-sm text-[#777b74]">Authenticated workspace owner</p>
               </div>
             </div>
             <div className="mt-6 grid gap-5 sm:grid-cols-2">
               <Field label="Display name">
-                <input value="Obseri Founder" readOnly className="clean-input" />
+                <input value={displayName} readOnly className="clean-input" />
               </Field>
               <Field label="Email">
-                <input value="flamki@obseri.com" readOnly className="clean-input" />
+                <input value={user?.email ?? ""} readOnly className="clean-input" />
               </Field>
             </div>
           </Card>
@@ -4082,7 +4166,7 @@ function CloneVoiceDialog({
       form.append("rightsBasis", rightsBasis);
       form.append("consent", String(consent));
       form.append("audio", audio);
-      const response = await fetch("/api/voice/clone", { method: "POST", body: form });
+      const response = await authFetch("/api/voice/clone", { method: "POST", body: form });
       const payload = (await response.json()) as {
         profile?: VoiceboxProfile;
         error?: { message?: string };

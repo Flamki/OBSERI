@@ -1,5 +1,6 @@
 import type { CrawlProgressEvent } from "@/lib/knowledge";
 import type { KnowledgeBase } from "@/lib/soul";
+import { authFetch } from "@/lib/auth-client";
 
 export async function streamWebsiteCrawl(
   input: {
@@ -12,7 +13,7 @@ export async function streamWebsiteCrawl(
   },
   onEvent: (event: CrawlProgressEvent) => void,
 ): Promise<KnowledgeBase> {
-  const response = await fetch("/api/ingest/stream", {
+  const response = await authFetch("/api/ingest/stream", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),

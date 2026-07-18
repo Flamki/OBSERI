@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import postgres from "postgres";
 
 const connectionString =
@@ -15,18 +15,22 @@ const sql = postgres(connectionString, {
 });
 
 try {
-  const migration = await readFile(
-    new URL("../db/migrations/001_production_integrations.sql", import.meta.url),
-    "utf8",
-  );
-
-  await sql.unsafe(migration);
+  const migrationsDirectory = new URL("../db/migrations/", import.meta.url);
+  const migrations = (await readdir(migrationsDirectory))
+    .filter((name) => /^\d+.*\.sql$/.test(name))
+    .sort();
+  for (const name of migrations) {
+    const migration = await readFile(new URL(name, migrationsDirectory), "utf8");
+    await sql.unsafe(migration);
+    console.log(`Applied ${name}.`);
+  }
 
   const expectedTables = [
     "obseri_conversations",
     "obseri_published_souls",
     "obseri_rate_limits",
     "obseri_webhook_deliveries",
+    "obseri_user_workspaces",
   ];
   const rows = await sql`
     select table_name

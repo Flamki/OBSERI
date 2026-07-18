@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { createWebhookEvent, deliverWebhook } from "@/lib/webhooks";
 import { getPublishedSoulForOwner } from "@/lib/integration-store";
-import { readBearerToken } from "@/lib/integration-security";
+import { requireUser } from "@/lib/user-auth";
 
 const schema = z.object({
   soulId: z.string().min(3).max(100),
@@ -13,11 +13,13 @@ export const Route = createFileRoute("/api/webhooks/test")({
     handlers: {
       POST: async ({ request }) => {
         try {
+          const user = await requireUser(request);
           const parsed = schema.safeParse(await request.json());
           if (!parsed.success) return responseError("Choose a valid published soul.", 400);
           const record = await getPublishedSoulForOwner(
             parsed.data.soulId,
-            readBearerToken(request),
+            request.headers.get("x-obseri-publish-key") ?? "",
+            user.id,
           );
           if (!record) return responseError("This publisher cannot access that soul.", 403);
           if (!record.webhook.enabled || !record.webhook.url) {
