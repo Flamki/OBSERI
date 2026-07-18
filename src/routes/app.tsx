@@ -482,14 +482,12 @@ function SoulStudio({ user }: { user: StudioUser }) {
   if (needsOnboarding) {
     return (
       <OnboardingFlow
-        email={user.email}
         initialUrl={quickStartUrl}
         onSave={saveOnboardingSoul}
         onEnterStudio={() => {
           setNeedsOnboarding(false);
           setView("playground");
         }}
-        onSignOut={() => void authClient.signOut().finally(() => window.location.replace("/"))}
       />
     );
   }

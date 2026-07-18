@@ -19,11 +19,9 @@ type SetupStep = "website" | "knowledge" | "personality" | "ready";
 type PersonalityPreset = "guide" | "expert" | "closer";
 
 type OnboardingFlowProps = {
-  email?: string | null;
   initialUrl?: string;
   onSave: (soul: Soul) => Promise<SoulWorkspace>;
   onEnterStudio: () => void;
-  onSignOut: () => void;
 };
 
 const STEPS: Array<{ id: SetupStep; label: string }> = [
@@ -68,11 +66,9 @@ const PRESETS: Array<{
 ];
 
 export default function OnboardingFlow({
-  email,
   initialUrl = "",
   onSave,
   onEnterStudio,
-  onSignOut,
 }: OnboardingFlowProps) {
   const [step, setStep] = useState<SetupStep>("website");
   const [url, setUrl] = useState(initialUrl);
@@ -179,23 +175,7 @@ export default function OnboardingFlow({
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#f7f5f2] font-sans text-[#19181a]">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[32rem] bg-[radial-gradient(ellipse_70%_65%_at_50%_-5%,rgba(255,92,122,.2),rgba(255,178,157,.12)_42%,transparent_75%)]" />
-      <header className="relative z-10 flex h-20 items-center justify-between border-b border-black/[0.07] px-6 sm:px-10">
-        <div className="flex items-center gap-3">
-          <img src="/obseri-pulse-mark.svg" alt="" className="h-8 w-8" />
-          <div>
-            <div className="text-xl font-medium tracking-[-0.03em]">obseri</div>
-            <div className="text-[11px] text-[#8a8583]">Set up your website soul</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-4 text-sm text-[#706b69]">
-          <span className="hidden sm:inline">{email}</span>
-          <button onClick={onSignOut} className="transition hover:text-black">
-            Sign out
-          </button>
-        </div>
-      </header>
-
-      <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-col px-5 pb-12 pt-8 sm:px-8 sm:pt-10">
+      <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-col px-5 pb-12 pt-7 sm:px-8 sm:pt-9">
         <SetupProgress current={step} />
 
         <section className="mt-8 min-h-[590px] overflow-hidden rounded-[32px] border border-black/[0.08] bg-white/80 shadow-[0_28px_90px_rgba(57,39,43,.09)] backdrop-blur-xl">
