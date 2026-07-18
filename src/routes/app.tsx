@@ -24,7 +24,6 @@ import {
   MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
-  Pause,
   Phone,
   Play,
   Plus,
@@ -115,7 +114,12 @@ const PAGE_META: Record<StudioView, { title: string; description: string }> = {
   help: { title: "Help", description: "Get support and find the right next step." },
 };
 
-type StudioUser = { id: string; name?: string | null; email?: string | null; image?: string | null };
+type StudioUser = {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+};
 
 const EMPTY_WORKSPACE: SoulWorkspace = {
   id: "pending-workspace",
@@ -2333,20 +2337,44 @@ type StudioVoice = {
   neuralVoiceId?: SupertonicVoiceId;
 };
 
-const VOICE_GRADIENTS = [
-  "linear-gradient(135deg,#dce9d2 0%,#7a9b8b 48%,#293a34 100%)",
-  "linear-gradient(135deg,#f4d3b4 0%,#b86b54 46%,#422a2d 100%)",
-  "linear-gradient(135deg,#d7d8f5 0%,#7874ba 48%,#302a55 100%)",
-  "linear-gradient(135deg,#d5eef0 0%,#5e9fa4 46%,#173c43 100%)",
-  "linear-gradient(135deg,#f1e2b8 0%,#aa8a52 46%,#3b3023 100%)",
-  "linear-gradient(135deg,#ead7e8 0%,#956d91 48%,#392a3b 100%)",
-];
+const VOICE_PALETTES = [
+  ["#fff7a8", "#69dce8", "#4b8ee8", "#f2a3c7"],
+  ["#ffd4a3", "#ff8d6d", "#a85586", "#5f4ac6"],
+  ["#e8ffb0", "#8bd0a3", "#4e8d8a", "#ffd0bb"],
+  ["#f8c9ff", "#9d91ff", "#6078d9", "#ff9bac"],
+  ["#ffe8a8", "#eeb95b", "#e6796f", "#8453a6"],
+  ["#c7fbff", "#62c9dd", "#487ab8", "#a17ed5"],
+  ["#ffd5e5", "#ed789f", "#9568c5", "#5a64b6"],
+  ["#e0ffd1", "#8fd890", "#45aaa0", "#6d79d8"],
+] as const;
 
 const VOICE_WAVEFORM = [18, 30, 44, 26, 54, 36, 22, 48, 62, 32, 46, 24, 58, 38, 20, 42, 30];
 
-function voiceGradient(id: string) {
-  const hash = [...id].reduce((total, character) => total + character.charCodeAt(0), 0);
-  return VOICE_GRADIENTS[hash % VOICE_GRADIENTS.length];
+function voiceVisual(id: string) {
+  const hash = [...id].reduce(
+    (total, character, index) => (total + character.charCodeAt(0) * (index + 11)) % 100_003,
+    0,
+  );
+  const palette = VOICE_PALETTES[hash % VOICE_PALETTES.length];
+  const angle = hash % 360;
+  return {
+    background: `radial-gradient(circle at 27% 22%,rgba(255,255,255,.9),transparent 18%), radial-gradient(circle at 72% 72%,${palette[3]} 0%,transparent 42%), conic-gradient(from ${angle}deg,${palette[0]},${palette[1]},${palette[2]},${palette[3]},${palette[0]})`,
+    boxShadow: `inset 0 0 22px rgba(255,255,255,.32), 0 10px 28px ${palette[2]}35`,
+  };
+}
+
+function VoiceOrb({ id, className = "" }: { id: string; className?: string }) {
+  const visual = voiceVisual(id);
+  return (
+    <span
+      aria-hidden="true"
+      className={`relative block shrink-0 overflow-hidden rounded-full ${className}`}
+      style={visual}
+    >
+      <span className="absolute inset-[9%] rounded-full bg-[radial-gradient(circle_at_68%_30%,rgba(255,255,255,.5),transparent_24%),radial-gradient(circle_at_36%_68%,rgba(255,255,255,.18),transparent_38%)] mix-blend-screen" />
+      <span className="absolute inset-0 rounded-full bg-[linear-gradient(145deg,rgba(255,255,255,.18),transparent_38%,rgba(0,0,0,.12))]" />
+    </span>
+  );
 }
 
 function cleanVoiceName(name: string) {
@@ -2794,8 +2822,8 @@ function VoiceView({
   }
 
   return (
-    <Page title="Choose a voice" description="Explore, preview, and shape how your website sounds.">
-      <div className="grid min-h-[calc(100vh-140px)] items-start xl:grid-cols-[minmax(0,1fr)_440px]">
+    <Page title="Voice" description="" hideHeader>
+      <div className="grid min-h-[calc(100dvh-76px)] items-start xl:grid-cols-[minmax(0,1fr)_440px]">
         <div className="min-w-0 xl:border-r xl:border-[#e5e6e2]">
           <section className="overflow-hidden border-b border-[#e5e6e2] bg-white">
             <div className="relative overflow-hidden bg-[#11130f] p-6 text-white sm:p-7">
@@ -2816,12 +2844,7 @@ function VoiceView({
 
               <div className="relative mt-9 flex flex-col gap-7 sm:flex-row sm:items-end sm:justify-between">
                 <div className="flex min-w-0 items-center gap-4">
-                  <span
-                    className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-white/15 text-xl font-semibold shadow-[0_12px_40px_rgba(0,0,0,.35)]"
-                    style={{ background: voiceGradient(activeVoice.id) }}
-                  >
-                    {activeVoice.name.charAt(0).toUpperCase()}
-                  </span>
+                  <VoiceOrb id={activeVoice.id} className="h-16 w-16" />
                   <div className="min-w-0">
                     <h2 className="truncate text-2xl font-semibold tracking-[-0.035em]">
                       {activeVoice.name}
@@ -2833,20 +2856,18 @@ function VoiceView({
                   onClick={() => void previewVoice(activeVoice)}
                   className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-white px-5 text-xs font-semibold text-[#171a17] transition hover:bg-[#b7f774]"
                 >
-                  {playingId === activeVoice.id ? (
-                    <Pause className="h-4 w-4 fill-current" />
-                  ) : (
-                    <Play className="h-4 w-4 fill-current" />
-                  )}
-                  {playingId === activeVoice.id ? "Stop preview" : "Preview voice"}
+                  <Play
+                    className={`h-4 w-4 fill-current ${playingId === activeVoice.id ? "animate-pulse" : ""}`}
+                  />
+                  Preview voice
                 </button>
               </div>
 
-              <div className="relative mt-9 flex h-16 items-center gap-1 rounded-xl border border-white/8 bg-black/20 px-4">
+              <div className="relative mt-9 flex h-16 items-center gap-1 rounded-xl bg-black/20 px-4">
                 {VOICE_WAVEFORM.map((height, index) => (
                   <span
                     key={`${height}-${index}`}
-                    className={`min-w-0 flex-1 rounded-full bg-white/25 transition duration-500 ${playingId === activeVoice.id ? "animate-pulse bg-[#b7f774]/70" : ""}`}
+                    className="min-w-0 flex-1 rounded-full bg-white/25"
                     style={{ height }}
                   />
                 ))}
@@ -2951,7 +2972,7 @@ function VoiceView({
           </Card>
         </div>
 
-        <section className="flex h-[calc(100vh-140px)] min-h-[590px] min-w-0 flex-col overflow-hidden bg-white xl:sticky xl:top-0">
+        <section className="flex h-[calc(100dvh-76px)] min-h-[590px] min-w-0 flex-col overflow-hidden bg-white xl:sticky xl:top-0">
           <div className="border-b border-[#ecece9] px-5 pt-5">
             <div className="flex items-center justify-between gap-4">
               <div>
@@ -3021,27 +3042,22 @@ function VoiceView({
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-2">
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
             {filteredVoices.length ? (
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {filteredVoices.map((voice) => {
                   const selected = activeVoice.id === voice.id;
                   const playing = playingId === voice.id;
                   return (
                     <div
                       key={voice.id}
-                      className={`group flex items-center gap-1 rounded-xl border transition ${selected ? "border-[#b9cf9f] bg-[#f1f7eb]" : "border-transparent hover:bg-[#f5f6f3]"}`}
+                      className={`group flex items-center gap-1 rounded-2xl transition duration-200 ${selected ? "bg-[linear-gradient(100deg,#f3f8ed,#fff7f8)] shadow-[0_8px_24px_rgba(49,51,46,.06)]" : "hover:bg-[#f7f7f5]"}`}
                     >
                       <button
                         onClick={() => void selectVoice(voice)}
                         className="flex min-w-0 flex-1 items-center gap-3 p-3 text-left"
                       >
-                        <span
-                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white shadow-sm"
-                          style={{ background: voiceGradient(voice.id) }}
-                        >
-                          {voice.name.charAt(0).toUpperCase()}
-                        </span>
+                        <VoiceOrb id={voice.id} className="h-11 w-11" />
                         <span className="min-w-0 flex-1">
                           <span className="flex items-center gap-2">
                             <span className="truncate text-sm font-semibold">{voice.name}</span>
@@ -3073,14 +3089,14 @@ function VoiceView({
                       <button
                         onClick={() => void previewVoice(voice)}
                         aria-label={`${playing ? "Stop" : "Preview"} ${voice.name}`}
-                        className="mr-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#4f544d] transition hover:bg-white hover:shadow-sm"
+                        className="mr-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#4f544d] transition hover:bg-white hover:shadow-sm"
                       >
                         {preparingId === voice.id ? (
                           <LoaderCircle className="h-4 w-4 animate-spin" />
-                        ) : playing ? (
-                          <Pause className="h-4 w-4 fill-current" />
                         ) : (
-                          <Play className="h-4 w-4 fill-current" />
+                          <Play
+                            className={`h-4 w-4 fill-current ${playing ? "animate-pulse" : ""}`}
+                          />
                         )}
                       </button>
                     </div>
