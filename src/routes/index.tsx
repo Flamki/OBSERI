@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Globe2 } from "lucide-react";
+import { useEffect } from "react";
 import PrismaticBurst from "@/components/PrismaticBurst";
 import ProductSections from "@/components/ProductSections";
+import { authClient } from "@/lib/auth-client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -91,6 +93,22 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
+  const session = authClient.useSession();
+
+  useEffect(() => {
+    if (session.data?.user) {
+      window.location.replace("/app");
+    }
+  }, [session.data?.user]);
+
+  if (session.data?.user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#f4f4ef] text-sm text-[#706d6b]">
+        Opening Soul Studio…
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#f4f4ef] font-sans text-[#17171a]">
       <Hero />

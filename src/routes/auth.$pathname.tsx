@@ -34,7 +34,7 @@ function AuthPage() {
           </p>
         </div>
         <div className="obseri-auth-form">
-          <AuthView path={pathname} />
+          <AuthView callbackURL="/app" path={pathname} redirectTo="/app" />
         </div>
       </section>
 
