@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   AudioLines,
@@ -596,10 +596,14 @@ function Sidebar({
         <div
           className={`flex h-16 shrink-0 items-center justify-between px-5 transition-[padding] duration-300 ${collapsed ? "lg:px-4" : "lg:px-5"}`}
         >
-          <Link
-            to="/"
+          <button
+            type="button"
+            onClick={() => {
+              onNavigate("playground");
+              onClose();
+            }}
             className="inline-flex min-w-0 items-center overflow-hidden"
-            aria-label="Obseri home"
+            aria-label="Open Agent workspace"
           >
             <img
               src="/obseri-logo-dark.svg"
@@ -611,7 +615,7 @@ function Sidebar({
               alt=""
               className={`hidden h-8 w-8 ${collapsed ? "lg:block" : ""}`}
             />
-          </Link>
+          </button>
           <button
             onClick={onClose}
             className="rounded-lg p-2 text-[#6f736d] hover:bg-[#f2f3f0] lg:hidden"
