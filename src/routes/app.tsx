@@ -41,6 +41,7 @@ import {
   X,
 } from "lucide-react";
 import SoulChat from "@/components/SoulChat";
+import OnboardingFlow from "@/components/OnboardingFlow";
 import {
   createSoul,
   createWebsiteSource,
@@ -116,6 +117,13 @@ const PAGE_META: Record<StudioView, { title: string; description: string }> = {
 
 type StudioUser = { id: string; name?: string | null; email?: string | null; image?: string | null };
 
+const EMPTY_WORKSPACE: SoulWorkspace = {
+  id: "pending-workspace",
+  name: "Obseri Workspace",
+  souls: [],
+  activeSoulId: null,
+};
+
 function AuthenticatedStudio() {
   const session = authClient.useSession();
   useEffect(() => {
@@ -145,12 +153,13 @@ function SoulStudio({ user }: { user: StudioUser }) {
   const [quickStartUrl, setQuickStartUrl] = useState("");
   const [notice, setNotice] = useState("");
   const [crawlEvents, setCrawlEvents] = useState<Record<string, CrawlProgressEvent[]>>({});
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   useEffect(() => {
     let active = true;
     const userStorageKey = `${STORAGE_KEY}:${user.id}`;
     async function hydrateWorkspace() {
-      let localWorkspace = DEMO_WORKSPACE;
+      let localWorkspace = EMPTY_WORKSPACE;
       try {
         const saved = localStorage.getItem(userStorageKey) ?? localStorage.getItem(STORAGE_KEY);
         if (saved) localWorkspace = normalizeWorkspace(JSON.parse(saved) as SoulWorkspace);
@@ -160,20 +169,19 @@ function SoulStudio({ user }: { user: StudioUser }) {
         const payload = (await response.json()) as { workspace: SoulWorkspace | null };
         if (!active) return;
         if (payload.workspace) {
-          setWorkspace(normalizeWorkspace(payload.workspace));
+          const savedWorkspace = normalizeWorkspace(payload.workspace);
+          setWorkspace(savedWorkspace);
+          setNeedsOnboarding(savedWorkspace.souls.length === 0);
         } else {
-          const createResponse = await authFetch("/api/workspace", {
-            method: "PUT",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(localWorkspace),
-          });
-          if (!createResponse.ok) throw new Error("Workspace could not be created.");
-          const created = (await createResponse.json()) as { workspace: SoulWorkspace };
-          if (active) setWorkspace(normalizeWorkspace(created.workspace));
+          setWorkspace(EMPTY_WORKSPACE);
+          setNeedsOnboarding(true);
           localStorage.removeItem(STORAGE_KEY);
         }
       } catch {
-        if (active) setWorkspace(localWorkspace);
+        if (active) {
+          setWorkspace(localWorkspace);
+          setNeedsOnboarding(localWorkspace.souls.length === 0);
+        }
       } finally {
         if (active) setHydrated(true);
       }
@@ -203,7 +211,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || needsOnboarding || workspace.souls.length === 0) return;
     const userStorageKey = `${STORAGE_KEY}:${user.id}`;
     localStorage.setItem(userStorageKey, JSON.stringify(workspace));
     const timer = window.setTimeout(() => {
@@ -214,7 +222,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
       });
     }, 650);
     return () => window.clearTimeout(timer);
-  }, [hydrated, user.id, workspace]);
+  }, [hydrated, needsOnboarding, user.id, workspace]);
 
   useEffect(() => {
     if (hydrated) localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarCollapsed));
@@ -247,6 +255,33 @@ function SoulStudio({ user }: { user: StudioUser }) {
     setView(next);
     setMobileNav(false);
     setProfileOpen(false);
+  }
+
+  async function saveOnboardingSoul(nextSoul: Soul) {
+    const pendingWorkspace: SoulWorkspace = {
+      id: EMPTY_WORKSPACE.id,
+      name: `${nextSoul.name} Workspace`,
+      souls: [nextSoul],
+      activeSoulId: nextSoul.id,
+    };
+    const response = await authFetch("/api/workspace", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(pendingWorkspace),
+    });
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as {
+        error?: { message?: string };
+      } | null;
+      throw new Error(payload?.error?.message || "Your website agent could not be saved.");
+    }
+    const payload = (await response.json()) as { workspace: SoulWorkspace };
+    const savedWorkspace = normalizeWorkspace(payload.workspace);
+    setWorkspace(savedWorkspace);
+    localStorage.setItem(`${STORAGE_KEY}:${user.id}`, JSON.stringify(savedWorkspace));
+    setCreateOpen(false);
+    setQuickStartUrl("");
+    return savedWorkspace;
   }
 
   async function createWebsiteSoul(input: { name: string; url: string }) {
@@ -434,6 +469,29 @@ function SoulStudio({ user }: { user: StudioUser }) {
         conversations: [conversation, ...current.conversations.filter((item) => item.id !== id)],
       };
     });
+  }
+
+  if (!hydrated) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#f7f5f2] text-sm text-[#77716e]">
+        <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Preparing your workspace…
+      </div>
+    );
+  }
+
+  if (needsOnboarding) {
+    return (
+      <OnboardingFlow
+        email={user.email}
+        initialUrl={quickStartUrl}
+        onSave={saveOnboardingSoul}
+        onEnterStudio={() => {
+          setNeedsOnboarding(false);
+          setView("playground");
+        }}
+        onSignOut={() => void authClient.signOut().finally(() => window.location.replace("/"))}
+      />
+    );
   }
 
   return (
