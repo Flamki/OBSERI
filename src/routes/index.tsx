@@ -8,7 +8,7 @@ import { authClient } from "@/lib/auth-client";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "AI Voice Agent & Website Chatbot Trained on Your Content | Obseri" },
+      { title: "Obseri: AI Voice Agent & Website Chatbot" },
       {
         name: "description",
         content:
@@ -42,6 +42,9 @@ export const Route = createFileRoute("/")({
               alternateName: "Obseri AI",
               url: "https://obseri.com/",
               email: "flamki@obseri.com",
+              slogan: "Make every visit a lead.",
+              disambiguatingDescription:
+                "Obseri is the website intelligence software platform at obseri.com for building source-grounded AI voice agents and chatbots.",
               logo: {
                 "@type": "ImageObject",
                 url: "https://obseri.com/obseri-search-logo.png",
@@ -51,6 +54,12 @@ export const Route = createFileRoute("/")({
               },
               description:
                 "Obseri builds source-grounded AI voice agents and website chatbots trained on a business's own content.",
+              contactPoint: {
+                "@type": "ContactPoint",
+                contactType: "sales and customer support",
+                email: "flamki@obseri.com",
+                availableLanguage: ["English"],
+              },
             },
             {
               "@type": "WebSite",
@@ -61,6 +70,14 @@ export const Route = createFileRoute("/")({
               description: "AI voice agents and website chatbots trained on your content.",
               publisher: { "@id": "https://obseri.com/#organization" },
               inLanguage: "en",
+            },
+            {
+              "@type": "Brand",
+              "@id": "https://obseri.com/#brand",
+              name: "Obseri",
+              slogan: "Make every visit a lead.",
+              url: "https://obseri.com/",
+              logo: "https://obseri.com/obseri-search-logo.png",
             },
             {
               "@type": "SoftwareApplication",
@@ -81,6 +98,14 @@ export const Route = createFileRoute("/")({
                 "Retrieval testing before launch",
                 "Embeddable website widget and signed webhooks",
               ],
+              brand: { "@id": "https://obseri.com/#brand" },
+              offers: {
+                "@type": "Offer",
+                price: "0",
+                priceCurrency: "INR",
+                url: "https://obseri.com/pricing",
+                description: "Start with Obseri's free plan.",
+              },
               publisher: { "@id": "https://obseri.com/#organization" },
             },
           ],

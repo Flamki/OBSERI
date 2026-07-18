@@ -224,11 +224,13 @@ export default function OnboardingFlow({
                   Live website learning
                 </span>
                 <h1 className="mt-5 font-serif text-5xl leading-none tracking-[-0.04em]">
-                  {draftSoul?.knowledge.status === "ready" ? "Knowledge ready." : "Reading your website."}
+                  {draftSoul?.knowledge.status === "ready"
+                    ? "Knowledge ready."
+                    : "Reading your website."}
                 </h1>
                 <p className="mt-5 text-base leading-7 text-[#716d6c]">
-                  This is real crawl activity—not a demo timer. Obseri checks crawl rules,
-                  discovers useful pages, extracts content, and prepares searchable blocks.
+                  This is real crawl activity—not a demo timer. Obseri checks crawl rules, discovers
+                  useful pages, extracts content, and prepares searchable blocks.
                 </p>
                 <div className="mt-8 grid grid-cols-3 gap-3">
                   <Metric value={stats?.discovered ?? 0} label="Found" />
@@ -248,24 +250,28 @@ export default function OnboardingFlow({
                   />
                 </div>
                 <div className="mt-8 space-y-3">
-                  {(events.length ? events.slice(-5) : [startingEvent()]).map((event, index, list) => (
-                    <div
-                      key={`${event.timestamp}-${index}`}
-                      className="flex items-start gap-3 rounded-2xl border border-black/[0.06] bg-white px-4 py-3"
-                    >
-                      {index === list.length - 1 && draftSoul?.knowledge.status !== "ready" && !error ? (
-                        <LoaderCircle className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-[#ff5c7a]" />
-                      ) : (
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#6d9d4f]" />
-                      )}
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-[#3e3a39]">{event.message}</p>
-                        {event.url && (
-                          <p className="mt-1 truncate text-xs text-[#9a9491]">{event.url}</p>
+                  {(events.length ? events.slice(-5) : [startingEvent()]).map(
+                    (event, index, list) => (
+                      <div
+                        key={`${event.timestamp}-${index}`}
+                        className="flex items-start gap-3 rounded-2xl border border-black/[0.06] bg-white px-4 py-3"
+                      >
+                        {index === list.length - 1 &&
+                        draftSoul?.knowledge.status !== "ready" &&
+                        !error ? (
+                          <LoaderCircle className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-[#ff5c7a]" />
+                        ) : (
+                          <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#6d9d4f]" />
                         )}
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-[#3e3a39]">{event.message}</p>
+                          {event.url && (
+                            <p className="mt-1 truncate text-xs text-[#9a9491]">{event.url}</p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ),
+                  )}
                 </div>
                 {error ? (
                   <div className="mt-6">
@@ -336,7 +342,11 @@ export default function OnboardingFlow({
                   disabled={saving}
                   className="mt-7 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#1c1b1d] px-5 py-4 text-sm font-semibold text-white transition hover:bg-[#b63c56] disabled:cursor-wait disabled:opacity-60"
                 >
-                  {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  {saving ? (
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
                   {saving ? "Saving your agent…" : "Finish setup"}
                 </button>
               </div>
@@ -377,7 +387,10 @@ export default function OnboardingFlow({
               </p>
               <div className="mt-8 flex flex-wrap justify-center gap-3">
                 <ReadyPill icon={<BookOpen className="h-4 w-4" />} label={`${pageCount} pages`} />
-                <ReadyPill icon={<Sparkles className="h-4 w-4" />} label={`${blockCount} knowledge blocks`} />
+                <ReadyPill
+                  icon={<Sparkles className="h-4 w-4" />}
+                  label={`${blockCount} knowledge blocks`}
+                />
                 <ReadyPill icon={<Volume2 className="h-4 w-4" />} label="Voice ready" />
               </div>
               <button
@@ -416,12 +429,16 @@ function SetupProgress({ current }: { current: SetupStep }) {
               >
                 {complete ? <Check className="h-3.5 w-3.5" /> : index + 1}
               </span>
-              <span className={`hidden text-xs font-medium sm:block ${active ? "text-black" : "text-[#9a9491]"}`}>
+              <span
+                className={`hidden text-xs font-medium sm:block ${active ? "text-black" : "text-[#9a9491]"}`}
+              >
                 {step.label}
               </span>
             </div>
             {index < STEPS.length - 1 && (
-              <div className={`mx-3 h-px flex-1 ${index < currentIndex ? "bg-[#ff5c7a]" : "bg-black/10"}`} />
+              <div
+                className={`mx-3 h-px flex-1 ${index < currentIndex ? "bg-[#ff5c7a]" : "bg-black/10"}`}
+              />
             )}
           </div>
         );
@@ -437,16 +454,38 @@ function OnboardingVisual() {
       <div className="absolute h-[25rem] w-[25rem] rounded-full border border-[#ff5c7a]/15" />
       <div className="absolute h-[17rem] w-[17rem] rounded-full bg-[radial-gradient(circle_at_35%_32%,#ffc3ae,#ff6a7f_38%,#763052_70%,#17171a_100%)] shadow-[0_0_90px_rgba(255,92,122,.3)]" />
       <img src="/obseri-pulse-mark.svg" alt="" className="relative h-20 w-20 brightness-0 invert" />
-      <VisualNode className="left-[12%] top-[22%]" icon={<Globe2 className="h-4 w-4" />} label="Discover" />
-      <VisualNode className="right-[10%] top-[38%]" icon={<BookOpen className="h-4 w-4" />} label="Understand" />
-      <VisualNode className="bottom-[18%] left-[18%]" icon={<MessageCircle className="h-4 w-4" />} label="Answer" />
+      <VisualNode
+        className="left-[12%] top-[22%]"
+        icon={<Globe2 className="h-4 w-4" />}
+        label="Discover"
+      />
+      <VisualNode
+        className="right-[10%] top-[38%]"
+        icon={<BookOpen className="h-4 w-4" />}
+        label="Understand"
+      />
+      <VisualNode
+        className="bottom-[18%] left-[18%]"
+        icon={<MessageCircle className="h-4 w-4" />}
+        label="Answer"
+      />
     </div>
   );
 }
 
-function VisualNode({ className, icon, label }: { className: string; icon: ReactNode; label: string }) {
+function VisualNode({
+  className,
+  icon,
+  label,
+}: {
+  className: string;
+  icon: ReactNode;
+  label: string;
+}) {
   return (
-    <div className={`absolute flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-xs text-white/75 backdrop-blur ${className}`}>
+    <div
+      className={`absolute flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-xs text-white/75 backdrop-blur ${className}`}
+    >
       {icon} {label}
     </div>
   );

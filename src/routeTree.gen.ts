@@ -13,6 +13,7 @@ import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AiVoiceAgentForWebsiteRouteImport } from './routes/ai-voice-agent-for-website'
 import { Route as AiChatbotTrainedOnYourWebsiteRouteImport } from './routes/ai-chatbot-trained-on-your-website'
+import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WidgetSoulIdRouteImport } from './routes/widget.$soulId'
 import { Route as AuthPathnameRouteImport } from './routes/auth.$pathname'
@@ -60,6 +61,11 @@ const AiChatbotTrainedOnYourWebsiteRoute =
     path: '/ai-chatbot-trained-on-your-website',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -189,6 +195,7 @@ const ApiInternalWebhooksDrainRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/ai-chatbot-trained-on-your-website': typeof AiChatbotTrainedOnYourWebsiteRoute
   '/ai-voice-agent-for-website': typeof AiVoiceAgentForWebsiteRoute
   '/app': typeof AppRoute
@@ -220,6 +227,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/ai-chatbot-trained-on-your-website': typeof AiChatbotTrainedOnYourWebsiteRoute
   '/ai-voice-agent-for-website': typeof AiVoiceAgentForWebsiteRoute
   '/app': typeof AppRoute
@@ -252,6 +260,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/ai-chatbot-trained-on-your-website': typeof AiChatbotTrainedOnYourWebsiteRoute
   '/ai-voice-agent-for-website': typeof AiVoiceAgentForWebsiteRoute
   '/app': typeof AppRoute
@@ -285,6 +294,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/about'
     | '/ai-chatbot-trained-on-your-website'
     | '/ai-voice-agent-for-website'
     | '/app'
@@ -316,6 +326,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/about'
     | '/ai-chatbot-trained-on-your-website'
     | '/ai-voice-agent-for-website'
     | '/app'
@@ -347,6 +358,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/about'
     | '/ai-chatbot-trained-on-your-website'
     | '/ai-voice-agent-for-website'
     | '/app'
@@ -379,6 +391,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AboutRoute: typeof AboutRoute
   AiChatbotTrainedOnYourWebsiteRoute: typeof AiChatbotTrainedOnYourWebsiteRoute
   AiVoiceAgentForWebsiteRoute: typeof AiVoiceAgentForWebsiteRoute
   AppRoute: typeof AppRoute
@@ -434,6 +447,13 @@ declare module '@tanstack/react-router' {
       path: '/ai-chatbot-trained-on-your-website'
       fullPath: '/ai-chatbot-trained-on-your-website'
       preLoaderRoute: typeof AiChatbotTrainedOnYourWebsiteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -651,6 +671,7 @@ const ApiSoulsSoulIdRouteWithChildren = ApiSoulsSoulIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AboutRoute: AboutRoute,
   AiChatbotTrainedOnYourWebsiteRoute: AiChatbotTrainedOnYourWebsiteRoute,
   AiVoiceAgentForWebsiteRoute: AiVoiceAgentForWebsiteRoute,
   AppRoute: AppRoute,

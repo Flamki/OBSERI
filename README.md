@@ -285,6 +285,25 @@ The production routing target is:
 - **Self-hosted open models through Voicebox** for private deployments, experiments, batch work,
   and a future cost-control path
 
+### Deferred managed-voice cutover
+
+**Status: planned, not active work.** Keep the currently configured Obseri voice path for the
+pilot. Do not provision a permanent GPU and do not change the public plan allowances until real
+usage has been measured. When production provider credentials are available, add the managed
+routes in this order:
+
+1. Sarvam streaming STT/TTS for Indian languages, Indian English, and code-switched calls.
+2. ElevenLabs streaming TTS and explicitly authorized voice cloning for premium global voices.
+3. Pin one provider and one voice to each conversation. Never switch speakers through a hidden
+   fallback while a call is active.
+4. Meter delivered audio seconds, synthesized characters, provider errors, and p50/p95
+   time-to-first-audio before revising prices or allowances.
+
+The cutover is ready only when credentials are server-only and restricted, spend and rate limits
+are enabled, greetings and interruption handling work over the streaming path, commercial
+embedding terms are confirmed, and regional latency tests meet the product target. Until then,
+the provider work remains in the backlog and the current experience remains the supported path.
+
 All speech providers must sit behind Obseri-owned STT and TTS interfaces so a Soul is never locked
 to one vendor. Live calls should use persistent WebSockets, streaming transcription, interruption
 handling, streamed LLM tokens, and streamed audio playback. Provider selection should be measured

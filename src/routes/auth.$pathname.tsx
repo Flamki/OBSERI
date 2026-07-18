@@ -28,10 +28,7 @@ function AuthPage() {
         <div className="obseri-auth-copy">
           <span>YOUR WEBSITE, ALWAYS ON.</span>
           <h1>Turn every visit into a conversation.</h1>
-          <p>
-            Sign in to train, shape, test, and publish your website's voice and chat
-            agent.
-          </p>
+          <p>Sign in to train, shape, test, and publish your website's voice and chat agent.</p>
         </div>
         <div className="obseri-auth-form">
           <AuthView callbackURL="/app" path={pathname} redirectTo="/app" />

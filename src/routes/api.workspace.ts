@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { requireUser } from "@/lib/user-auth";
 import { readUserWorkspace, saveUserWorkspace } from "@/lib/user-workspace-store";
-import { assertWorkspaceWithinPlan } from "@/lib/billing-store";
+import { applyWorkspacePlanPolicy, assertWorkspaceWithinPlan } from "@/lib/billing-store";
 import type { SoulWorkspace } from "@/lib/soul";
 
 export const Route = createFileRoute("/api/workspace")({
@@ -22,12 +22,15 @@ export const Route = createFileRoute("/api/workspace")({
         try {
           const user = await requireUser(request);
           const length = Number(request.headers.get("content-length") ?? "0");
-          if (length > 1_600_000) return apiError(new Error("Workspace payload is too large."), 413);
+          if (length > 1_600_000)
+            return apiError(new Error("Workspace payload is too large."), 413);
           const value = await request.json();
+          let saveValue = value;
           if (value && typeof value === "object" && Array.isArray((value as SoulWorkspace).souls)) {
-            await assertWorkspaceWithinPlan(user.id, value as SoulWorkspace);
+            const { plan } = await assertWorkspaceWithinPlan(user.id, value as SoulWorkspace);
+            saveValue = applyWorkspacePlanPolicy(value as SoulWorkspace, plan);
           }
-          const workspace = await saveUserWorkspace(user.id, value);
+          const workspace = await saveUserWorkspace(user.id, saveValue);
           return Response.json({ workspace }, { headers: { "cache-control": "no-store" } });
         } catch (error) {
           return apiError(error);
@@ -42,7 +45,11 @@ function apiError(error: unknown, overrideStatus?: number) {
     overrideStatus ??
     (typeof error === "object" && error && "status" in error ? Number(error.status) : 500);
   const message =
-    status >= 500 ? "The workspace could not be saved." : error instanceof Error ? error.message : "Request failed.";
+    status >= 500
+      ? "The workspace could not be saved."
+      : error instanceof Error
+        ? error.message
+        : "Request failed.";
   return Response.json(
     { error: { code: "workspace_request_failed", message } },
     { status, headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } },

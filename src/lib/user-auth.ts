@@ -12,8 +12,11 @@ export type AuthenticatedUser = {
 let jwks: ReturnType<typeof createRemoteJWKSet> | undefined;
 
 function authUrl() {
-  return (process.env.NEON_AUTH_BASE_URL ?? process.env.VITE_NEON_AUTH_URL ?? DEFAULT_AUTH_URL)
-    .replace(/\/$/, "");
+  return (
+    process.env.NEON_AUTH_BASE_URL ??
+    process.env.VITE_NEON_AUTH_URL ??
+    DEFAULT_AUTH_URL
+  ).replace(/\/$/, "");
 }
 
 export function authJwksUrl() {

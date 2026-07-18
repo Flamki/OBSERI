@@ -1,4 +1,5 @@
 export type BillingPlanId = "free" | "launch" | "growth" | "scale" | "enterprise";
+export type BillingFeature = "webhooks" | "remove_branding" | "api_access";
 
 export type BillingLimits = {
   websites: number | null;
@@ -42,7 +43,7 @@ export const BILLING_PLANS = {
       retentionDays: 7,
       refreshIntervalHours: null,
     },
-    features: ["Manual website refresh", "Obseri branding", "Community support"],
+    features: ["Website voice and chat widget", "Manual website refresh", "Community support"],
   },
   launch: {
     id: "launch",
@@ -78,9 +79,9 @@ export const BILLING_PLANS = {
     },
     features: [
       "Manual incremental refresh",
-      "Remove Obseri branding",
-      "Webhooks and integrations",
+      "Signed webhooks and integrations",
       "Conversation analytics",
+      "90-day conversation history",
       "Priority email support",
     ],
     highlighted: true,
@@ -102,9 +103,9 @@ export const BILLING_PLANS = {
     },
     features: [
       "Manual incremental refresh",
-      "Advanced analytics and exports",
-      "API access",
-      "Priority processing",
+      "Signed webhooks and integrations",
+      "365-day conversation history",
+      "High-volume workspace capacity",
       "Priority support",
     ],
   },
@@ -135,6 +136,27 @@ export const BILLING_PLANS = {
 } as const satisfies Record<BillingPlanId, BillingPlan>;
 
 export const SELF_SERVE_PLAN_IDS = ["free", "launch", "growth", "scale"] as const;
+
+export const BILLING_FEATURE_MINIMUM: Record<BillingFeature, BillingPlanId> = {
+  webhooks: "growth",
+  remove_branding: "growth",
+  api_access: "scale",
+};
+
+const BILLING_PLAN_RANK: Record<BillingPlanId, number> = {
+  free: 0,
+  launch: 1,
+  growth: 2,
+  scale: 3,
+  enterprise: 4,
+};
+
+export function billingPlanIncludesFeature(
+  planId: BillingPlanId,
+  feature: BillingFeature,
+): boolean {
+  return BILLING_PLAN_RANK[planId] >= BILLING_PLAN_RANK[BILLING_FEATURE_MINIMUM[feature]];
+}
 
 export function isBillingPlanId(value: unknown): value is BillingPlanId {
   return typeof value === "string" && value in BILLING_PLANS;

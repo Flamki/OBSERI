@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { BILLING_PLANS, SELF_SERVE_PLAN_IDS, formatInr, getBillingPlan } from "./billing-plans";
+import {
+  BILLING_PLANS,
+  SELF_SERVE_PLAN_IDS,
+  billingPlanIncludesFeature,
+  formatInr,
+  getBillingPlan,
+} from "./billing-plans";
 
 describe("billing plan catalog", () => {
   it("keeps self-serve prices and limits finite", () => {
@@ -18,5 +24,14 @@ describe("billing plan catalog", () => {
 
   it("formats paise as Indian rupees", () => {
     expect(formatInr(349_900)).toContain("3,499");
+  });
+
+  it("keeps premium feature gates aligned with the catalog", () => {
+    expect(billingPlanIncludesFeature("free", "webhooks")).toBe(false);
+    expect(billingPlanIncludesFeature("launch", "webhooks")).toBe(false);
+    expect(billingPlanIncludesFeature("growth", "webhooks")).toBe(true);
+    expect(billingPlanIncludesFeature("growth", "api_access")).toBe(false);
+    expect(billingPlanIncludesFeature("scale", "api_access")).toBe(true);
+    expect(billingPlanIncludesFeature("enterprise", "remove_branding")).toBe(true);
   });
 });

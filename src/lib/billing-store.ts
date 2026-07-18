@@ -1,6 +1,14 @@
 import { createHash, randomUUID } from "node:crypto";
 import postgres from "postgres";
-import { BILLING_PLANS, getBillingPlan, type BillingPlanId } from "@/lib/billing-plans";
+import {
+  BILLING_FEATURE_MINIMUM,
+  BILLING_PLANS,
+  billingPlanIncludesFeature,
+  getBillingPlan,
+  type BillingFeature,
+  type BillingPlan,
+  type BillingPlanId,
+} from "@/lib/billing-plans";
 import {
   billingPlanFromRazorpayPlanId,
   type BillingCycle,
@@ -257,6 +265,14 @@ export async function assertWorkspaceWithinPlan(
   workspace: Pick<SoulWorkspace, "souls">,
 ) {
   const { plan } = await billingSummary(ownerUserId);
+  const { websiteCount, indexedPages } = assertWorkspaceFitsPlan(workspace, plan);
+  return { plan, websiteCount, indexedPages };
+}
+
+export function assertWorkspaceFitsPlan(
+  workspace: Pick<SoulWorkspace, "souls">,
+  plan: BillingPlan,
+) {
   const websiteCount = workspace.souls.length;
   const indexedPages = workspace.souls.reduce(
     (total, soul) => total + soul.knowledge.pages.length,
@@ -276,7 +292,63 @@ export async function assertWorkspaceWithinPlan(
       "indexed_page_limit_reached",
     );
   }
-  return { plan, websiteCount, indexedPages };
+  return { websiteCount, indexedPages };
+}
+
+export async function assertPlanTransitionAllowed(
+  ownerUserId: string,
+  targetPlanId: BillingPlanId,
+  workspace: Pick<SoulWorkspace, "souls"> | null,
+) {
+  const targetPlan = getBillingPlan(targetPlanId);
+  if (workspace) assertWorkspaceFitsPlan(workspace, targetPlan);
+  const current = await billingSummary(ownerUserId);
+  const textLimit = targetPlan.limits.textResponsesPerMonth;
+  const voiceLimitSeconds =
+    targetPlan.limits.voiceMinutesPerMonth === null
+      ? null
+      : targetPlan.limits.voiceMinutesPerMonth * 60;
+  if (textLimit !== null && current.usage.textResponses > textLimit) {
+    throw new BillingStoreError(
+      `This month already has ${current.usage.textResponses.toLocaleString("en-IN")} text responses. Change to ${targetPlan.name} after the next billing period or choose a larger plan.`,
+      409,
+      "target_plan_usage_exceeded",
+    );
+  }
+  if (voiceLimitSeconds !== null && current.usage.voiceSeconds > voiceLimitSeconds) {
+    throw new BillingStoreError(
+      `This month already has ${Math.ceil(current.usage.voiceSeconds / 60).toLocaleString("en-IN")} voice minutes. Change to ${targetPlan.name} after the next billing period or choose a larger plan.`,
+      409,
+      "target_plan_usage_exceeded",
+    );
+  }
+  return targetPlan;
+}
+
+export function applyWorkspacePlanPolicy(
+  workspace: SoulWorkspace,
+  plan: BillingPlan,
+  now = new Date(),
+): SoulWorkspace {
+  const cutoff =
+    plan.limits.retentionDays === null
+      ? null
+      : now.getTime() - plan.limits.retentionDays * 24 * 60 * 60 * 1_000;
+  const allowWebhooks = billingPlanIncludesFeature(plan.id, "webhooks");
+  return {
+    ...workspace,
+    souls: workspace.souls.map((soul) => ({
+      ...soul,
+      conversations:
+        cutoff === null
+          ? soul.conversations
+          : soul.conversations.filter((conversation) => {
+              const updatedAt = Date.parse(conversation.updatedAt);
+              return Number.isFinite(updatedAt) && updatedAt >= cutoff;
+            }),
+      channels: allowWebhooks ? soul.channels : { ...soul.channels, webhookEnabled: false },
+    })),
+  };
 }
 
 export async function crawlPageAllowance(
@@ -296,26 +368,12 @@ export async function crawlPageAllowance(
   return Math.max(0, Math.min(50, plan.limits.indexedPages - totalPages + replaceablePages));
 }
 
-export async function assertPlanFeature(
-  ownerUserId: string,
-  feature: "webhooks" | "remove_branding" | "api_access",
-) {
+export async function assertPlanFeature(ownerUserId: string, feature: BillingFeature) {
   const { plan } = await billingSummary(ownerUserId);
-  const minimum: Record<typeof feature, BillingPlanId> = {
-    webhooks: "growth",
-    remove_branding: "growth",
-    api_access: "scale",
-  };
-  const rank: Record<BillingPlanId, number> = {
-    free: 0,
-    launch: 1,
-    growth: 2,
-    scale: 3,
-    enterprise: 4,
-  };
-  if (rank[plan.id] < rank[minimum[feature]]) {
+  const minimum = BILLING_FEATURE_MINIMUM[feature];
+  if (!billingPlanIncludesFeature(plan.id, feature)) {
     throw new BillingStoreError(
-      `${feature === "webhooks" ? "Conversation webhooks" : feature === "remove_branding" ? "Removing Obseri branding" : "External API access"} requires the ${BILLING_PLANS[minimum[feature]].name} plan or higher.`,
+      `${feature === "webhooks" ? "Conversation webhooks" : feature === "remove_branding" ? "Removing Obseri branding" : "External API access"} requires the ${BILLING_PLANS[minimum].name} plan or higher.`,
       402,
       "feature_not_in_plan",
     );

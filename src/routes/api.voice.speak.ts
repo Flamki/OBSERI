@@ -159,7 +159,10 @@ export const Route = createFileRoute("/api/voice/speak")({
 class VoiceAccessError extends Error {
   readonly code = "voice_access_denied";
 
-  constructor(message: string, readonly status: number) {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
     super(message);
     this.name = "VoiceAccessError";
   }

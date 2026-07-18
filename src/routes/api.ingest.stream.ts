@@ -32,8 +32,13 @@ export const Route = createFileRoute("/api/ingest/stream")({
         try {
           ownerUserId = (await requireUser(request)).id;
         } catch (error) {
-          const status = typeof error === "object" && error && "status" in error ? Number(error.status) : 401;
-          return errorResponse(error instanceof Error ? error.message : "Sign in to continue.", status, "unauthorized");
+          const status =
+            typeof error === "object" && error && "status" in error ? Number(error.status) : 401;
+          return errorResponse(
+            error instanceof Error ? error.message : "Sign in to continue.",
+            status,
+            "unauthorized",
+          );
         }
         const length = Number(request.headers.get("content-length") ?? "0");
         if (length > 250_000)

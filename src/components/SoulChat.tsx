@@ -164,6 +164,7 @@ export default function SoulChat({
     soul.voice.profileId,
     soul.voice.speed,
     soul.personality.greeting,
+    soul.id,
     callLanguage,
   ]);
 

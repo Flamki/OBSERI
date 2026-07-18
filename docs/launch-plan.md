@@ -42,6 +42,24 @@ Sell a finished website presence, not “another chatbot.”
 - Abuse detection, prompt-injection regression tests, secret rotation, backups, and restore drills
 - Multi-region/runtime cost review for crawler, model, voice, and storage workloads
 
+## Deferred voice-provider backlog
+
+The pilot continues on the currently configured Obseri voice path. Managed-provider expansion is
+deliberately deferred until production keys and measured traffic are available; it is not a reason
+to buy GPU capacity now.
+
+- [ ] Add restricted, server-only `SARVAM_API_KEY` and `ELEVENLABS_API_KEY` values to the production environment.
+- [ ] Implement Sarvam streaming STT/TTS behind the Obseri voice interfaces for Indian and code-switched conversations.
+- [ ] Implement ElevenLabs streaming premium voices and consent-backed voice cloning behind the same interfaces.
+- [ ] Pin a provider and speaker for the lifetime of each call; do not use cross-provider or cross-voice fallback.
+- [ ] Add automatic greeting, VAD, barge-in, cancellation, and incremental audio playback to the managed route.
+- [ ] Meter actual audio seconds, TTS characters, provider failures, and p50/p95 first-audio latency by region.
+- [ ] Run quality, interruption, concurrency, consent, and spend-limit tests before enabling the routes for customers.
+- [ ] Recalculate plan prices and allowances from measured unit economics rather than advertised provider rates.
+- [ ] Reconsider self-hosted GPU serving only after sustained provider spend exceeds the fully loaded hosting cost or an enterprise customer requires private deployment.
+
+This backlog does not change the current customer plans or runtime behavior.
+
 ## First 30-day scorecard
 
 - 20 tailored demos built from real prospect websites

@@ -26,7 +26,10 @@ export const Route = createFileRoute("/api/voice/profiles")({
         try {
           await requireUser(request);
         } catch (error) {
-          return Response.json({ error: { message: error instanceof Error ? error.message : "Sign in to continue." } }, { status: 401 });
+          return Response.json(
+            { error: { message: error instanceof Error ? error.message : "Sign in to continue." } },
+            { status: 401 },
+          );
         }
         const baseUrl = getRuntimeEnvironment().OBSERI_VOICEBOX_URL?.replace(/\/$/, "");
         if (!baseUrl) {
@@ -75,7 +78,10 @@ export const Route = createFileRoute("/api/voice/profiles")({
         try {
           await requireUser(request);
         } catch (error) {
-          return Response.json({ error: { message: error instanceof Error ? error.message : "Sign in to continue." } }, { status: 401 });
+          return Response.json(
+            { error: { message: error instanceof Error ? error.message : "Sign in to continue." } },
+            { status: 401 },
+          );
         }
         const parsed = presetSchema.safeParse(await request.json());
         if (!parsed.success)

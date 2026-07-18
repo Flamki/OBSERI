@@ -11,7 +11,8 @@ export const Route = createFileRoute("/api/voice/clone")({
         try {
           await requireUser(request);
         } catch (error) {
-          const status = typeof error === "object" && error && "status" in error ? Number(error.status) : 401;
+          const status =
+            typeof error === "object" && error && "status" in error ? Number(error.status) : 401;
           return jsonError(error instanceof Error ? error.message : "Sign in to continue.", status);
         }
         const length = Number(request.headers.get("content-length") ?? "0");

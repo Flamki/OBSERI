@@ -20,10 +20,7 @@ export async function readUserWorkspace(userId: string): Promise<SoulWorkspace |
   return rows[0]?.workspace ? normalizeWorkspace(rows[0].workspace) : null;
 }
 
-export async function saveUserWorkspace(
-  userId: string,
-  value: unknown,
-): Promise<SoulWorkspace> {
+export async function saveUserWorkspace(userId: string, value: unknown): Promise<SoulWorkspace> {
   if (!isWorkspace(value)) throw new WorkspaceStoreError("The workspace payload is invalid.", 422);
   if (Buffer.byteLength(JSON.stringify(value), "utf8") > 1_500_000) {
     throw new WorkspaceStoreError("The workspace is too large to save.", 413);

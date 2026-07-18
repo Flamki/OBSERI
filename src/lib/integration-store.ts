@@ -3,6 +3,8 @@ import postgres from "postgres";
 import type { Soul, SoulConversation } from "@/lib/soul";
 import { deliverWebhook, type ObseriWebhookEvent } from "@/lib/webhooks";
 import { normalizeAllowedDomains, sha256 } from "@/lib/integration-security";
+import { billingPlanIncludesFeature } from "@/lib/billing-plans";
+import { billingSummary } from "@/lib/billing-store";
 
 export type PublishedSoulRecord = {
   soul: Soul;
@@ -213,6 +215,20 @@ export async function persistConversation(input: {
   conversation: SoulConversation;
 }): Promise<string | null> {
   const sql = db();
+  const publishedRows = await sql<
+    { owner_user_id: string | null; webhook_enabled: boolean; webhook_url: string | null }[]
+  >`
+    select owner_user_id, webhook_enabled, webhook_url
+    from obseri_published_souls
+    where soul_id = ${input.soulId}
+    limit 1
+  `;
+  const publishedSoul = publishedRows[0] ?? null;
+  const summary = publishedSoul?.owner_user_id
+    ? await billingSummary(publishedSoul.owner_user_id)
+    : null;
+  const webhookAllowed = summary ? billingPlanIncludesFeature(summary.plan.id, "webhooks") : false;
+  const retentionDays = summary?.plan.limits.retentionDays ?? null;
   const eventType =
     input.conversation.leadIntent === "high" ? "lead.detected" : "conversation.updated";
   const event: ObseriWebhookEvent = {
@@ -244,10 +260,16 @@ export async function persistConversation(input: {
         messages = excluded.messages,
         updated_at = excluded.updated_at
     `;
-    const published = await transaction<{ webhook_enabled: boolean; webhook_url: string | null }[]>`
-      select webhook_enabled, webhook_url from obseri_published_souls where soul_id = ${input.soulId}
-    `;
-    if (!published[0]?.webhook_enabled || !published[0].webhook_url) return null;
+    if (retentionDays !== null) {
+      await transaction`
+        delete from obseri_conversations
+        where soul_id = ${input.soulId}
+          and updated_at < now() - (${retentionDays} * interval '1 day')
+      `;
+    }
+    if (!webhookAllowed || !publishedSoul?.webhook_enabled || !publishedSoul.webhook_url) {
+      return null;
+    }
     await transaction`
       insert into obseri_webhook_deliveries (
         event_id, soul_id, event, status, attempt_count, next_attempt_at, created_at, updated_at

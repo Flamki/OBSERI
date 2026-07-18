@@ -1,8 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { isBillingPlanId } from "@/lib/billing-plans";
-import { findOwnedSubscription, saveSubscriptionPlanChange } from "@/lib/billing-store";
+import {
+  assertPlanTransitionAllowed,
+  findOwnedSubscription,
+  saveSubscriptionPlanChange,
+} from "@/lib/billing-store";
 import { razorpayPlanId, updateRazorpaySubscription, type BillingCycle } from "@/lib/razorpay";
 import { requireUser } from "@/lib/user-auth";
+import { readUserWorkspace } from "@/lib/user-workspace-store";
 
 export const Route = createFileRoute("/api/billing/change")({
   server: {
@@ -25,6 +30,7 @@ export const Route = createFileRoute("/api/billing/change")({
           if (!["active", "authenticated"].includes(owned.status)) {
             return apiError("This subscription cannot be changed right now.", 409);
           }
+          await assertPlanTransitionAllowed(user.id, body.planId, await readUserWorkspace(user.id));
           const cycle: BillingCycle = body.cycle;
           const subscription = await updateRazorpaySubscription({
             subscriptionId: body.subscriptionId,

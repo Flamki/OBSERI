@@ -958,6 +958,9 @@ function Footer() {
       <div className="mx-auto flex max-w-[1240px] flex-col gap-6 border-t border-black/[0.08] pt-8 text-[10px] text-black/35 sm:flex-row sm:items-center sm:justify-between">
         <img src="/obseri-logo-dark.svg" alt="Obseri" className="h-7 w-auto" />
         <nav className="flex flex-wrap gap-x-5 gap-y-2">
+          <a href="/about" className="transition hover:text-black">
+            About
+          </a>
           <a href="/ai-voice-agent-for-website" className="transition hover:text-black">
             Voice agent
           </a>

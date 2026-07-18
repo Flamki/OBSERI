@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   AudioLines,
   BookOpen,
@@ -68,6 +68,7 @@ import { authClient, authFetch } from "@/lib/auth-client";
 import {
   BILLING_PLANS,
   SELF_SERVE_PLAN_IDS,
+  billingPlanIncludesFeature,
   formatInr,
   type BillingPlan,
   type BillingPlanId,
@@ -111,6 +112,7 @@ type StudioView =
   | "playground"
   | "deploy"
   | "conversations"
+  | "billing"
   | "profile"
   | "settings"
   | "help";
@@ -134,6 +136,7 @@ const PAGE_META: Record<StudioView, { title: string; description: string }> = {
     title: "Conversations",
     description: "Understand what visitors are asking for.",
   },
+  billing: { title: "Plans and billing", description: "Manage capacity, usage, and invoices." },
   profile: { title: "Profile and workspace", description: "Manage your account and workspace." },
   settings: { title: "Settings", description: "Manage the selected website and its data." },
   help: { title: "Help", description: "Get support and find the right next step." },
@@ -183,6 +186,8 @@ function SoulStudio({ user }: { user: StudioUser }) {
   const [notice, setNotice] = useState("");
   const [crawlEvents, setCrawlEvents] = useState<Record<string, CrawlProgressEvent[]>>({});
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [activePlan, setActivePlan] = useState<BillingPlan>(BILLING_PLANS.free);
+  const lastPersistedWorkspace = useRef<SoulWorkspace>(EMPTY_WORKSPACE);
 
   useEffect(() => {
     let active = true;
@@ -199,15 +204,18 @@ function SoulStudio({ user }: { user: StudioUser }) {
         if (!active) return;
         if (payload.workspace) {
           const savedWorkspace = normalizeWorkspace(payload.workspace);
+          lastPersistedWorkspace.current = savedWorkspace;
           setWorkspace(savedWorkspace);
           setNeedsOnboarding(savedWorkspace.souls.length === 0);
         } else {
+          lastPersistedWorkspace.current = EMPTY_WORKSPACE;
           setWorkspace(EMPTY_WORKSPACE);
           setNeedsOnboarding(true);
           localStorage.removeItem(STORAGE_KEY);
         }
       } catch {
         if (active) {
+          lastPersistedWorkspace.current = localWorkspace;
           setWorkspace(localWorkspace);
           setNeedsOnboarding(localWorkspace.souls.length === 0);
         }
@@ -216,6 +224,20 @@ function SoulStudio({ user }: { user: StudioUser }) {
       }
     }
     void hydrateWorkspace();
+    return () => {
+      active = false;
+    };
+  }, [user.id]);
+
+  useEffect(() => {
+    let active = true;
+    void authFetch("/api/billing/summary", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const summary = (await response.json()) as BillingSummaryResponse;
+        if (active) setActivePlan(summary.plan);
+      })
+      .catch(() => undefined);
     return () => {
       active = false;
     };
@@ -248,7 +270,19 @@ function SoulStudio({ user }: { user: StudioUser }) {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(workspace),
-      });
+      })
+        .then(async (response) => {
+          if (response.ok) {
+            lastPersistedWorkspace.current = workspace;
+            return;
+          }
+          const payload = (await response.json().catch(() => null)) as {
+            error?: { message?: string };
+          } | null;
+          if (response.status === 402) setWorkspace(lastPersistedWorkspace.current);
+          setNotice(payload?.error?.message || "The workspace could not be saved.");
+        })
+        .catch(() => setNotice("The workspace could not be saved."));
     }, 650);
     return () => window.clearTimeout(timer);
   }, [hydrated, needsOnboarding, user.id, workspace]);
@@ -284,6 +318,27 @@ function SoulStudio({ user }: { user: StudioUser }) {
     setView(next);
     setMobileNav(false);
     setProfileOpen(false);
+    const params = new URLSearchParams(window.location.search);
+    if (next === "playground") params.delete("view");
+    else params.set("view", next);
+    const query = params.toString();
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${window.location.pathname}${query ? `?${query}` : ""}`,
+    );
+  }
+
+  function openCreateWebsite() {
+    const limit = activePlan.limits.websites;
+    if (limit !== null && workspace.souls.length >= limit) {
+      setNotice(
+        `${activePlan.name} supports ${limit} website${limit === 1 ? "" : "s"}. Choose a larger plan to add another.`,
+      );
+      navigate("billing");
+      return;
+    }
+    setCreateOpen(true);
   }
 
   async function saveOnboardingSoul(nextSoul: Soul) {
@@ -306,6 +361,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
     }
     const payload = (await response.json()) as { workspace: SoulWorkspace };
     const savedWorkspace = normalizeWorkspace(payload.workspace);
+    lastPersistedWorkspace.current = savedWorkspace;
     setWorkspace(savedWorkspace);
     localStorage.setItem(`${STORAGE_KEY}:${user.id}`, JSON.stringify(savedWorkspace));
     setCreateOpen(false);
@@ -316,14 +372,29 @@ function SoulStudio({ user }: { user: StudioUser }) {
   async function createWebsiteSoul(input: { name: string; url: string }) {
     const normalizedUrl = /^https?:\/\//i.test(input.url) ? input.url : `https://${input.url}`;
     const nextSoul = createSoul(normalizedUrl, input.name);
-    setWorkspace((current) => ({
-      ...current,
-      souls: [...current.souls, nextSoul],
+    const pendingWorkspace: SoulWorkspace = {
+      ...workspace,
+      souls: [...workspace.souls, nextSoul],
       activeSoulId: nextSoul.id,
-    }));
+    };
+    const response = await authFetch("/api/workspace", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(pendingWorkspace),
+    });
+    const payload = (await response.json().catch(() => null)) as {
+      workspace?: SoulWorkspace;
+      error?: { message?: string };
+    } | null;
+    if (!response.ok || !payload?.workspace) {
+      throw new Error(payload?.error?.message || "This website could not be added.");
+    }
+    const savedWorkspace = normalizeWorkspace(payload.workspace);
+    lastPersistedWorkspace.current = savedWorkspace;
+    setWorkspace(savedWorkspace);
     setCreateOpen(false);
     setQuickStartUrl("");
-    setView("knowledge");
+    navigate("knowledge");
     setCrawlEvents((current) => ({ ...current, [nextSoul.id]: [] }));
     try {
       const knowledge = await streamWebsiteCrawl(
@@ -532,7 +603,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
           mobileOpen={mobileNav}
           onClose={() => setMobileNav(false)}
           onNavigate={navigate}
-          onNew={() => setCreateOpen(true)}
+          onNew={openCreateWebsite}
           onExpand={() => setSidebarCollapsed(false)}
           onSoulChange={(id) => setWorkspace((current) => ({ ...current, activeSoulId: id }))}
         />
@@ -557,7 +628,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
             }`}
           >
             {!soul ? (
-              <EmptyState onCreate={() => setCreateOpen(true)} />
+              <EmptyState onCreate={openCreateWebsite} />
             ) : view === "knowledge" ? (
               <KnowledgeView
                 soul={soul}
@@ -581,13 +652,27 @@ function SoulStudio({ user }: { user: StudioUser }) {
                 onIntegrate={() => navigate("deploy")}
               />
             ) : view === "deploy" ? (
-              <DeployView soul={soul} onUpdate={updateSoul} onNotice={setNotice} />
+              <DeployView
+                soul={soul}
+                plan={activePlan}
+                onUpdate={updateSoul}
+                onNotice={setNotice}
+                onUpgrade={() => navigate("billing")}
+              />
             ) : view === "conversations" ? (
               <ConversationsView soul={soul} onTest={() => navigate("playground")} />
+            ) : view === "billing" ? (
+              <ProfileWorkspaceView
+                workspace={workspace}
+                onWorkspaceNameChange={(name) => setWorkspace((current) => ({ ...current, name }))}
+                billingOnly
+                onPlanChange={setActivePlan}
+              />
             ) : view === "profile" ? (
               <ProfileWorkspaceView
                 workspace={workspace}
                 onWorkspaceNameChange={(name) => setWorkspace((current) => ({ ...current, name }))}
+                onPlanChange={setActivePlan}
               />
             ) : view === "settings" ? (
               <SettingsView
@@ -824,6 +909,15 @@ function Sidebar({
         </nav>
 
         <div className="border-t border-[#ecece9] p-3">
+          <button
+            onClick={() => onNavigate("billing")}
+            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${collapsed ? "lg:justify-center lg:px-0" : ""} ${view === "billing" ? "bg-[#efefed] text-[#171916]" : "text-[#666a64] hover:bg-[#f5f5f3]"}`}
+            aria-label="Plans and billing"
+            title={collapsed ? "Plans and billing" : undefined}
+          >
+            <CreditCard className="h-[18px] w-[18px]" />
+            <span className={collapsed ? "lg:hidden" : ""}>Plans</span>
+          </button>
           <button
             onClick={() => onNavigate("settings")}
             className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${collapsed ? "lg:justify-center lg:px-0" : ""} ${view === "settings" ? "bg-[#efefed] text-[#171916]" : "text-[#666a64] hover:bg-[#f5f5f3]"}`}
@@ -1129,8 +1223,13 @@ function ProfileMenu({
       <div className="my-2 h-px bg-[#ecece9]" />
       <MenuRow
         icon={<UserRound />}
-        label="Profile, workspace and billing"
+        label="Profile and workspace"
         onClick={() => onNavigate("profile")}
+      />
+      <MenuRow
+        icon={<CreditCard />}
+        label="Plans and billing"
+        onClick={() => onNavigate("billing")}
       />
       <MenuRow icon={<Settings />} label="Settings" onClick={() => onNavigate("settings")} />
       <div className="my-2 h-px bg-[#ecece9]" />
@@ -3563,16 +3662,21 @@ function PlaygroundView({
 
 function DeployView({
   soul,
+  plan,
   onUpdate,
   onNotice,
+  onUpgrade,
 }: {
   soul: Soul;
+  plan: BillingPlan;
   onUpdate: (updater: (soul: Soul) => Soul) => void;
   onNotice: (message: string) => void;
+  onUpgrade: () => void;
 }) {
   const [tab, setTab] = useState<"widget" | "webhook">("widget");
   const [busy, setBusy] = useState(false);
   const [previewMode, setPreviewMode] = useState<"closed" | "chat" | "voice">("closed");
+  const webhookAvailable = billingPlanIncludesFeature(plan.id, "webhooks");
   const origin = typeof window === "undefined" ? "https://app.obseri.com" : window.location.origin;
   const code = `<script\n  src="${origin}/obseri-widget.js"\n  data-soul-id="${soul.id}"\n  data-widget-token="${soul.channels.widgetToken}"\n  data-position="${soul.appearance.position}"\n  data-accent="${soul.appearance.accent}"\n  async\n></script>`;
   const updateAppearance = (patch: Partial<Soul["appearance"]>) =>
@@ -3586,17 +3690,26 @@ function DeployView({
   async function publish() {
     setBusy(true);
     try {
+      const publishableSoul = webhookAvailable
+        ? soul
+        : { ...soul, channels: { ...soul.channels, webhookEnabled: false } };
       const response = await authFetch("/api/souls/publish", {
         method: "POST",
         headers: {
           "content-type": "application/json",
           "x-obseri-publish-key": soul.channels.publishKey,
         },
-        body: JSON.stringify(soul),
+        body: JSON.stringify(publishableSoul),
       });
       const payload = (await response.json()) as { error?: { message?: string } };
       if (!response.ok) throw new Error(payload.error?.message || "Publishing failed.");
-      onUpdate((current) => ({ ...current, status: "live" }));
+      onUpdate((current) => ({
+        ...current,
+        status: "live",
+        channels: webhookAvailable
+          ? current.channels
+          : { ...current.channels, webhookEnabled: false },
+      }));
       onNotice("Published. Your website widget is ready.");
     } catch (error) {
       onNotice(error instanceof Error ? error.message : "Publishing failed.");
@@ -3786,53 +3899,76 @@ function DeployView({
         </div>
       ) : (
         <div className="min-h-[calc(100vh-112px)]">
-          <Card>
-            <div className="flex items-start justify-between gap-4">
-              <SectionHeading
-                title="Conversation webhooks"
-                description="Send conversation and lead events to your own backend."
-              />
-              <Toggle
-                checked={soul.channels.webhookEnabled}
-                onChange={(checked) => updateChannels({ webhookEnabled: checked })}
-              />
-            </div>
-            <Field label="Destination URL" className="mt-6">
-              <input
-                value={soul.channels.webhookUrl}
-                onChange={(event) => updateChannels({ webhookUrl: event.target.value })}
-                placeholder="https://yourapp.com/webhooks/obseri"
-                className="clean-input"
-              />
-            </Field>
-            <Field label="Signing secret" className="mt-5">
-              <div className="flex gap-2">
-                <input
-                  readOnly
-                  value={soul.channels.webhookSecret}
-                  className="clean-input font-mono"
-                />
-                <button
-                  onClick={() => void copy(soul.channels.webhookSecret, "Signing secret copied.")}
-                  className="rounded-xl border border-[#dfe0dc] px-3 hover:bg-[#f5f5f3]"
-                >
-                  <Clipboard className="h-4 w-4" />
+          {!webhookAvailable ? (
+            <div className="mx-auto flex min-h-[calc(100vh-112px)] max-w-3xl items-center px-5 py-10 sm:px-8">
+              <div className="w-full rounded-3xl border border-[#e2e4df] bg-[#fafaf8] p-7 sm:p-10">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#fff0f3] text-[#c23d58]">
+                  <Webhook className="h-5 w-5" />
+                </span>
+                <p className="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-[#c23d58]">
+                  Growth feature
+                </p>
+                <h2 className="mt-2 text-3xl font-semibold tracking-[-0.04em]">
+                  Connect conversations to your stack.
+                </h2>
+                <p className="mt-3 max-w-xl text-sm leading-6 text-[#70756d]">
+                  Signed conversation and lead webhooks are available on Growth and higher. Your
+                  widget and chat remain live on {plan.name}.
+                </p>
+                <button type="button" onClick={onUpgrade} className="primary-button mt-7">
+                  Compare plans <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
-            </Field>
-            <button
-              onClick={() => void testWebhook()}
-              disabled={!soul.channels.webhookUrl || busy}
-              className="mt-6 inline-flex items-center gap-2 rounded-xl border border-[#dfe0dc] px-4 py-2.5 text-sm font-semibold hover:bg-[#f5f5f3] disabled:opacity-40"
-            >
-              <Webhook className="h-4 w-4" />
-              Send test event
-            </button>
-            <div className="mt-6 rounded-xl bg-[#f3f5f0] p-4 text-sm leading-6 text-[#62675f]">
-              Events include a timestamp, unique event ID, idempotency key, and HMAC-SHA256
-              signature.
             </div>
-          </Card>
+          ) : (
+            <Card>
+              <div className="flex items-start justify-between gap-4">
+                <SectionHeading
+                  title="Conversation webhooks"
+                  description="Send conversation and lead events to your own backend."
+                />
+                <Toggle
+                  checked={soul.channels.webhookEnabled}
+                  onChange={(checked) => updateChannels({ webhookEnabled: checked })}
+                />
+              </div>
+              <Field label="Destination URL" className="mt-6">
+                <input
+                  value={soul.channels.webhookUrl}
+                  onChange={(event) => updateChannels({ webhookUrl: event.target.value })}
+                  placeholder="https://yourapp.com/webhooks/obseri"
+                  className="clean-input"
+                />
+              </Field>
+              <Field label="Signing secret" className="mt-5">
+                <div className="flex gap-2">
+                  <input
+                    readOnly
+                    value={soul.channels.webhookSecret}
+                    className="clean-input font-mono"
+                  />
+                  <button
+                    onClick={() => void copy(soul.channels.webhookSecret, "Signing secret copied.")}
+                    className="rounded-xl border border-[#dfe0dc] px-3 hover:bg-[#f5f5f3]"
+                  >
+                    <Clipboard className="h-4 w-4" />
+                  </button>
+                </div>
+              </Field>
+              <button
+                onClick={() => void testWebhook()}
+                disabled={!soul.channels.webhookUrl || busy}
+                className="mt-6 inline-flex items-center gap-2 rounded-xl border border-[#dfe0dc] px-4 py-2.5 text-sm font-semibold hover:bg-[#f5f5f3] disabled:opacity-40"
+              >
+                <Webhook className="h-4 w-4" />
+                Send test event
+              </button>
+              <div className="mt-6 rounded-xl bg-[#f3f5f0] p-4 text-sm leading-6 text-[#62675f]">
+                Events include a timestamp, unique event ID, idempotency key, and HMAC-SHA256
+                signature.
+              </div>
+            </Card>
+          )}
         </div>
       )}
     </Page>
@@ -3986,9 +4122,13 @@ function HelpView() {
 function ProfileWorkspaceView({
   workspace,
   onWorkspaceNameChange,
+  billingOnly = false,
+  onPlanChange,
 }: {
   workspace: SoulWorkspace;
   onWorkspaceNameChange: (name: string) => void;
+  billingOnly?: boolean;
+  onPlanChange?: (plan: BillingPlan) => void;
 }) {
   const session = authClient.useSession();
   const user = session.data?.user;
@@ -4009,12 +4149,13 @@ function ProfileWorkspaceView({
   const [billingNotice, setBillingNotice] = useState("");
   const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
 
-  async function loadBilling() {
+  const loadBilling = useCallback(async () => {
     try {
       const response = await authFetch("/api/billing/summary", { cache: "no-store" });
       if (!response.ok) throw new Error("Billing details could not be loaded.");
       const summary = (await response.json()) as BillingSummaryResponse;
       setBilling(summary);
+      onPlanChange?.(summary.plan);
       if (summary.subscription?.id) {
         const invoiceResponse = await authFetch(
           `/api/billing/invoices?subscriptionId=${encodeURIComponent(summary.subscription.id)}`,
@@ -4032,11 +4173,11 @@ function ProfileWorkspaceView({
         error instanceof Error ? error.message : "Billing details could not be loaded.",
       );
     }
-  }
+  }, [onPlanChange]);
 
   useEffect(() => {
     void loadBilling();
-  }, []);
+  }, [loadBilling]);
 
   async function beginCheckout(planId: BillingPlanId) {
     if (planId === "free" || planId === "enterprise") return;
@@ -4158,41 +4299,57 @@ function ProfileWorkspaceView({
   }
 
   return (
-    <Page title="Profile and workspace" description="Your account, plan, and workspace." hideHeader>
-      <div className="grid min-h-[calc(100vh-64px)] lg:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="min-w-0 lg:border-r lg:border-[#e5e6e2]">
-          <Card>
-            <SectionHeading title="Profile" description="The person who owns this workspace." />
-            <div className="mt-6 flex items-center gap-4">
-              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#20221f] font-semibold text-white">
-                {initials || "O"}
-              </span>
-              <div>
-                <p className="font-semibold">{displayName}</p>
-                <p className="mt-1 text-sm text-[#777b74]">Authenticated workspace owner</p>
+    <Page
+      title={billingOnly ? "Plans and billing" : "Profile and workspace"}
+      description={
+        billingOnly
+          ? "Manage capacity, usage, invoices, and your subscription."
+          : "Manage your account and workspace."
+      }
+      hideHeader
+    >
+      <div
+        className={
+          billingOnly
+            ? "mx-auto max-w-6xl px-5 py-8 sm:px-8 lg:px-10"
+            : "grid min-h-[calc(100vh-64px)] lg:grid-cols-[minmax(0,1fr)_380px]"
+        }
+      >
+        {!billingOnly && (
+          <div className="min-w-0 lg:border-r lg:border-[#e5e6e2]">
+            <Card>
+              <SectionHeading title="Profile" description="The person who owns this workspace." />
+              <div className="mt-6 flex items-center gap-4">
+                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#20221f] font-semibold text-white">
+                  {initials || "O"}
+                </span>
+                <div>
+                  <p className="font-semibold">{displayName}</p>
+                  <p className="mt-1 text-sm text-[#777b74]">Authenticated workspace owner</p>
+                </div>
               </div>
-            </div>
-            <div className="mt-6 grid gap-5 sm:grid-cols-2">
-              <Field label="Display name">
-                <input value={displayName} readOnly className="clean-input" />
+              <div className="mt-6 grid gap-5 sm:grid-cols-2">
+                <Field label="Display name">
+                  <input value={displayName} readOnly className="clean-input" />
+                </Field>
+                <Field label="Email">
+                  <input value={user?.email ?? ""} readOnly className="clean-input" />
+                </Field>
+              </div>
+            </Card>
+            <Card>
+              <SectionHeading title="Workspace" description="The shared home for your websites." />
+              <Field label="Workspace name" className="mt-5">
+                <input
+                  value={workspace.name}
+                  onChange={(event) => onWorkspaceNameChange(event.target.value)}
+                  className="clean-input"
+                />
               </Field>
-              <Field label="Email">
-                <input value={user?.email ?? ""} readOnly className="clean-input" />
-              </Field>
-            </div>
-          </Card>
-          <Card>
-            <SectionHeading title="Workspace" description="The shared home for your websites." />
-            <Field label="Workspace name" className="mt-5">
-              <input
-                value={workspace.name}
-                onChange={(event) => onWorkspaceNameChange(event.target.value)}
-                className="clean-input"
-              />
-            </Field>
-          </Card>
-        </div>
-        <div className="min-w-0 bg-[#fafaf8]">
+            </Card>
+          </div>
+        )}
+        <div className={billingOnly ? "min-w-0" : "min-w-0 bg-[#fafaf8]"}>
           <Card>
             <div className="flex items-center justify-between gap-4">
               <div>
@@ -4276,70 +4433,72 @@ function ProfileWorkspaceView({
           </Card>
         </div>
       </div>
-      <div className="border-t border-[#e5e6e2] bg-[#fafaf8] px-5 py-8 sm:px-8 lg:px-10">
-        <div className="mx-auto max-w-6xl">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#c23d58]">
-                Plans
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight">
-                Pay for the capacity you need.
-              </h2>
-              <p className="mt-2 text-sm text-[#747870]">
-                Final checkout prices with hard limits—no surprise usage bill.
-              </p>
+      {billingOnly && (
+        <div className="border-t border-[#e5e6e2] bg-[#fafaf8] px-5 py-8 sm:px-8 lg:px-10">
+          <div className="mx-auto max-w-6xl">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#c23d58]">
+                  Plans
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight">
+                  Pay for the capacity you need.
+                </h2>
+                <p className="mt-2 text-sm text-[#747870]">
+                  Final checkout prices with hard limits—no surprise usage bill.
+                </p>
+              </div>
+              <div className="flex rounded-full border border-[#dfe1dc] bg-white p-1 text-sm">
+                {(["monthly", "annual"] as const).map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setCycle(value)}
+                    className={`rounded-full px-4 py-2 font-medium capitalize ${cycle === value ? "bg-[#20221f] text-white" : "text-[#70756d]"}`}
+                  >
+                    {value}
+                    {value === "annual" ? " · save 15%" : ""}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="flex rounded-full border border-[#dfe1dc] bg-white p-1 text-sm">
-              {(["monthly", "annual"] as const).map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setCycle(value)}
-                  className={`rounded-full px-4 py-2 font-medium capitalize ${cycle === value ? "bg-[#20221f] text-white" : "text-[#70756d]"}`}
-                >
-                  {value}
-                  {value === "annual" ? " · save 15%" : ""}
-                </button>
+            {billingNotice && (
+              <p className="mt-5 rounded-xl bg-[#fff1f4] px-4 py-3 text-sm text-[#8d2f44]">
+                {billingNotice}
+              </p>
+            )}
+            <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {SELF_SERVE_PLAN_IDS.map((planId) => (
+                <PlanCard
+                  key={planId}
+                  plan={BILLING_PLANS[planId]}
+                  cycle={cycle}
+                  current={
+                    billing?.plan.id === planId &&
+                    (planId === "free" || billing.subscription?.cycle === cycle)
+                  }
+                  busy={billingBusy === planId}
+                  onChoose={() => void beginCheckout(planId)}
+                />
               ))}
             </div>
-          </div>
-          {billingNotice && (
-            <p className="mt-5 rounded-xl bg-[#fff1f4] px-4 py-3 text-sm text-[#8d2f44]">
-              {billingNotice}
-            </p>
-          )}
-          <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {SELF_SERVE_PLAN_IDS.map((planId) => (
-              <PlanCard
-                key={planId}
-                plan={BILLING_PLANS[planId]}
-                cycle={cycle}
-                current={
-                  billing?.plan.id === planId &&
-                  (planId === "free" || billing.subscription?.cycle === cycle)
-                }
-                busy={billingBusy === planId}
-                onChoose={() => void beginCheckout(planId)}
-              />
-            ))}
-          </div>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#20221f] px-5 py-4 text-white">
-            <div>
-              <p className="font-semibold">Enterprise</p>
-              <p className="mt-0.5 text-sm text-white/60">
-                Committed capacity, SSO, private deployments, and an SLA.
-              </p>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#20221f] px-5 py-4 text-white">
+              <div>
+                <p className="font-semibold">Enterprise</p>
+                <p className="mt-0.5 text-sm text-white/60">
+                  Committed capacity, SSO, private deployments, and an SLA.
+                </p>
+              </div>
+              <a
+                href="mailto:flamki@obseri.com?subject=Obseri%20Enterprise"
+                className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#20221f]"
+              >
+                Contact sales
+              </a>
             </div>
-            <a
-              href="mailto:flamki@obseri.com?subject=Obseri%20Enterprise"
-              className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#20221f]"
-            >
-              Contact sales
-            </a>
           </div>
         </div>
-      </div>
+      )}
     </Page>
   );
 }
@@ -4423,6 +4582,12 @@ function PlanCard({
         <p>{plan.limits.indexedPages?.toLocaleString("en-IN")} indexed pages</p>
         <p>{plan.limits.textResponsesPerMonth?.toLocaleString("en-IN")} text responses</p>
         <p>{plan.limits.voiceMinutesPerMonth} voice minutes</p>
+        <p>{plan.limits.retentionDays?.toLocaleString("en-IN")} days conversation history</p>
+        <p>
+          {billingPlanIncludesFeature(plan.id, "webhooks")
+            ? "Signed webhooks included"
+            : "Website widget included"}
+        </p>
       </div>
       <button
         type="button"
@@ -4567,12 +4732,19 @@ function CreateSoulDialog({
   const [name, setName] = useState("");
   const [url, setUrl] = useState(initialUrl);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!url.trim()) return;
     setBusy(true);
-    await onCreate({ name, url });
-    setBusy(false);
+    setError("");
+    try {
+      await onCreate({ name, url });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "This website could not be added.");
+    } finally {
+      setBusy(false);
+    }
   }
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm">
@@ -4613,6 +4785,9 @@ function CreateSoulDialog({
             className="clean-input"
           />
         </Field>
+        {error && (
+          <p className="mt-5 rounded-xl bg-[#fff1f4] px-4 py-3 text-sm text-[#8d2f44]">{error}</p>
+        )}
         <button
           disabled={!url.trim() || busy}
           className="mt-7 flex w-full items-center justify-center gap-2 rounded-xl bg-[#1d1f1c] px-4 py-3 text-sm font-semibold text-white disabled:opacity-40"
@@ -5110,11 +5285,9 @@ const DEMO_SOUL: Soul = {
     webhookEnabled: false,
     allowedDomains: ["obseri.com"],
     webhookUrl: "",
-    webhookSecret: "whsec_demo_only_replace_in_production",
-    publishKey:
-      "obspub_demo_only_replace_in_production_0000000000000000000000000000000000000000000000000000000000000000",
-    widgetToken:
-      "obswgt_demo_only_replace_in_production_0000000000000000000000000000000000000000000000000000000000000000",
+    webhookSecret: "",
+    publishKey: "",
+    widgetToken: "",
   },
   conversations: [],
 };

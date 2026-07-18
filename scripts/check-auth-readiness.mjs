@@ -1,7 +1,6 @@
 import postgres from "postgres";
 
-const connectionString =
-  process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL;
+const connectionString = process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL;
 
 if (!connectionString) {
   throw new Error("DATABASE_URL_UNPOOLED or DATABASE_URL is required");
@@ -75,9 +74,7 @@ try {
     const regionIndex = hostParts.findIndex((part) => /^c-\d+$/.test(part)) + 1;
     const region = hostParts[regionIndex];
     const authHosts = [
-      cell && region
-        ? `${endpointId}.neonauth.${cell}.${region}.aws.neon.tech`
-        : null,
+      cell && region ? `${endpointId}.neonauth.${cell}.${region}.aws.neon.tech` : null,
       region ? `${endpointId}.neonauth.${region}.aws.neon.tech` : null,
     ].filter(Boolean);
 

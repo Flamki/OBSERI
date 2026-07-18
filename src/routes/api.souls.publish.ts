@@ -15,7 +15,29 @@ export const Route = createFileRoute("/api/souls/publish")({
           const user = await requireUser(request);
           const value = (await request.json()) as Partial<Soul>;
           const workspace = await readUserWorkspace(user.id);
-          if (workspace) await assertWorkspaceWithinPlan(user.id, workspace);
+          if (
+            !workspace ||
+            typeof value.id !== "string" ||
+            !value.knowledge ||
+            !Array.isArray(value.knowledge.pages)
+          ) {
+            return responseError("Save this website in Soul Studio before publishing it.", 409);
+          }
+          const savedSoul = workspace.souls.find((candidate) => candidate.id === value.id);
+          if (!savedSoul)
+            return responseError("This website does not belong to your workspace.", 403);
+          if (
+            savedSoul.channels.publishKey !== request.headers.get("x-obseri-publish-key") ||
+            savedSoul.channels.widgetToken !== value.channels?.widgetToken
+          ) {
+            return responseError("The publish credentials do not match this website.", 403);
+          }
+          await assertWorkspaceWithinPlan(user.id, {
+            ...workspace,
+            souls: workspace.souls.map((candidate) =>
+              candidate.id === value.id ? (value as Soul) : candidate,
+            ),
+          });
           if (value.channels?.webhookEnabled) await assertPlanFeature(user.id, "webhooks");
           const record = await publishSoul({
             value,
