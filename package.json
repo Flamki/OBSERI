@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "auth:check": "node scripts/check-auth-readiness.mjs",
+    "billing:setup": "node scripts/setup-razorpay-plans.mjs",
     "db:migrate:production": "node scripts/migrate-production.mjs",
     "dev": "vite dev",
     "build": "vite build",

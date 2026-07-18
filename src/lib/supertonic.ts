@@ -5,6 +5,7 @@
  * pinned Hugging Face revision is immutable, so normal browser/CDN caching can
  * safely reuse the large model files between calls and sessions.
  */
+import { authFetch } from "@/lib/auth-client";
 
 export const SUPERTONIC_MODEL_REVISION = "3cadd1ee6394adea1bd021217a0e650ede09a323";
 
@@ -136,6 +137,7 @@ export async function synthesizeSupertonic(
     language?: string;
     speed?: number;
     qualitySteps?: number;
+    soulId?: string;
     onProgress?: (stage: SupertonicLoadStage) => void;
   } = {},
 ) {
@@ -182,6 +184,7 @@ export function fetchSupertonicAudio(
     language: normalizeLanguage(options.language),
     speed: options.speed ?? 1.03,
     qualitySteps: Math.min(8, Math.max(2, options.qualitySteps ?? 4)),
+    soulId: options.soulId,
   };
   const cacheKey = JSON.stringify(request);
   const cached = cloudAudioCache.get(cacheKey);
@@ -191,6 +194,7 @@ export function fetchSupertonicAudio(
     throw error;
   });
   cloudAudioCache.set(cacheKey, audio);
+  void audio.finally(() => cloudAudioCache.delete(cacheKey));
   while (cloudAudioCache.size > CLOUD_AUDIO_CACHE_LIMIT) {
     const oldest = cloudAudioCache.keys().next().value;
     if (typeof oldest !== "string") break;
@@ -231,8 +235,9 @@ async function fetchCloudSupertonic(request: {
   language: string;
   speed: number;
   qualitySteps: number;
+  soulId?: string;
 }) {
-  const response = await fetch("/api/voice/speak", {
+  const response = await authFetch("/api/voice/speak", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -242,6 +247,7 @@ async function fetchCloudSupertonic(request: {
       language: request.language,
       speed: request.speed,
       qualitySteps: request.qualitySteps,
+      soulId: request.soulId,
     }),
     // A live call must fail over quickly instead of leaving dead air. A warm
     // regional service should answer well inside this ceiling.

@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { publishSoul } from "@/lib/published-souls";
 import type { Soul } from "@/lib/soul";
 import { requireUser } from "@/lib/user-auth";
+import { assertPlanFeature, assertWorkspaceWithinPlan } from "@/lib/billing-store";
+import { readUserWorkspace } from "@/lib/user-workspace-store";
 
 export const Route = createFileRoute("/api/souls/publish")({
   server: {
@@ -12,6 +14,9 @@ export const Route = createFileRoute("/api/souls/publish")({
           if (length > 900_000) return responseError("Soul payload is too large.", 413);
           const user = await requireUser(request);
           const value = (await request.json()) as Partial<Soul>;
+          const workspace = await readUserWorkspace(user.id);
+          if (workspace) await assertWorkspaceWithinPlan(user.id, workspace);
+          if (value.channels?.webhookEnabled) await assertPlanFeature(user.id, "webhooks");
           const record = await publishSoul({
             value,
             ownerKey: request.headers.get("x-obseri-publish-key") ?? "",

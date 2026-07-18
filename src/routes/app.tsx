@@ -10,6 +10,7 @@ import {
   CircleHelp,
   Clipboard,
   Code2,
+  CreditCard,
   Download,
   ExternalLink,
   FileText,
@@ -64,6 +65,30 @@ import {
   type SupertonicVoiceId,
 } from "@/lib/supertonic";
 import { authClient, authFetch } from "@/lib/auth-client";
+import {
+  BILLING_PLANS,
+  SELF_SERVE_PLAN_IDS,
+  formatInr,
+  type BillingPlan,
+  type BillingPlanId,
+} from "@/lib/billing-plans";
+
+type RazorpayCheckoutResponse = {
+  razorpay_payment_id: string;
+  razorpay_subscription_id: string;
+  razorpay_signature: string;
+};
+
+type RazorpayCheckout = {
+  open: () => void;
+  on: (event: string, handler: (response: unknown) => void) => void;
+};
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => RazorpayCheckout;
+  }
+}
 
 export const Route = createFileRoute("/app")({
   head: () => ({
@@ -1089,7 +1114,7 @@ function ProfileMenu({
       </div>
       <div className="rounded-xl border border-[#e5e6e2] bg-[#fafaf8] p-3">
         <div className="flex items-center justify-between">
-          <span className="text-xs text-[#73776f]">Founder plan</span>
+          <span className="text-xs text-[#73776f]">Plan and usage</span>
           <span className="rounded-md bg-[#20221f] px-2 py-1 text-xs font-semibold text-white">
             Active
           </span>
@@ -1104,7 +1129,7 @@ function ProfileMenu({
       <div className="my-2 h-px bg-[#ecece9]" />
       <MenuRow
         icon={<UserRound />}
-        label="Profile and workspace"
+        label="Profile, workspace and billing"
         onClick={() => onNavigate("profile")}
       />
       <MenuRow icon={<Settings />} label="Settings" onClick={() => onNavigate("settings")} />
@@ -3978,6 +4003,159 @@ function ProfileWorkspaceView({
     (total, workspaceSoul) => total + workspaceSoul.knowledge.pages.length,
     0,
   );
+  const [billing, setBilling] = useState<BillingSummaryResponse | null>(null);
+  const [cycle, setCycle] = useState<"monthly" | "annual">("monthly");
+  const [billingBusy, setBillingBusy] = useState<BillingPlanId | "cancel" | null>(null);
+  const [billingNotice, setBillingNotice] = useState("");
+  const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
+
+  async function loadBilling() {
+    try {
+      const response = await authFetch("/api/billing/summary", { cache: "no-store" });
+      if (!response.ok) throw new Error("Billing details could not be loaded.");
+      const summary = (await response.json()) as BillingSummaryResponse;
+      setBilling(summary);
+      if (summary.subscription?.id) {
+        const invoiceResponse = await authFetch(
+          `/api/billing/invoices?subscriptionId=${encodeURIComponent(summary.subscription.id)}`,
+          { cache: "no-store" },
+        );
+        if (invoiceResponse.ok) {
+          const payload = (await invoiceResponse.json()) as { invoices?: BillingInvoice[] };
+          setInvoices(payload.invoices ?? []);
+        }
+      } else {
+        setInvoices([]);
+      }
+    } catch (error) {
+      setBillingNotice(
+        error instanceof Error ? error.message : "Billing details could not be loaded.",
+      );
+    }
+  }
+
+  useEffect(() => {
+    void loadBilling();
+  }, []);
+
+  async function beginCheckout(planId: BillingPlanId) {
+    if (planId === "free" || planId === "enterprise") return;
+    setBillingBusy(planId);
+    setBillingNotice("");
+    try {
+      if (
+        billing?.subscription &&
+        ["active", "authenticated"].includes(billing.subscription.status)
+      ) {
+        if (billing.subscription.cancelAtPeriodEnd) {
+          throw new Error(
+            "This subscription is scheduled to end. Contact support to restore or change it.",
+          );
+        }
+        const plan = BILLING_PLANS[planId];
+        const confirmed = window.confirm(
+          `Change to ${plan.name} ${cycle} now? Razorpay will calculate any prorated charge or refund.`,
+        );
+        if (!confirmed) {
+          setBillingBusy(null);
+          return;
+        }
+        const change = await authFetch("/api/billing/change", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            subscriptionId: billing.subscription.id,
+            planId,
+            cycle,
+          }),
+        });
+        const payload = (await change.json().catch(() => null)) as {
+          error?: { message?: string };
+        } | null;
+        if (!change.ok)
+          throw new Error(payload?.error?.message || "The plan could not be changed.");
+        await loadBilling();
+        setBillingNotice(`Your plan is now ${plan.name}.`);
+        setBillingBusy(null);
+        return;
+      }
+      await loadRazorpayScript();
+      const response = await authFetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ planId, cycle }),
+      });
+      const payload = (await response.json()) as {
+        checkout?: {
+          keyId: string;
+          subscriptionId: string;
+          name: string;
+          description: string;
+          email: string;
+        };
+        error?: { message?: string };
+      };
+      if (!response.ok || !payload.checkout) {
+        throw new Error(payload.error?.message || "Checkout could not be started.");
+      }
+      if (!window.Razorpay) throw new Error("Secure checkout did not load.");
+      const checkout = new window.Razorpay({
+        key: payload.checkout.keyId,
+        subscription_id: payload.checkout.subscriptionId,
+        name: payload.checkout.name,
+        description: payload.checkout.description,
+        image: `${window.location.origin}/obseri-pulse-mark.svg`,
+        prefill: { email: payload.checkout.email },
+        theme: { color: "#ff5c7a" },
+        modal: { ondismiss: () => setBillingBusy(null) },
+        handler: async (result: RazorpayCheckoutResponse) => {
+          const confirmation = await authFetch("/api/billing/confirm", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(result),
+          });
+          if (!confirmation.ok)
+            throw new Error("Payment was received but confirmation is pending.");
+          await loadBilling();
+          setBillingNotice("Your plan is active.");
+          setBillingBusy(null);
+        },
+      });
+      checkout.on("payment.failed", () => {
+        setBillingNotice("Payment was not completed. No plan change was made.");
+        setBillingBusy(null);
+      });
+      checkout.open();
+    } catch (error) {
+      setBillingNotice(error instanceof Error ? error.message : "Checkout could not be started.");
+      setBillingBusy(null);
+    }
+  }
+
+  async function cancelSubscription() {
+    if (!billing?.subscription?.id) return;
+    setBillingBusy("cancel");
+    setBillingNotice("");
+    try {
+      const response = await authFetch("/api/billing/cancel", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ subscriptionId: billing.subscription.id }),
+      });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as {
+          error?: { message?: string };
+        } | null;
+        throw new Error(payload?.error?.message || "Cancellation could not be scheduled.");
+      }
+      await loadBilling();
+      setBillingNotice("Cancellation is scheduled for the end of this billing period.");
+    } catch (error) {
+      setBillingNotice(error instanceof Error ? error.message : "Cancellation failed.");
+    } finally {
+      setBillingBusy(null);
+    }
+  }
 
   return (
     <Page title="Profile and workspace" description="Your account, plan, and workspace." hideHeader>
@@ -4018,11 +4196,15 @@ function ProfileWorkspaceView({
           <Card>
             <div className="flex items-center justify-between gap-4">
               <div>
-                <h3 className="font-semibold">Founder plan</h3>
-                <p className="mt-1 text-sm text-[#747870]">Workspace access</p>
+                <h3 className="font-semibold">{billing?.plan.name ?? "Free"} plan</h3>
+                <p className="mt-1 text-sm text-[#747870]">
+                  {billing?.subscription?.currentPeriodEnd
+                    ? `${billing.subscription.cancelAtPeriodEnd ? "Ends" : "Renews"} ${new Date(billing.subscription.currentPeriodEnd).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`
+                    : "No payment method required"}
+                </p>
               </div>
               <span className="rounded-lg bg-[#20221f] px-3 py-1.5 text-xs font-semibold text-white">
-                Active
+                {billing?.subscription?.status === "active" ? "Active" : "Free"}
               </span>
             </div>
             <div className="mt-6 grid grid-cols-2 gap-3">
@@ -4035,11 +4217,243 @@ function ProfileWorkspaceView({
                 <p className="mt-1 text-xs text-[#777b74]">Pages learned</p>
               </div>
             </div>
+            <UsageBar
+              label="Text responses"
+              value={billing?.usage.textResponses ?? 0}
+              limit={billing?.plan.limits.textResponsesPerMonth ?? null}
+            />
+            <UsageBar
+              label="Voice minutes"
+              value={Math.ceil((billing?.usage.voiceSeconds ?? 0) / 60)}
+              limit={billing?.plan.limits.voiceMinutesPerMonth ?? null}
+            />
+            {billing?.subscription?.status === "active" &&
+              !billing.subscription.cancelAtPeriodEnd && (
+                <button
+                  type="button"
+                  onClick={() => void cancelSubscription()}
+                  disabled={billingBusy !== null}
+                  className="mt-5 text-xs font-medium text-[#777b74] underline underline-offset-4 hover:text-[#20221f] disabled:opacity-50"
+                >
+                  {billingBusy === "cancel" ? "Scheduling…" : "Cancel at period end"}
+                </button>
+              )}
+            {invoices.length > 0 && (
+              <div className="mt-6 border-t border-[#e5e6e2] pt-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#777b74]">
+                  Invoices
+                </p>
+                <div className="mt-3 space-y-2">
+                  {invoices.slice(0, 3).map((invoice) => (
+                    <a
+                      key={invoice.id}
+                      href={invoice.url ?? undefined}
+                      target={invoice.url ? "_blank" : undefined}
+                      rel={invoice.url ? "noreferrer" : undefined}
+                      className={`flex items-center justify-between rounded-xl bg-[#f3f4f1] px-3 py-2.5 text-xs ${invoice.url ? "hover:bg-[#eceee9]" : "cursor-default"}`}
+                    >
+                      <span>
+                        <span className="block font-medium text-[#353934]">
+                          {invoice.paidAt || invoice.issuedAt
+                            ? new Date(invoice.paidAt ?? invoice.issuedAt ?? "").toLocaleDateString(
+                                "en-IN",
+                                { day: "numeric", month: "short", year: "numeric" },
+                              )
+                            : invoice.number}
+                        </span>
+                        <span className="mt-0.5 block capitalize text-[#7b7f78]">
+                          {invoice.status.replaceAll("_", " ")}
+                        </span>
+                      </span>
+                      <span className="font-semibold text-[#353934]">
+                        {formatInr(invoice.amountPaise)}
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </Card>
+        </div>
+      </div>
+      <div className="border-t border-[#e5e6e2] bg-[#fafaf8] px-5 py-8 sm:px-8 lg:px-10">
+        <div className="mx-auto max-w-6xl">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#c23d58]">
+                Plans
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight">
+                Pay for the capacity you need.
+              </h2>
+              <p className="mt-2 text-sm text-[#747870]">
+                Final checkout prices with hard limits—no surprise usage bill.
+              </p>
+            </div>
+            <div className="flex rounded-full border border-[#dfe1dc] bg-white p-1 text-sm">
+              {(["monthly", "annual"] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setCycle(value)}
+                  className={`rounded-full px-4 py-2 font-medium capitalize ${cycle === value ? "bg-[#20221f] text-white" : "text-[#70756d]"}`}
+                >
+                  {value}
+                  {value === "annual" ? " · save 15%" : ""}
+                </button>
+              ))}
+            </div>
+          </div>
+          {billingNotice && (
+            <p className="mt-5 rounded-xl bg-[#fff1f4] px-4 py-3 text-sm text-[#8d2f44]">
+              {billingNotice}
+            </p>
+          )}
+          <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {SELF_SERVE_PLAN_IDS.map((planId) => (
+              <PlanCard
+                key={planId}
+                plan={BILLING_PLANS[planId]}
+                cycle={cycle}
+                current={
+                  billing?.plan.id === planId &&
+                  (planId === "free" || billing.subscription?.cycle === cycle)
+                }
+                busy={billingBusy === planId}
+                onChoose={() => void beginCheckout(planId)}
+              />
+            ))}
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#20221f] px-5 py-4 text-white">
+            <div>
+              <p className="font-semibold">Enterprise</p>
+              <p className="mt-0.5 text-sm text-white/60">
+                Committed capacity, SSO, private deployments, and an SLA.
+              </p>
+            </div>
+            <a
+              href="mailto:flamki@obseri.com?subject=Obseri%20Enterprise"
+              className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#20221f]"
+            >
+              Contact sales
+            </a>
+          </div>
         </div>
       </div>
     </Page>
   );
+}
+
+type BillingSummaryResponse = {
+  plan: BillingPlan;
+  subscription: {
+    id: string;
+    status: string;
+    cycle: string;
+    currentPeriodEnd: string | null;
+    cancelAtPeriodEnd: boolean;
+  } | null;
+  usage: { textResponses: number; voiceSeconds: number };
+};
+
+type BillingInvoice = {
+  id: string;
+  number: string;
+  status: string;
+  amountPaise: number;
+  issuedAt: string | null;
+  paidAt: string | null;
+  url: string | null;
+};
+
+function UsageBar({ label, value, limit }: { label: string; value: number; limit: number | null }) {
+  const percentage = limit ? Math.min(100, Math.round((value / limit) * 100)) : 0;
+  return (
+    <div className="mt-5">
+      <div className="flex items-center justify-between text-xs">
+        <span className="font-medium text-[#555a53]">{label}</span>
+        <span className="text-[#7b7f78]">
+          {value.toLocaleString("en-IN")} / {limit?.toLocaleString("en-IN") ?? "Custom"}
+        </span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e7e9e4]">
+        <div className="h-full rounded-full bg-[#ff5c7a]" style={{ width: `${percentage}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function PlanCard({
+  plan,
+  cycle,
+  current,
+  busy,
+  onChoose,
+}: {
+  plan: BillingPlan;
+  cycle: "monthly" | "annual";
+  current: boolean;
+  busy: boolean;
+  onChoose: () => void;
+}) {
+  const total = cycle === "annual" ? plan.annualPriceInrPaise : plan.monthlyPriceInrPaise;
+  const display =
+    total === null ? "Custom" : formatInr(cycle === "annual" ? Math.round(total / 12) : total);
+  return (
+    <div
+      className={`flex min-h-[280px] flex-col rounded-2xl border bg-white p-5 ${plan.highlighted ? "border-[#ff8ba0] shadow-[0_12px_35px_rgba(255,92,122,.10)]" : "border-[#e1e3de]"}`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="font-semibold">{plan.name}</h3>
+        {plan.highlighted && (
+          <span className="rounded-full bg-[#fff0f3] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#b53851]">
+            Popular
+          </span>
+        )}
+      </div>
+      <p className="mt-3 text-2xl font-semibold tracking-tight">
+        {display}
+        <span className="text-xs font-normal text-[#7b7f78]">{total ? "/mo" : ""}</span>
+      </p>
+      <p className="mt-2 min-h-10 text-sm text-[#747870]">{plan.description}</p>
+      <div className="mt-4 space-y-2 text-xs text-[#555a53]">
+        <p>
+          {plan.limits.websites} {plan.limits.websites === 1 ? "website" : "websites"}
+        </p>
+        <p>{plan.limits.indexedPages?.toLocaleString("en-IN")} indexed pages</p>
+        <p>{plan.limits.textResponsesPerMonth?.toLocaleString("en-IN")} text responses</p>
+        <p>{plan.limits.voiceMinutesPerMonth} voice minutes</p>
+      </div>
+      <button
+        type="button"
+        onClick={onChoose}
+        disabled={current || busy || plan.id === "free"}
+        className={`mt-auto rounded-xl px-4 py-3 text-sm font-semibold transition disabled:cursor-default ${current ? "bg-[#eef0eb] text-[#777c74]" : plan.id === "free" ? "bg-[#f3f4f1] text-[#777c74]" : "bg-[#20221f] text-white hover:bg-black disabled:opacity-60"}`}
+      >
+        {current
+          ? "Current plan"
+          : busy
+            ? "Opening checkout…"
+            : plan.id === "free"
+              ? "Included"
+              : `Choose ${plan.name}`}
+      </button>
+    </div>
+  );
+}
+
+let razorpayScriptPromise: Promise<void> | null = null;
+function loadRazorpayScript() {
+  if (window.Razorpay) return Promise.resolve();
+  razorpayScriptPromise ??= new Promise<void>((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Secure checkout could not be loaded."));
+    document.head.appendChild(script);
+  });
+  return razorpayScriptPromise;
 }
 
 function SettingsView({

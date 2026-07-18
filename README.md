@@ -26,7 +26,7 @@ self-serve customers.
 | -------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Landing experience               | Done and live                        | Responsive premium landing page with optimized WebGL effects and quick-start URL entry                                                                                   |
 | Soul Studio                      | Done and live                        | Knowledge, personality, voice, live website simulation, integration, conversations, and settings in one workspace                                                        |
-| Authentication                   | Done and live                        | Neon Auth email/password and Google OAuth, project-scoped Ed25519 JWT verification, real sign-out, and protected owner APIs                                               |
+| Authentication                   | Done and live                        | Neon Auth email/password and Google OAuth, project-scoped Ed25519 JWT verification, real sign-out, and protected owner APIs                                              |
 | Visitor experience simulator     | Done and live                        | Renders the website behind the real assistant with desktop, tablet, mobile, theme, launcher, accent, and placement controls                                              |
 | Website ingestion                | Done and live                        | Same-origin discovery, robots and sitemap support, bounded depth/page limits, canonicalization, deduplication, revisions, refresh validators, and visible crawl progress |
 | Retrieval and chat               | Done and live                        | Source-grounded answers, visible citations, deterministic fallback, and an OpenAI-compatible hosted provider                                                             |
@@ -39,7 +39,7 @@ self-serve customers.
 | Public Voicebox service          | Waiting on infrastructure            | Requires a public GPU worker; unavailable voices fail clearly instead of substituting a different speaker                                                                |
 | Widget integration               | Code complete, provisioning required | Per-Soul publisher keys, opaque widget tokens, short-lived signed sessions, origin allowlists, durable rate limits, and a responsive isolated loader                     |
 | Webhooks                         | Code complete, provisioning required | Encrypted secrets, authenticated tests, DNS/private-network checks, durable delivery jobs, exponential retries, HMAC-SHA256 signatures, timestamps, and idempotency keys |
-| Production schema                | Done and live                        | Neon Postgres stores per-user Studio workspaces, published Souls, conversations, rate limits, and webhook delivery                                                        |
+| Production schema                | Done and live                        | Neon Postgres stores per-user Studio workspaces, published Souls, conversations, rate limits, and webhook delivery                                                       |
 | Durable accounts and Studio data | Done and live                        | Every authenticated user receives an isolated durable workspace keyed by the verified Neon Auth subject                                                                  |
 | Billing                          | Planned                              | Stripe adapters and self-serve plan enforcement are not connected                                                                                                        |
 | Integration abuse controls       | Done in code                         | Durable rate limiting, publisher authentication, allowed-domain enforcement, signed widget sessions, conversation persistence, and retryable webhook jobs                |
@@ -357,5 +357,6 @@ Before charging customers, also complete:
 5. Add API ownership, rate limits, domain verification, durable queues, and observability.
 6. Run a private pilot before enabling Stripe and self-serve onboarding.
 
-See [architecture](docs/architecture.md) for system boundaries and
-[launch plan](docs/launch-plan.md) for pilot and paid-launch gates.
+See [architecture](docs/architecture.md) for system boundaries,
+[launch plan](docs/launch-plan.md) for pilot and paid-launch gates, and the
+[billing and plan model](docs/billing-and-plans.md) for pricing and usage limits.

@@ -1,8 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import postgres from "postgres";
 
-const connectionString =
-  process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL;
+const connectionString = process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL;
 
 if (!connectionString) {
   throw new Error("DATABASE_URL_UNPOOLED or DATABASE_URL is required");
@@ -31,6 +30,11 @@ try {
     "obseri_rate_limits",
     "obseri_webhook_deliveries",
     "obseri_user_workspaces",
+    "obseri_billing_subscriptions",
+    "obseri_billing_events",
+    "obseri_usage_monthly",
+    "obseri_usage_grants",
+    "obseri_usage_reservations",
   ];
   const rows = await sql`
     select table_name

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { answerSoulQuestion } from "@/lib/conversation";
 import type { ChatRequest } from "@/lib/conversation";
 import { ChatAccessError, resolveChatRequest } from "@/lib/chat-access";
+import { BillingStoreError, finalizeUsage, reserveUsage } from "@/lib/billing-store";
 
 const messageSchema = z.object({
   role: z.enum(["visitor", "assistant"]),
@@ -48,16 +49,28 @@ export const Route = createFileRoute("/api/chat")({
           const parsed = schema.safeParse(await request.json());
           if (!parsed.success)
             return errorResponse("Invalid conversation request.", 400, "invalid_request");
-          const input = await resolveChatRequest(request, parsed.data as ChatRequest);
-          const result = await answerSoulQuestion(input);
-          return Response.json(result, {
-            headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" },
-          });
+          const access = await resolveChatRequest(request, parsed.data as ChatRequest);
+          const reservation = access.ownerUserId
+            ? await reserveUsage(access.ownerUserId, "text_responses", 1)
+            : { reservationId: null };
+          let committed = false;
+          try {
+            const result = await answerSoulQuestion(access.input);
+            await finalizeUsage(reservation.reservationId, true);
+            committed = true;
+            return Response.json(result, {
+              headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" },
+            });
+          } finally {
+            if (!committed) await finalizeUsage(reservation.reservationId, false);
+          }
         } catch (error) {
           if (error instanceof SyntaxError)
             return errorResponse("Request body must be JSON.", 400, "invalid_json");
           if (error instanceof ChatAccessError)
             return errorResponse(error.message, error.status, "chat_access_denied");
+          if (error instanceof BillingStoreError)
+            return errorResponse(error.message, error.status, error.code);
           console.error("soul_chat_failed", error);
           return errorResponse("The soul could not answer right now.", 500, "chat_failed");
         }

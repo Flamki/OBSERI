@@ -3,6 +3,7 @@ import { z } from "zod";
 import { streamSoulVoiceAnswer } from "@/lib/conversation";
 import type { ChatRequest } from "@/lib/conversation";
 import { ChatAccessError, resolveChatRequest } from "@/lib/chat-access";
+import { BillingStoreError, finalizeUsage, reserveUsage } from "@/lib/billing-store";
 
 const messageSchema = z.object({
   role: z.enum(["visitor", "assistant"]),
@@ -47,8 +48,17 @@ export const Route = createFileRoute("/api/chat/stream")({
           const parsed = schema.safeParse(await request.json());
           if (!parsed.success)
             return errorResponse("Invalid conversation request.", 400, "invalid_request");
-          const input = await resolveChatRequest(request, parsed.data as ChatRequest);
-          const result = await streamSoulVoiceAnswer(input);
+          const access = await resolveChatRequest(request, parsed.data as ChatRequest);
+          const reservation = access.ownerUserId
+            ? await reserveUsage(access.ownerUserId, "text_responses", 1)
+            : { reservationId: null };
+          let result: Awaited<ReturnType<typeof streamSoulVoiceAnswer>>;
+          try {
+            result = await streamSoulVoiceAnswer(access.input);
+          } catch (error) {
+            await finalizeUsage(reservation.reservationId, false);
+            throw error;
+          }
           const encoder = new TextEncoder();
           const stream = new ReadableStream<Uint8Array>({
             async start(controller) {
@@ -73,8 +83,10 @@ export const Route = createFileRoute("/api/chat/stream")({
                   );
                 }
                 controller.enqueue(encoder.encode(`${JSON.stringify({ type: "done" })}\n`));
+                await finalizeUsage(reservation.reservationId, true);
                 controller.close();
               } catch (error) {
+                await finalizeUsage(reservation.reservationId, false);
                 controller.enqueue(
                   encoder.encode(
                     `${JSON.stringify({
@@ -102,6 +114,8 @@ export const Route = createFileRoute("/api/chat/stream")({
             return errorResponse("Request body must be JSON.", 400, "invalid_json");
           if (error instanceof ChatAccessError)
             return errorResponse(error.message, error.status, "chat_access_denied");
+          if (error instanceof BillingStoreError)
+            return errorResponse(error.message, error.status, error.code);
           console.error("soul_voice_stream_failed", error);
           return errorResponse("The soul could not answer right now.", 500, "voice_stream_failed");
         }

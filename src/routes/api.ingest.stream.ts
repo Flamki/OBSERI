@@ -3,6 +3,8 @@ import { z } from "zod";
 import { ingestWebsite, type CrawlProgressEvent } from "@/lib/knowledge";
 import { ScanError } from "@/lib/scanner";
 import { requireUser } from "@/lib/user-auth";
+import { readUserWorkspace } from "@/lib/user-workspace-store";
+import { crawlPageAllowance } from "@/lib/billing-store";
 
 const schema = z.object({
   url: z.string().trim().url().max(2_048),
@@ -26,8 +28,9 @@ export const Route = createFileRoute("/api/ingest/stream")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        let ownerUserId: string;
         try {
-          await requireUser(request);
+          ownerUserId = (await requireUser(request)).id;
         } catch (error) {
           const status = typeof error === "object" && error && "status" in error ? Number(error.status) : 401;
           return errorResponse(error instanceof Error ? error.message : "Sign in to continue.", status, "unauthorized");
@@ -47,6 +50,19 @@ export const Route = createFileRoute("/api/ingest/stream")({
             return errorResponse("Request body must be JSON.", 400, "invalid_json");
           throw error;
         }
+
+        const allowance = await crawlPageAllowance(
+          ownerUserId,
+          await readUserWorkspace(ownerUserId),
+          input.url,
+        );
+        if (allowance < 1)
+          return errorResponse(
+            "Your plan's indexed-page capacity is full. Remove pages or upgrade before crawling another website.",
+            402,
+            "indexed_page_limit_reached",
+          );
+        input = { ...input, maxPages: Math.min(input.maxPages, allowance) };
 
         const encoder = new TextEncoder();
         const stream = new ReadableStream<Uint8Array>({

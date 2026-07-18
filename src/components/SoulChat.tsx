@@ -156,6 +156,7 @@ export default function SoulChat({
       language: callLanguage,
       speed: soul.voice.speed,
       qualitySteps: 4,
+      soulId: soul.id,
     }).catch(() => undefined);
   }, [
     voiceMode,
@@ -376,6 +377,7 @@ export default function SoulChat({
             language: callLanguage,
             speed: soul.voice.speed,
             qualitySteps: 2,
+            soulId: soul.id,
           }),
         );
         synthesis = audio.then(
@@ -417,6 +419,7 @@ export default function SoulChat({
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         text,
+        soulId: soul.id,
         profileId: soul.voice.profileId,
         language: callLanguage,
       }),
@@ -583,6 +586,7 @@ export default function SoulChat({
             language: callLanguage,
             speed: soul.voice.speed,
             qualitySteps: 4,
+            soulId: soul.id,
           }).then(playSupertonicAudio)
         : speak(greeting);
     void opening

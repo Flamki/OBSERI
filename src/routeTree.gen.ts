@@ -27,6 +27,13 @@ import { Route as ApiSoulsPublishRouteImport } from './routes/api.souls.publish'
 import { Route as ApiSoulsSoulIdRouteImport } from './routes/api.souls.$soulId'
 import { Route as ApiIngestStreamRouteImport } from './routes/api.ingest.stream'
 import { Route as ApiChatStreamRouteImport } from './routes/api.chat.stream'
+import { Route as ApiBillingWebhookRouteImport } from './routes/api.billing.webhook'
+import { Route as ApiBillingSummaryRouteImport } from './routes/api.billing.summary'
+import { Route as ApiBillingInvoicesRouteImport } from './routes/api.billing.invoices'
+import { Route as ApiBillingConfirmRouteImport } from './routes/api.billing.confirm'
+import { Route as ApiBillingCheckoutRouteImport } from './routes/api.billing.checkout'
+import { Route as ApiBillingChangeRouteImport } from './routes/api.billing.change'
+import { Route as ApiBillingCancelRouteImport } from './routes/api.billing.cancel'
 import { Route as ApiWidgetsSoulIdSessionRouteImport } from './routes/api.widgets.$soulId.session'
 import { Route as ApiSoulsSoulIdEventsRouteImport } from './routes/api.souls.$soulId.events'
 import { Route as ApiInternalWebhooksDrainRouteImport } from './routes/api.internal.webhooks.drain'
@@ -122,6 +129,41 @@ const ApiChatStreamRoute = ApiChatStreamRouteImport.update({
   path: '/stream',
   getParentRoute: () => ApiChatRoute,
 } as any)
+const ApiBillingWebhookRoute = ApiBillingWebhookRouteImport.update({
+  id: '/api/billing/webhook',
+  path: '/api/billing/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingSummaryRoute = ApiBillingSummaryRouteImport.update({
+  id: '/api/billing/summary',
+  path: '/api/billing/summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingInvoicesRoute = ApiBillingInvoicesRouteImport.update({
+  id: '/api/billing/invoices',
+  path: '/api/billing/invoices',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingConfirmRoute = ApiBillingConfirmRouteImport.update({
+  id: '/api/billing/confirm',
+  path: '/api/billing/confirm',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingCheckoutRoute = ApiBillingCheckoutRouteImport.update({
+  id: '/api/billing/checkout',
+  path: '/api/billing/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingChangeRoute = ApiBillingChangeRouteImport.update({
+  id: '/api/billing/change',
+  path: '/api/billing/change',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingCancelRoute = ApiBillingCancelRouteImport.update({
+  id: '/api/billing/cancel',
+  path: '/api/billing/cancel',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiWidgetsSoulIdSessionRoute = ApiWidgetsSoulIdSessionRouteImport.update({
   id: '/api/widgets/$soulId/session',
   path: '/api/widgets/$soulId/session',
@@ -150,6 +192,13 @@ export interface FileRoutesByFullPath {
   '/api/workspace': typeof ApiWorkspaceRoute
   '/auth/$pathname': typeof AuthPathnameRoute
   '/widget/$soulId': typeof WidgetSoulIdRoute
+  '/api/billing/cancel': typeof ApiBillingCancelRoute
+  '/api/billing/change': typeof ApiBillingChangeRoute
+  '/api/billing/checkout': typeof ApiBillingCheckoutRoute
+  '/api/billing/confirm': typeof ApiBillingConfirmRoute
+  '/api/billing/invoices': typeof ApiBillingInvoicesRoute
+  '/api/billing/summary': typeof ApiBillingSummaryRoute
+  '/api/billing/webhook': typeof ApiBillingWebhookRoute
   '/api/chat/stream': typeof ApiChatStreamRoute
   '/api/ingest/stream': typeof ApiIngestStreamRoute
   '/api/souls/$soulId': typeof ApiSoulsSoulIdRouteWithChildren
@@ -173,6 +222,13 @@ export interface FileRoutesByTo {
   '/api/workspace': typeof ApiWorkspaceRoute
   '/auth/$pathname': typeof AuthPathnameRoute
   '/widget/$soulId': typeof WidgetSoulIdRoute
+  '/api/billing/cancel': typeof ApiBillingCancelRoute
+  '/api/billing/change': typeof ApiBillingChangeRoute
+  '/api/billing/checkout': typeof ApiBillingCheckoutRoute
+  '/api/billing/confirm': typeof ApiBillingConfirmRoute
+  '/api/billing/invoices': typeof ApiBillingInvoicesRoute
+  '/api/billing/summary': typeof ApiBillingSummaryRoute
+  '/api/billing/webhook': typeof ApiBillingWebhookRoute
   '/api/chat/stream': typeof ApiChatStreamRoute
   '/api/ingest/stream': typeof ApiIngestStreamRoute
   '/api/souls/$soulId': typeof ApiSoulsSoulIdRouteWithChildren
@@ -197,6 +253,13 @@ export interface FileRoutesById {
   '/api/workspace': typeof ApiWorkspaceRoute
   '/auth/$pathname': typeof AuthPathnameRoute
   '/widget/$soulId': typeof WidgetSoulIdRoute
+  '/api/billing/cancel': typeof ApiBillingCancelRoute
+  '/api/billing/change': typeof ApiBillingChangeRoute
+  '/api/billing/checkout': typeof ApiBillingCheckoutRoute
+  '/api/billing/confirm': typeof ApiBillingConfirmRoute
+  '/api/billing/invoices': typeof ApiBillingInvoicesRoute
+  '/api/billing/summary': typeof ApiBillingSummaryRoute
+  '/api/billing/webhook': typeof ApiBillingWebhookRoute
   '/api/chat/stream': typeof ApiChatStreamRoute
   '/api/ingest/stream': typeof ApiIngestStreamRoute
   '/api/souls/$soulId': typeof ApiSoulsSoulIdRouteWithChildren
@@ -222,6 +285,13 @@ export interface FileRouteTypes {
     | '/api/workspace'
     | '/auth/$pathname'
     | '/widget/$soulId'
+    | '/api/billing/cancel'
+    | '/api/billing/change'
+    | '/api/billing/checkout'
+    | '/api/billing/confirm'
+    | '/api/billing/invoices'
+    | '/api/billing/summary'
+    | '/api/billing/webhook'
     | '/api/chat/stream'
     | '/api/ingest/stream'
     | '/api/souls/$soulId'
@@ -245,6 +315,13 @@ export interface FileRouteTypes {
     | '/api/workspace'
     | '/auth/$pathname'
     | '/widget/$soulId'
+    | '/api/billing/cancel'
+    | '/api/billing/change'
+    | '/api/billing/checkout'
+    | '/api/billing/confirm'
+    | '/api/billing/invoices'
+    | '/api/billing/summary'
+    | '/api/billing/webhook'
     | '/api/chat/stream'
     | '/api/ingest/stream'
     | '/api/souls/$soulId'
@@ -268,6 +345,13 @@ export interface FileRouteTypes {
     | '/api/workspace'
     | '/auth/$pathname'
     | '/widget/$soulId'
+    | '/api/billing/cancel'
+    | '/api/billing/change'
+    | '/api/billing/checkout'
+    | '/api/billing/confirm'
+    | '/api/billing/invoices'
+    | '/api/billing/summary'
+    | '/api/billing/webhook'
     | '/api/chat/stream'
     | '/api/ingest/stream'
     | '/api/souls/$soulId'
@@ -292,6 +376,13 @@ export interface RootRouteChildren {
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   AuthPathnameRoute: typeof AuthPathnameRoute
   WidgetSoulIdRoute: typeof WidgetSoulIdRoute
+  ApiBillingCancelRoute: typeof ApiBillingCancelRoute
+  ApiBillingChangeRoute: typeof ApiBillingChangeRoute
+  ApiBillingCheckoutRoute: typeof ApiBillingCheckoutRoute
+  ApiBillingConfirmRoute: typeof ApiBillingConfirmRoute
+  ApiBillingInvoicesRoute: typeof ApiBillingInvoicesRoute
+  ApiBillingSummaryRoute: typeof ApiBillingSummaryRoute
+  ApiBillingWebhookRoute: typeof ApiBillingWebhookRoute
   ApiSoulsSoulIdRoute: typeof ApiSoulsSoulIdRouteWithChildren
   ApiSoulsPublishRoute: typeof ApiSoulsPublishRoute
   ApiVoiceCloneRoute: typeof ApiVoiceCloneRoute
@@ -430,6 +521,55 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiChatStreamRouteImport
       parentRoute: typeof ApiChatRoute
     }
+    '/api/billing/webhook': {
+      id: '/api/billing/webhook'
+      path: '/api/billing/webhook'
+      fullPath: '/api/billing/webhook'
+      preLoaderRoute: typeof ApiBillingWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/summary': {
+      id: '/api/billing/summary'
+      path: '/api/billing/summary'
+      fullPath: '/api/billing/summary'
+      preLoaderRoute: typeof ApiBillingSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/invoices': {
+      id: '/api/billing/invoices'
+      path: '/api/billing/invoices'
+      fullPath: '/api/billing/invoices'
+      preLoaderRoute: typeof ApiBillingInvoicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/confirm': {
+      id: '/api/billing/confirm'
+      path: '/api/billing/confirm'
+      fullPath: '/api/billing/confirm'
+      preLoaderRoute: typeof ApiBillingConfirmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/checkout': {
+      id: '/api/billing/checkout'
+      path: '/api/billing/checkout'
+      fullPath: '/api/billing/checkout'
+      preLoaderRoute: typeof ApiBillingCheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/change': {
+      id: '/api/billing/change'
+      path: '/api/billing/change'
+      fullPath: '/api/billing/change'
+      preLoaderRoute: typeof ApiBillingChangeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/cancel': {
+      id: '/api/billing/cancel'
+      path: '/api/billing/cancel'
+      fullPath: '/api/billing/cancel'
+      preLoaderRoute: typeof ApiBillingCancelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/widgets/$soulId/session': {
       id: '/api/widgets/$soulId/session'
       path: '/api/widgets/$soulId/session'
@@ -500,6 +640,13 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   AuthPathnameRoute: AuthPathnameRoute,
   WidgetSoulIdRoute: WidgetSoulIdRoute,
+  ApiBillingCancelRoute: ApiBillingCancelRoute,
+  ApiBillingChangeRoute: ApiBillingChangeRoute,
+  ApiBillingCheckoutRoute: ApiBillingCheckoutRoute,
+  ApiBillingConfirmRoute: ApiBillingConfirmRoute,
+  ApiBillingInvoicesRoute: ApiBillingInvoicesRoute,
+  ApiBillingSummaryRoute: ApiBillingSummaryRoute,
+  ApiBillingWebhookRoute: ApiBillingWebhookRoute,
   ApiSoulsSoulIdRoute: ApiSoulsSoulIdRouteWithChildren,
   ApiSoulsPublishRoute: ApiSoulsPublishRoute,
   ApiVoiceCloneRoute: ApiVoiceCloneRoute,

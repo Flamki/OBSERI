@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { requireUser } from "@/lib/user-auth";
 import { readUserWorkspace, saveUserWorkspace } from "@/lib/user-workspace-store";
+import { assertWorkspaceWithinPlan } from "@/lib/billing-store";
+import type { SoulWorkspace } from "@/lib/soul";
 
 export const Route = createFileRoute("/api/workspace")({
   server: {
@@ -21,7 +23,11 @@ export const Route = createFileRoute("/api/workspace")({
           const user = await requireUser(request);
           const length = Number(request.headers.get("content-length") ?? "0");
           if (length > 1_600_000) return apiError(new Error("Workspace payload is too large."), 413);
-          const workspace = await saveUserWorkspace(user.id, await request.json());
+          const value = await request.json();
+          if (value && typeof value === "object" && Array.isArray((value as SoulWorkspace).souls)) {
+            await assertWorkspaceWithinPlan(user.id, value as SoulWorkspace);
+          }
+          const workspace = await saveUserWorkspace(user.id, value);
           return Response.json({ workspace }, { headers: { "cache-control": "no-store" } });
         } catch (error) {
           return apiError(error);

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createWebhookEvent, deliverWebhook } from "@/lib/webhooks";
 import { getPublishedSoulForOwner } from "@/lib/integration-store";
 import { requireUser } from "@/lib/user-auth";
+import { assertPlanFeature } from "@/lib/billing-store";
 
 const schema = z.object({
   soulId: z.string().min(3).max(100),
@@ -14,6 +15,7 @@ export const Route = createFileRoute("/api/webhooks/test")({
       POST: async ({ request }) => {
         try {
           const user = await requireUser(request);
+          await assertPlanFeature(user.id, "webhooks");
           const parsed = schema.safeParse(await request.json());
           if (!parsed.success) return responseError("Choose a valid published soul.", 400);
           const record = await getPublishedSoulForOwner(

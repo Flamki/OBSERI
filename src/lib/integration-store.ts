@@ -6,6 +6,7 @@ import { normalizeAllowedDomains, sha256 } from "@/lib/integration-security";
 
 export type PublishedSoulRecord = {
   soul: Soul;
+  ownerUserId: string;
   publishedAt: string;
   webhook: { enabled: boolean; url: string; secret: string };
 };
@@ -119,6 +120,7 @@ export async function publishSoul(input: {
 
   return {
     soul: publicSoul,
+    ownerUserId: input.ownerUserId,
     publishedAt: now,
     webhook: {
       enabled: source.channels.webhookEnabled,
@@ -145,13 +147,13 @@ export async function getPublishedSoulForOwner(
   const sql = db();
   const rows = ownerUserId
     ? await sql<PublishedRow[]>`
-        select soul, webhook_enabled, webhook_url, webhook_secret, published_at
+        select soul, owner_user_id, webhook_enabled, webhook_url, webhook_secret, published_at
         from obseri_published_souls
         where soul_id = ${soulId} and owner_key_hash = ${sha256(ownerKey)}
           and owner_user_id = ${ownerUserId}
       `
     : await sql<PublishedRow[]>`
-        select soul, webhook_enabled, webhook_url, webhook_secret, published_at
+        select soul, owner_user_id, webhook_enabled, webhook_url, webhook_secret, published_at
         from obseri_published_souls
         where soul_id = ${soulId} and owner_key_hash = ${sha256(ownerKey)}
       `;
@@ -161,7 +163,7 @@ export async function getPublishedSoulForOwner(
 export async function getPublishedSoul(soulId: string): Promise<PublishedSoulRecord | null> {
   const sql = db();
   const rows = await sql<PublishedRow[]>`
-    select soul, webhook_enabled, webhook_url, webhook_secret, published_at
+    select soul, owner_user_id, webhook_enabled, webhook_url, webhook_secret, published_at
     from obseri_published_souls where soul_id = ${soulId} and widget_enabled = true
   `;
   return rowToRecord(rows[0]);
@@ -176,12 +178,12 @@ async function readRecord(
   const rows =
     column === "widget_token_hash"
       ? await sql<PublishedRow[]>`
-          select soul, webhook_enabled, webhook_url, webhook_secret, published_at
+          select soul, owner_user_id, webhook_enabled, webhook_url, webhook_secret, published_at
           from obseri_published_souls
           where soul_id = ${soulId} and widget_token_hash = ${hash} and widget_enabled = true
         `
       : await sql<PublishedRow[]>`
-          select soul, webhook_enabled, webhook_url, webhook_secret, published_at
+          select soul, owner_user_id, webhook_enabled, webhook_url, webhook_secret, published_at
           from obseri_published_souls
           where soul_id = ${soulId} and owner_key_hash = ${hash}
         `;
@@ -331,6 +333,7 @@ export async function drainWebhookQueue(limit = 25) {
 
 type PublishedRow = {
   soul: Soul;
+  owner_user_id: string;
   webhook_enabled: boolean;
   webhook_url: string | null;
   webhook_secret: string;
@@ -341,6 +344,7 @@ function rowToRecord(row: PublishedRow | undefined): PublishedSoulRecord | null 
   if (!row) return null;
   return {
     soul: row.soul,
+    ownerUserId: row.owner_user_id,
     publishedAt:
       row.published_at instanceof Date ? row.published_at.toISOString() : row.published_at,
     webhook: {
