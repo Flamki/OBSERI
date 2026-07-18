@@ -964,6 +964,9 @@ function Footer() {
           <a href="/ai-chatbot-trained-on-your-website" className="transition hover:text-black">
             Website chatbot
           </a>
+          <Link to="/pricing" className="transition hover:text-black">
+            Pricing
+          </Link>
           <a href="#trust" className="transition hover:text-black">
             Trust
           </a>

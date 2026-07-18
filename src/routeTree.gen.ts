@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AiVoiceAgentForWebsiteRouteImport } from './routes/ai-voice-agent-for-website'
 import { Route as AiChatbotTrainedOnYourWebsiteRouteImport } from './routes/ai-chatbot-trained-on-your-website'
@@ -38,6 +39,11 @@ import { Route as ApiWidgetsSoulIdSessionRouteImport } from './routes/api.widget
 import { Route as ApiSoulsSoulIdEventsRouteImport } from './routes/api.souls.$soulId.events'
 import { Route as ApiInternalWebhooksDrainRouteImport } from './routes/api.internal.webhooks.drain'
 
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppRoute = AppRouteImport.update({
   id: '/app',
   path: '/app',
@@ -186,6 +192,7 @@ export interface FileRoutesByFullPath {
   '/ai-chatbot-trained-on-your-website': typeof AiChatbotTrainedOnYourWebsiteRoute
   '/ai-voice-agent-for-website': typeof AiVoiceAgentForWebsiteRoute
   '/app': typeof AppRoute
+  '/pricing': typeof PricingRoute
   '/api/chat': typeof ApiChatRouteWithChildren
   '/api/ingest': typeof ApiIngestRouteWithChildren
   '/api/scan': typeof ApiScanRoute
@@ -216,6 +223,7 @@ export interface FileRoutesByTo {
   '/ai-chatbot-trained-on-your-website': typeof AiChatbotTrainedOnYourWebsiteRoute
   '/ai-voice-agent-for-website': typeof AiVoiceAgentForWebsiteRoute
   '/app': typeof AppRoute
+  '/pricing': typeof PricingRoute
   '/api/chat': typeof ApiChatRouteWithChildren
   '/api/ingest': typeof ApiIngestRouteWithChildren
   '/api/scan': typeof ApiScanRoute
@@ -247,6 +255,7 @@ export interface FileRoutesById {
   '/ai-chatbot-trained-on-your-website': typeof AiChatbotTrainedOnYourWebsiteRoute
   '/ai-voice-agent-for-website': typeof AiVoiceAgentForWebsiteRoute
   '/app': typeof AppRoute
+  '/pricing': typeof PricingRoute
   '/api/chat': typeof ApiChatRouteWithChildren
   '/api/ingest': typeof ApiIngestRouteWithChildren
   '/api/scan': typeof ApiScanRoute
@@ -279,6 +288,7 @@ export interface FileRouteTypes {
     | '/ai-chatbot-trained-on-your-website'
     | '/ai-voice-agent-for-website'
     | '/app'
+    | '/pricing'
     | '/api/chat'
     | '/api/ingest'
     | '/api/scan'
@@ -309,6 +319,7 @@ export interface FileRouteTypes {
     | '/ai-chatbot-trained-on-your-website'
     | '/ai-voice-agent-for-website'
     | '/app'
+    | '/pricing'
     | '/api/chat'
     | '/api/ingest'
     | '/api/scan'
@@ -339,6 +350,7 @@ export interface FileRouteTypes {
     | '/ai-chatbot-trained-on-your-website'
     | '/ai-voice-agent-for-website'
     | '/app'
+    | '/pricing'
     | '/api/chat'
     | '/api/ingest'
     | '/api/scan'
@@ -370,6 +382,7 @@ export interface RootRouteChildren {
   AiChatbotTrainedOnYourWebsiteRoute: typeof AiChatbotTrainedOnYourWebsiteRoute
   AiVoiceAgentForWebsiteRoute: typeof AiVoiceAgentForWebsiteRoute
   AppRoute: typeof AppRoute
+  PricingRoute: typeof PricingRoute
   ApiChatRoute: typeof ApiChatRouteWithChildren
   ApiIngestRoute: typeof ApiIngestRouteWithChildren
   ApiScanRoute: typeof ApiScanRoute
@@ -395,6 +408,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app': {
       id: '/app'
       path: '/app'
@@ -634,6 +654,7 @@ const rootRouteChildren: RootRouteChildren = {
   AiChatbotTrainedOnYourWebsiteRoute: AiChatbotTrainedOnYourWebsiteRoute,
   AiVoiceAgentForWebsiteRoute: AiVoiceAgentForWebsiteRoute,
   AppRoute: AppRoute,
+  PricingRoute: PricingRoute,
   ApiChatRoute: ApiChatRouteWithChildren,
   ApiIngestRoute: ApiIngestRouteWithChildren,
   ApiScanRoute: ApiScanRoute,

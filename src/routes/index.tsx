@@ -199,6 +199,9 @@ function Hero() {
           <a href="#studio" className="transition duration-200 hover:text-white">
             Soul Studio
           </a>
+          <Link to="/pricing" className="transition duration-200 hover:text-white">
+            Pricing
+          </Link>
           <a href="#trust" className="transition duration-200 hover:text-white">
             Trust
           </a>
