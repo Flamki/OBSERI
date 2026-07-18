@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useStore } from "@neondatabase/auth/react";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   AudioLines,
@@ -118,7 +117,7 @@ const PAGE_META: Record<StudioView, { title: string; description: string }> = {
 type StudioUser = { id: string; name?: string | null; email?: string | null; image?: string | null };
 
 function AuthenticatedStudio() {
-  const session = useStore(authClient.useSession);
+  const session = authClient.useSession();
   useEffect(() => {
     if (!session.isPending && !session.data?.user) {
       window.location.replace("/auth/sign-in?redirectTo=/app");
@@ -1002,7 +1001,7 @@ function ProfileMenu({
   soul: Soul | null;
   onNavigate: (view: StudioView) => void;
 }) {
-  const session = useStore(authClient.useSession);
+  const session = authClient.useSession();
   const user = session.data?.user;
   const displayName = user?.name || user?.email?.split("@")[0] || "Obseri user";
   const initials = displayName
@@ -3890,7 +3889,7 @@ function ProfileWorkspaceView({
   workspace: SoulWorkspace;
   onWorkspaceNameChange: (name: string) => void;
 }) {
-  const session = useStore(authClient.useSession);
+  const session = authClient.useSession();
   const user = session.data?.user;
   const displayName = user?.name || user?.email?.split("@")[0] || "Obseri user";
   const initials = displayName

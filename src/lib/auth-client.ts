@@ -1,4 +1,4 @@
-import { createInternalNeonAuth } from "@neondatabase/auth";
+import { createInternalNeonAuth, type ReactBetterAuthClient } from "@neondatabase/auth";
 import { BetterAuthReactAdapter } from "@neondatabase/auth/react/adapters";
 
 export const NEON_AUTH_URL =
@@ -9,7 +9,11 @@ const neonAuth = createInternalNeonAuth(NEON_AUTH_URL, {
   adapter: BetterAuthReactAdapter(),
 });
 
-export const authClient = neonAuth.adapter;
+// @neondatabase/auth 0.4 beta's internal factory currently exposes the correct
+// Better Auth React client at runtime but infers its hook atoms in TypeScript.
+// Keep the internal factory for getJWTToken(), and narrow the public adapter to
+// the React API that BetterAuthReactAdapter actually returns.
+export const authClient = neonAuth.adapter as unknown as ReactBetterAuthClient;
 
 export async function authFetch(
   input: RequestInfo | URL,
