@@ -4119,6 +4119,9 @@ function HelpView() {
   );
 }
 
+const pricingSerif =
+  "[font-family:Baskerville,'Iowan_Old_Style','Palatino_Linotype','Times_New_Roman',serif]";
+
 function ProfileWorkspaceView({
   workspace,
   onWorkspaceNameChange,
@@ -4147,7 +4150,6 @@ function ProfileWorkspaceView({
   const [cycle, setCycle] = useState<"monthly" | "annual">("monthly");
   const [billingBusy, setBillingBusy] = useState<BillingPlanId | "cancel" | null>(null);
   const [billingNotice, setBillingNotice] = useState("");
-  const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
 
   const loadBilling = useCallback(async () => {
     try {
@@ -4156,18 +4158,6 @@ function ProfileWorkspaceView({
       const summary = (await response.json()) as BillingSummaryResponse;
       setBilling(summary);
       onPlanChange?.(summary.plan);
-      if (summary.subscription?.id) {
-        const invoiceResponse = await authFetch(
-          `/api/billing/invoices?subscriptionId=${encodeURIComponent(summary.subscription.id)}`,
-          { cache: "no-store" },
-        );
-        if (invoiceResponse.ok) {
-          const payload = (await invoiceResponse.json()) as { invoices?: BillingInvoice[] };
-          setInvoices(payload.invoices ?? []);
-        }
-      } else {
-        setInvoices([]);
-      }
     } catch (error) {
       setBillingNotice(
         error instanceof Error ? error.message : "Billing details could not be loaded.",
@@ -4298,6 +4288,138 @@ function ProfileWorkspaceView({
     }
   }
 
+  if (billingOnly) {
+    return (
+      <Page
+        title="Plans and billing"
+        description="Choose the capacity that fits your website."
+        hideHeader
+      >
+        <section className="relative min-h-[calc(100vh-64px)] overflow-hidden bg-[#f4f1f3] px-4 pb-16 pt-12 text-[#17171a] sm:px-6 sm:pt-16 lg:px-10">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[430px] bg-[linear-gradient(180deg,#f79a8d_0%,#eab4b2_36%,#ddd9e9_72%,rgba(244,241,243,0)_100%)]" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(circle_at_50%_-15%,rgba(255,92,122,.42),transparent_38%),radial-gradient(circle_at_8%_45%,rgba(255,238,229,.62),transparent_28%),radial-gradient(circle_at_92%_48%,rgba(124,103,173,.2),transparent_30%)]" />
+
+          <div className="relative mx-auto max-w-[1380px]">
+            <div className="text-center">
+              <div className="inline-flex items-center gap-2 rounded-full border border-black/[0.08] bg-white/35 px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-black/50 shadow-sm backdrop-blur-xl">
+                <img src="/obseri-pulse-mark.svg" alt="" className="h-5 w-5" />
+                Plans built for real conversations
+              </div>
+              <h1
+                className={`mx-auto mt-6 max-w-[760px] text-[clamp(2.8rem,5.4vw,5rem)] font-normal leading-[.95] tracking-[-.052em] ${pricingSerif}`}
+              >
+                Start free. <span className="text-[#a4314a]">Scale when it works.</span>
+              </h1>
+              <p className="mx-auto mt-5 max-w-[560px] text-[14px] leading-7 text-black/55 sm:text-[16px]">
+                Every plan includes a grounded voice and chat agent. Upgrade only when your traffic
+                needs more capacity.
+              </p>
+
+              <div
+                className="mt-8 inline-flex rounded-full border border-white/70 bg-white/40 p-1.5 shadow-[0_14px_40px_rgba(70,38,50,.1)] backdrop-blur-xl"
+                aria-label="Billing interval"
+              >
+                {(["monthly", "annual"] as const).map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={cycle === value}
+                    onClick={() => setCycle(value)}
+                    className={`h-10 rounded-full px-5 text-[11px] font-semibold capitalize transition-all ${
+                      cycle === value
+                        ? "bg-[#17171a] text-white shadow-[0_8px_18px_rgba(23,23,26,.2)]"
+                        : "text-black/48 hover:text-black"
+                    }`}
+                  >
+                    {value}
+                    {value === "annual" ? (
+                      <span className="ml-2 text-[#ff869b]">Save 15%</span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {billingNotice && (
+              <p className="mx-auto mt-6 max-w-3xl rounded-2xl border border-[#ff5c7a]/15 bg-white/60 px-4 py-3 text-center text-sm text-[#8d2f44] shadow-sm backdrop-blur-xl">
+                {billingNotice}
+              </p>
+            )}
+
+            <div className="mt-10 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {SELF_SERVE_PLAN_IDS.map((planId) => (
+                <PlanCard
+                  key={planId}
+                  plan={BILLING_PLANS[planId]}
+                  cycle={cycle}
+                  current={
+                    billing?.plan.id === planId &&
+                    (planId === "free" || billing.subscription?.cycle === cycle)
+                  }
+                  busy={billingBusy === planId}
+                  onChoose={() => void beginCheckout(planId)}
+                />
+              ))}
+            </div>
+
+            <div className="relative mt-3 overflow-hidden rounded-[2rem] border border-black/[0.08] bg-[#ebe6eb] p-7 sm:p-9">
+              <div className="pointer-events-none absolute -right-20 -top-28 h-72 w-72 rounded-full bg-[#ff5c7a]/15 blur-3xl" />
+              <div className="relative flex flex-wrap items-center justify-between gap-6">
+                <div>
+                  <p className="text-[9px] font-semibold uppercase tracking-[.2em] text-[#a4314a]">
+                    Enterprise
+                  </p>
+                  <h2 className={`mt-3 text-3xl tracking-[-.04em] sm:text-4xl ${pricingSerif}`}>
+                    Capacity designed around your traffic.
+                  </h2>
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-black/52">
+                    Committed capacity, SSO, private deployments, custom retention, and an SLA.
+                  </p>
+                </div>
+                <a
+                  href="mailto:flamki@obseri.com?subject=Obseri%20Enterprise"
+                  className="inline-flex h-12 items-center gap-2 rounded-full bg-[#17171a] px-6 text-[11px] font-bold text-white transition hover:-translate-y-0.5 hover:bg-[#a4314a]"
+                >
+                  Contact sales <ChevronRight className="h-3.5 w-3.5" />
+                </a>
+              </div>
+            </div>
+
+            {billing?.subscription && (
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-black/[0.07] bg-white/55 px-5 py-4 text-sm backdrop-blur-xl">
+                <div>
+                  <span className="font-semibold">{billing.plan.name}</span>
+                  <span className="ml-2 text-black/45">
+                    {billing.subscription.currentPeriodEnd
+                      ? `${billing.subscription.cancelAtPeriodEnd ? "Ends" : "Renews"} ${new Date(
+                          billing.subscription.currentPeriodEnd,
+                        ).toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}`
+                      : "Active subscription"}
+                  </span>
+                </div>
+                {billing.subscription.status === "active" &&
+                  !billing.subscription.cancelAtPeriodEnd && (
+                    <button
+                      type="button"
+                      onClick={() => void cancelSubscription()}
+                      disabled={billingBusy !== null}
+                      className="text-xs font-semibold text-black/45 underline underline-offset-4 transition hover:text-black disabled:opacity-50"
+                    >
+                      {billingBusy === "cancel" ? "Scheduling…" : "Cancel at period end"}
+                    </button>
+                  )}
+              </div>
+            )}
+          </div>
+        </section>
+      </Page>
+    );
+  }
+
   return (
     <Page
       title={billingOnly ? "Plans and billing" : "Profile and workspace"}
@@ -4395,41 +4517,6 @@ function ProfileWorkspaceView({
                   {billingBusy === "cancel" ? "Scheduling…" : "Cancel at period end"}
                 </button>
               )}
-            {invoices.length > 0 && (
-              <div className="mt-6 border-t border-[#e5e6e2] pt-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#777b74]">
-                  Invoices
-                </p>
-                <div className="mt-3 space-y-2">
-                  {invoices.slice(0, 3).map((invoice) => (
-                    <a
-                      key={invoice.id}
-                      href={invoice.url ?? undefined}
-                      target={invoice.url ? "_blank" : undefined}
-                      rel={invoice.url ? "noreferrer" : undefined}
-                      className={`flex items-center justify-between rounded-xl bg-[#f3f4f1] px-3 py-2.5 text-xs ${invoice.url ? "hover:bg-[#eceee9]" : "cursor-default"}`}
-                    >
-                      <span>
-                        <span className="block font-medium text-[#353934]">
-                          {invoice.paidAt || invoice.issuedAt
-                            ? new Date(invoice.paidAt ?? invoice.issuedAt ?? "").toLocaleDateString(
-                                "en-IN",
-                                { day: "numeric", month: "short", year: "numeric" },
-                              )
-                            : invoice.number}
-                        </span>
-                        <span className="mt-0.5 block capitalize text-[#7b7f78]">
-                          {invoice.status.replaceAll("_", " ")}
-                        </span>
-                      </span>
-                      <span className="font-semibold text-[#353934]">
-                        {formatInr(invoice.amountPaise)}
-                      </span>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
           </Card>
         </div>
       </div>
@@ -4515,16 +4602,6 @@ type BillingSummaryResponse = {
   usage: { textResponses: number; voiceSeconds: number };
 };
 
-type BillingInvoice = {
-  id: string;
-  number: string;
-  status: string;
-  amountPaise: number;
-  issuedAt: string | null;
-  paidAt: string | null;
-  url: string | null;
-};
-
 function UsageBar({ label, value, limit }: { label: string; value: number; limit: number | null }) {
   const percentage = limit ? Math.min(100, Math.round((value / limit) * 100)) : 0;
   return (
@@ -4556,44 +4633,104 @@ function PlanCard({
   onChoose: () => void;
 }) {
   const total = cycle === "annual" ? plan.annualPriceInrPaise : plan.monthlyPriceInrPaise;
-  const display =
-    total === null ? "Custom" : formatInr(cycle === "annual" ? Math.round(total / 12) : total);
+  const monthlyEquivalent =
+    cycle === "annual" && total !== null && total > 0 ? Math.round(total / 12) : total;
+  const isDark = plan.highlighted;
+  const eyebrow =
+    plan.id === "free"
+      ? "Explore"
+      : plan.id === "launch"
+        ? "Go live"
+        : plan.id === "growth"
+          ? "Build pipeline"
+          : "Run volume";
+  const limitLabel = (value: number | null, noun: string) =>
+    value === null
+      ? `Custom ${noun}s`
+      : `${value.toLocaleString("en-IN")} ${noun}${value === 1 ? "" : "s"}`;
+  const limitRows = [
+    limitLabel(plan.limits.websites, "website"),
+    limitLabel(plan.limits.indexedPages, "indexed page"),
+    `${limitLabel(plan.limits.textResponsesPerMonth, "text response")} / month`,
+    `${limitLabel(plan.limits.voiceMinutesPerMonth, "voice minute")} / month`,
+  ];
+  if (plan.limits.seats && plan.limits.seats > 1) {
+    limitRows.push(`${plan.limits.seats.toLocaleString("en-IN")} team seats`);
+  }
   return (
-    <div
-      className={`flex min-h-[280px] flex-col rounded-2xl border bg-white p-5 ${plan.highlighted ? "border-[#ff8ba0] shadow-[0_12px_35px_rgba(255,92,122,.10)]" : "border-[#e1e3de]"}`}
+    <article
+      className={`relative flex min-h-[570px] flex-col overflow-hidden rounded-[2rem] border p-6 sm:p-7 ${
+        isDark
+          ? "border-[#ff5c7a]/55 bg-[#17171a] text-white shadow-[0_26px_80px_rgba(69,32,44,.2)]"
+          : "border-black/[0.08] bg-white/75 shadow-[0_18px_60px_rgba(46,38,43,.06)] backdrop-blur-xl"
+      }`}
     >
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="font-semibold">{plan.name}</h3>
-        {plan.highlighted && (
-          <span className="rounded-full bg-[#fff0f3] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#b53851]">
-            Popular
+      {isDark ? (
+        <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#ff5c7a,#ffad92,#927fc2)]" />
+      ) : null}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p
+            className={`text-[10px] font-semibold uppercase tracking-[0.18em] ${isDark ? "text-white/44" : "text-black/38"}`}
+          >
+            {eyebrow}
+          </p>
+          <h3 className={`mt-3 text-[2.35rem] font-normal tracking-[-.04em] ${pricingSerif}`}>
+            {plan.name}
+          </h3>
+        </div>
+        {isDark && (
+          <span className="rounded-full bg-[#ff5c7a] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[.14em] text-white">
+            Most popular
           </span>
         )}
       </div>
-      <p className="mt-3 text-2xl font-semibold tracking-tight">
-        {display}
-        <span className="text-xs font-normal text-[#7b7f78]">{total ? "/mo" : ""}</span>
+      <p
+        className={`mt-3 min-h-12 text-[13px] leading-6 ${isDark ? "text-white/54" : "text-black/50"}`}
+      >
+        {plan.description}
       </p>
-      <p className="mt-2 min-h-10 text-sm text-[#747870]">{plan.description}</p>
-      <div className="mt-4 space-y-2 text-xs text-[#555a53]">
-        <p>
-          {plan.limits.websites} {plan.limits.websites === 1 ? "website" : "websites"}
-        </p>
-        <p>{plan.limits.indexedPages?.toLocaleString("en-IN")} indexed pages</p>
-        <p>{plan.limits.textResponsesPerMonth?.toLocaleString("en-IN")} text responses</p>
-        <p>{plan.limits.voiceMinutesPerMonth} voice minutes</p>
-        <p>{plan.limits.retentionDays?.toLocaleString("en-IN")} days conversation history</p>
-        <p>
-          {billingPlanIncludesFeature(plan.id, "webhooks")
-            ? "Signed webhooks included"
-            : "Website widget included"}
-        </p>
+      <div className="mt-7 min-h-[78px]">
+        {monthlyEquivalent === 0 ? (
+          <p className={`text-[3rem] font-normal tracking-[-.05em] ${pricingSerif}`}>₹0</p>
+        ) : (
+          <>
+            <div className="flex items-end gap-1.5">
+              <span
+                className={`text-[2.75rem] font-normal leading-none tracking-[-.05em] ${pricingSerif}`}
+              >
+                {monthlyEquivalent === null ? "Custom" : formatInr(monthlyEquivalent)}
+              </span>
+              {monthlyEquivalent !== null ? (
+                <span className={`pb-1 text-[11px] ${isDark ? "text-white/42" : "text-black/38"}`}>
+                  / month
+                </span>
+              ) : null}
+            </div>
+            {total !== null ? (
+              <p className={`mt-2 text-[10px] ${isDark ? "text-white/38" : "text-black/35"}`}>
+                {cycle === "annual" ? `${formatInr(total)} billed yearly` : "Billed monthly"} · GST
+                included
+              </p>
+            ) : null}
+          </>
+        )}
       </div>
       <button
         type="button"
         onClick={onChoose}
         disabled={current || busy || plan.id === "free"}
-        className={`mt-auto rounded-xl px-4 py-3 text-sm font-semibold transition disabled:cursor-default ${current ? "bg-[#eef0eb] text-[#777c74]" : plan.id === "free" ? "bg-[#f3f4f1] text-[#777c74]" : "bg-[#20221f] text-white hover:bg-black disabled:opacity-60"}`}
+        className={`mt-5 inline-flex h-12 items-center justify-center gap-2 rounded-full text-[11px] font-bold transition disabled:cursor-default ${
+          current
+            ? isDark
+              ? "bg-white/10 text-white/55"
+              : "bg-black/[0.06] text-black/45"
+            : plan.id === "free"
+              ? "bg-black/[0.05] text-black/38"
+              : isDark
+                ? "bg-[#ff5c7a] text-white shadow-[0_12px_30px_rgba(255,92,122,.2)] hover:-translate-y-0.5 hover:bg-white hover:text-black disabled:opacity-60"
+                : "bg-[#17171a] text-white hover:-translate-y-0.5 hover:bg-[#a4314a] disabled:opacity-60"
+        }`}
       >
         {current
           ? "Current plan"
@@ -4602,8 +4739,35 @@ function PlanCard({
             : plan.id === "free"
               ? "Included"
               : `Choose ${plan.name}`}
+        {!current && !busy && plan.id !== "free" ? <ChevronRight className="h-3.5 w-3.5" /> : null}
       </button>
-    </div>
+
+      <div className={`my-7 h-px ${isDark ? "bg-white/10" : "bg-black/[0.07]"}`} />
+      <ul className="space-y-3.5">
+        {limitRows.map((label) => (
+          <li
+            key={label}
+            className={`flex gap-2.5 text-[12px] leading-5 ${isDark ? "text-white/68" : "text-black/60"}`}
+          >
+            <Check
+              className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${isDark ? "text-[#ff869b]" : "text-[#a4314a]"}`}
+            />
+            {label}
+          </li>
+        ))}
+        {plan.features.slice(0, plan.id === "free" ? 2 : 3).map((feature) => (
+          <li
+            key={feature}
+            className={`flex gap-2.5 text-[12px] leading-5 ${isDark ? "text-white/68" : "text-black/60"}`}
+          >
+            <Check
+              className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${isDark ? "text-[#ff869b]" : "text-[#a4314a]"}`}
+            />
+            {feature}
+          </li>
+        ))}
+      </ul>
+    </article>
   );
 }
 
