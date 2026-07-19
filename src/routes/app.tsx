@@ -136,7 +136,7 @@ const PAGE_META: Record<StudioView, { title: string; description: string }> = {
     title: "Conversations",
     description: "Understand what visitors are asking for.",
   },
-  billing: { title: "Plans and billing", description: "Manage capacity, usage, and invoices." },
+  billing: { title: "Plans and billing", description: "Choose and manage your plan." },
   profile: { title: "Profile and workspace", description: "Manage your account and workspace." },
   settings: { title: "Settings", description: "Manage the selected website and its data." },
   help: { title: "Help", description: "Get support and find the right next step." },
@@ -667,6 +667,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
                 onWorkspaceNameChange={(name) => setWorkspace((current) => ({ ...current, name }))}
                 billingOnly
                 onPlanChange={setActivePlan}
+                onClose={() => navigate("playground")}
               />
             ) : view === "profile" ? (
               <ProfileWorkspaceView
@@ -4119,19 +4120,18 @@ function HelpView() {
   );
 }
 
-const pricingSerif =
-  "[font-family:Baskerville,'Iowan_Old_Style','Palatino_Linotype','Times_New_Roman',serif]";
-
 function ProfileWorkspaceView({
   workspace,
   onWorkspaceNameChange,
   billingOnly = false,
   onPlanChange,
+  onClose,
 }: {
   workspace: SoulWorkspace;
   onWorkspaceNameChange: (name: string) => void;
   billingOnly?: boolean;
   onPlanChange?: (plan: BillingPlan) => void;
+  onClose?: () => void;
 }) {
   const session = authClient.useSession();
   const user = session.data?.user;
@@ -4290,133 +4290,114 @@ function ProfileWorkspaceView({
 
   if (billingOnly) {
     return (
-      <Page
-        title="Plans and billing"
-        description="Choose the capacity that fits your website."
-        hideHeader
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="billing-title"
+        className="fixed inset-0 z-[100] overflow-y-auto bg-[#0b0b0d] text-white"
       >
-        <section className="relative min-h-[calc(100vh-64px)] overflow-hidden bg-[#f4f1f3] px-4 pb-16 pt-12 text-[#17171a] sm:px-6 sm:pt-16 lg:px-10">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-[430px] bg-[linear-gradient(180deg,#f79a8d_0%,#eab4b2_36%,#ddd9e9_72%,rgba(244,241,243,0)_100%)]" />
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(circle_at_50%_-15%,rgba(255,92,122,.42),transparent_38%),radial-gradient(circle_at_8%_45%,rgba(255,238,229,.62),transparent_28%),radial-gradient(circle_at_92%_48%,rgba(124,103,173,.2),transparent_30%)]" />
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close plans"
+          className="fixed right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-xl border border-white/20 bg-[#18181b]/90 text-white/70 backdrop-blur-xl transition hover:border-white/40 hover:text-white sm:right-6 sm:top-6"
+        >
+          <X className="h-5 w-5" />
+        </button>
 
-          <div className="relative mx-auto max-w-[1380px]">
-            <div className="text-center">
-              <div className="inline-flex items-center gap-2 rounded-full border border-black/[0.08] bg-white/35 px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-black/50 shadow-sm backdrop-blur-xl">
-                <img src="/obseri-pulse-mark.svg" alt="" className="h-5 w-5" />
-                Plans built for real conversations
-              </div>
-              <h1
-                className={`mx-auto mt-6 max-w-[760px] text-[clamp(2.8rem,5.4vw,5rem)] font-normal leading-[.95] tracking-[-.052em] ${pricingSerif}`}
-              >
-                Start free. <span className="text-[#a4314a]">Scale when it works.</span>
-              </h1>
-              <p className="mx-auto mt-5 max-w-[560px] text-[14px] leading-7 text-black/55 sm:text-[16px]">
-                Every plan includes a grounded voice and chat agent. Upgrade only when your traffic
-                needs more capacity.
-              </p>
-
-              <div
-                className="mt-8 inline-flex rounded-full border border-white/70 bg-white/40 p-1.5 shadow-[0_14px_40px_rgba(70,38,50,.1)] backdrop-blur-xl"
-                aria-label="Billing interval"
-              >
-                {(["monthly", "annual"] as const).map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    aria-pressed={cycle === value}
-                    onClick={() => setCycle(value)}
-                    className={`h-10 rounded-full px-5 text-[11px] font-semibold capitalize transition-all ${
-                      cycle === value
-                        ? "bg-[#17171a] text-white shadow-[0_8px_18px_rgba(23,23,26,.2)]"
-                        : "text-black/48 hover:text-black"
-                    }`}
-                  >
-                    {value}
-                    {value === "annual" ? (
-                      <span className="ml-2 text-[#ff869b]">Save 15%</span>
-                    ) : null}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {billingNotice && (
-              <p className="mx-auto mt-6 max-w-3xl rounded-2xl border border-[#ff5c7a]/15 bg-white/60 px-4 py-3 text-center text-sm text-[#8d2f44] shadow-sm backdrop-blur-xl">
-                {billingNotice}
-              </p>
-            )}
-
-            <div className="mt-10 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {SELF_SERVE_PLAN_IDS.map((planId) => (
-                <PlanCard
-                  key={planId}
-                  plan={BILLING_PLANS[planId]}
-                  cycle={cycle}
-                  current={
-                    billing?.plan.id === planId &&
-                    (planId === "free" || billing.subscription?.cycle === cycle)
-                  }
-                  busy={billingBusy === planId}
-                  onChoose={() => void beginCheckout(planId)}
-                />
+        <div className="mx-auto flex min-h-full max-w-[1880px] flex-col px-4 pb-8 pt-16 sm:px-5 sm:pt-12 lg:px-6">
+          <header className="shrink-0 text-center">
+            <h1
+              id="billing-title"
+              className="text-[28px] font-medium tracking-[-0.035em] sm:text-[34px]"
+            >
+              Upgrade your plan
+            </h1>
+            <div
+              className="mx-auto mt-6 grid w-full max-w-[440px] grid-cols-2 rounded-full bg-[#2a2a2d] p-1"
+              aria-label="Billing interval"
+            >
+              {(["monthly", "annual"] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={cycle === value}
+                  onClick={() => setCycle(value)}
+                  className={`h-11 rounded-full text-sm font-semibold transition-all ${
+                    cycle === value
+                      ? "bg-[#171719] text-white shadow-sm"
+                      : "text-white/55 hover:text-white"
+                  }`}
+                >
+                  {value === "annual" ? "Annual · Save 15%" : "Monthly"}
+                </button>
               ))}
             </div>
+          </header>
 
-            <div className="relative mt-3 overflow-hidden rounded-[2rem] border border-black/[0.08] bg-[#ebe6eb] p-7 sm:p-9">
-              <div className="pointer-events-none absolute -right-20 -top-28 h-72 w-72 rounded-full bg-[#ff5c7a]/15 blur-3xl" />
-              <div className="relative flex flex-wrap items-center justify-between gap-6">
-                <div>
-                  <p className="text-[9px] font-semibold uppercase tracking-[.2em] text-[#a4314a]">
-                    Enterprise
-                  </p>
-                  <h2 className={`mt-3 text-3xl tracking-[-.04em] sm:text-4xl ${pricingSerif}`}>
-                    Capacity designed around your traffic.
-                  </h2>
-                  <p className="mt-3 max-w-2xl text-sm leading-6 text-black/52">
-                    Committed capacity, SSO, private deployments, custom retention, and an SLA.
-                  </p>
-                </div>
-                <a
-                  href="mailto:flamki@obseri.com?subject=Obseri%20Enterprise"
-                  className="inline-flex h-12 items-center gap-2 rounded-full bg-[#17171a] px-6 text-[11px] font-bold text-white transition hover:-translate-y-0.5 hover:bg-[#a4314a]"
-                >
-                  Contact sales <ChevronRight className="h-3.5 w-3.5" />
-                </a>
-              </div>
-            </div>
+          {billingNotice && (
+            <p className="mx-auto mt-5 max-w-3xl rounded-xl border border-[#ff5c7a]/30 bg-[#ff5c7a]/10 px-4 py-3 text-center text-sm text-[#ffb3c0]">
+              {billingNotice}
+            </p>
+          )}
 
-            {billing?.subscription && (
-              <div className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-black/[0.07] bg-white/55 px-5 py-4 text-sm backdrop-blur-xl">
-                <div>
-                  <span className="font-semibold">{billing.plan.name}</span>
-                  <span className="ml-2 text-black/45">
-                    {billing.subscription.currentPeriodEnd
-                      ? `${billing.subscription.cancelAtPeriodEnd ? "Ends" : "Renews"} ${new Date(
-                          billing.subscription.currentPeriodEnd,
-                        ).toLocaleDateString("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}`
-                      : "Active subscription"}
-                  </span>
-                </div>
-                {billing.subscription.status === "active" &&
-                  !billing.subscription.cancelAtPeriodEnd && (
-                    <button
-                      type="button"
-                      onClick={() => void cancelSubscription()}
-                      disabled={billingBusy !== null}
-                      className="text-xs font-semibold text-black/45 underline underline-offset-4 transition hover:text-black disabled:opacity-50"
-                    >
-                      {billingBusy === "cancel" ? "Scheduling…" : "Cancel at period end"}
-                    </button>
-                  )}
-              </div>
-            )}
+          <div className="mt-7 grid flex-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+            {SELF_SERVE_PLAN_IDS.map((planId) => (
+              <PlanCard
+                key={planId}
+                plan={BILLING_PLANS[planId]}
+                cycle={cycle}
+                current={
+                  billing?.plan.id === planId &&
+                  (planId === "free" || billing.subscription?.cycle === cycle)
+                }
+                busy={billingBusy === planId}
+                onChoose={() => void beginCheckout(planId)}
+              />
+            ))}
           </div>
-        </section>
-      </Page>
+
+          <footer className="mt-7 flex shrink-0 flex-col items-center justify-center gap-2 text-center text-sm text-white/52 sm:flex-row">
+            <span>Need custom capacity, SSO, or a private deployment?</span>
+            <a
+              href="mailto:flamki@obseri.com?subject=Obseri%20Enterprise"
+              className="font-semibold text-white underline decoration-white/30 underline-offset-4 transition hover:decoration-white"
+            >
+              Talk to enterprise sales
+            </a>
+          </footer>
+
+          {billing?.subscription && (
+            <div className="mx-auto mt-4 flex w-full max-w-3xl flex-wrap items-center justify-center gap-x-3 gap-y-2 text-center text-xs text-white/42">
+              <div>
+                <span className="font-semibold">{billing.plan.name}</span>
+                <span className="ml-2">
+                  {billing.subscription.currentPeriodEnd
+                    ? `${billing.subscription.cancelAtPeriodEnd ? "Ends" : "Renews"} ${new Date(
+                        billing.subscription.currentPeriodEnd,
+                      ).toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}`
+                    : "Active subscription"}
+                </span>
+              </div>
+              {billing.subscription.status === "active" &&
+                !billing.subscription.cancelAtPeriodEnd && (
+                  <button
+                    type="button"
+                    onClick={() => void cancelSubscription()}
+                    disabled={billingBusy !== null}
+                    className="text-xs font-semibold text-white/60 underline underline-offset-4 transition hover:text-white disabled:opacity-50"
+                  >
+                    {billingBusy === "cancel" ? "Scheduling…" : "Cancel at period end"}
+                  </button>
+                )}
+            </div>
+          )}
+        </div>
+      </section>
     );
   }
 
@@ -4635,7 +4616,7 @@ function PlanCard({
   const total = cycle === "annual" ? plan.annualPriceInrPaise : plan.monthlyPriceInrPaise;
   const monthlyEquivalent =
     cycle === "annual" && total !== null && total > 0 ? Math.round(total / 12) : total;
-  const isDark = plan.highlighted;
+  const isHighlighted = plan.highlighted;
   const eyebrow =
     plan.id === "free"
       ? "Explore"
@@ -4659,56 +4640,44 @@ function PlanCard({
   }
   return (
     <article
-      className={`relative flex min-h-[570px] flex-col overflow-hidden rounded-[2rem] border p-6 sm:p-7 ${
-        isDark
-          ? "border-[#ff5c7a]/55 bg-[#17171a] text-white shadow-[0_26px_80px_rgba(69,32,44,.2)]"
-          : "border-black/[0.08] bg-white/75 shadow-[0_18px_60px_rgba(46,38,43,.06)] backdrop-blur-xl"
+      className={`relative flex min-h-[600px] flex-col overflow-hidden rounded-[1.4rem] border p-6 text-white sm:p-7 ${
+        isHighlighted
+          ? "border-[#ff7190]/80 bg-[linear-gradient(180deg,#38233b_0%,#25212e_38%,#1a1a1e_100%)] shadow-[0_24px_80px_rgba(255,92,122,.12)]"
+          : "border-white/[0.12] bg-[#1d1d20]"
       }`}
     >
-      {isDark ? (
+      {isHighlighted ? (
         <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#ff5c7a,#ffad92,#927fc2)]" />
       ) : null}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p
-            className={`text-[10px] font-semibold uppercase tracking-[0.18em] ${isDark ? "text-white/44" : "text-black/38"}`}
-          >
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/44">
             {eyebrow}
           </p>
-          <h3 className={`mt-3 text-[2.35rem] font-normal tracking-[-.04em] ${pricingSerif}`}>
-            {plan.name}
-          </h3>
+          <h3 className="mt-3 text-[2rem] font-semibold tracking-[-.04em]">{plan.name}</h3>
         </div>
-        {isDark && (
+        {isHighlighted && (
           <span className="rounded-full bg-[#ff5c7a] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[.14em] text-white">
             Most popular
           </span>
         )}
       </div>
-      <p
-        className={`mt-3 min-h-12 text-[13px] leading-6 ${isDark ? "text-white/54" : "text-black/50"}`}
-      >
-        {plan.description}
-      </p>
+      <p className="mt-3 min-h-12 text-[13px] leading-6 text-white/54">{plan.description}</p>
       <div className="mt-7 min-h-[78px]">
         {monthlyEquivalent === 0 ? (
-          <p className={`text-[3rem] font-normal tracking-[-.05em] ${pricingSerif}`}>₹0</p>
+          <p className="text-[3.25rem] font-semibold tracking-[-.055em]">{formatInr(0)}</p>
         ) : (
           <>
             <div className="flex items-end gap-1.5">
-              <span
-                className={`text-[2.75rem] font-normal leading-none tracking-[-.05em] ${pricingSerif}`}
-              >
+              <span className="text-[3.25rem] font-semibold leading-none tracking-[-.055em]">
                 {monthlyEquivalent === null ? "Custom" : formatInr(monthlyEquivalent)}
               </span>
               {monthlyEquivalent !== null ? (
-                <span className={`pb-1 text-[11px] ${isDark ? "text-white/42" : "text-black/38"}`}>
-                  / month
-                </span>
+                <span className="pb-1 text-[11px] text-white/42">/ month</span>
               ) : null}
             </div>
             {total !== null ? (
-              <p className={`mt-2 text-[10px] ${isDark ? "text-white/38" : "text-black/35"}`}>
+              <p className="mt-2 text-[10px] text-white/38">
                 {cycle === "annual" ? `${formatInr(total)} billed yearly` : "Billed monthly"} · GST
                 included
               </p>
@@ -4720,16 +4689,14 @@ function PlanCard({
         type="button"
         onClick={onChoose}
         disabled={current || busy || plan.id === "free"}
-        className={`mt-5 inline-flex h-12 items-center justify-center gap-2 rounded-full text-[11px] font-bold transition disabled:cursor-default ${
+        className={`mt-5 inline-flex h-12 items-center justify-center gap-2 rounded-full text-sm font-bold transition disabled:cursor-default ${
           current
-            ? isDark
-              ? "bg-white/10 text-white/55"
-              : "bg-black/[0.06] text-black/45"
+            ? "border border-white/10 bg-transparent text-white/42"
             : plan.id === "free"
-              ? "bg-black/[0.05] text-black/38"
-              : isDark
-                ? "bg-[#ff5c7a] text-white shadow-[0_12px_30px_rgba(255,92,122,.2)] hover:-translate-y-0.5 hover:bg-white hover:text-black disabled:opacity-60"
-                : "bg-[#17171a] text-white hover:-translate-y-0.5 hover:bg-[#a4314a] disabled:opacity-60"
+              ? "border border-white/10 bg-transparent text-white/42"
+              : isHighlighted
+                ? "bg-[#ff5c7a] text-white shadow-[0_12px_30px_rgba(255,92,122,.2)] hover:bg-[#ff7690] disabled:opacity-60"
+                : "bg-white text-[#17171a] hover:bg-[#f1f1f1] disabled:opacity-60"
         }`}
       >
         {current
@@ -4742,27 +4709,17 @@ function PlanCard({
         {!current && !busy && plan.id !== "free" ? <ChevronRight className="h-3.5 w-3.5" /> : null}
       </button>
 
-      <div className={`my-7 h-px ${isDark ? "bg-white/10" : "bg-black/[0.07]"}`} />
+      <div className="my-7 h-px bg-white/10" />
       <ul className="space-y-3.5">
         {limitRows.map((label) => (
-          <li
-            key={label}
-            className={`flex gap-2.5 text-[12px] leading-5 ${isDark ? "text-white/68" : "text-black/60"}`}
-          >
-            <Check
-              className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${isDark ? "text-[#ff869b]" : "text-[#a4314a]"}`}
-            />
+          <li key={label} className="flex gap-3 text-[13px] leading-5 text-white/72">
+            <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#ff7f98]" />
             {label}
           </li>
         ))}
         {plan.features.slice(0, plan.id === "free" ? 2 : 3).map((feature) => (
-          <li
-            key={feature}
-            className={`flex gap-2.5 text-[12px] leading-5 ${isDark ? "text-white/68" : "text-black/60"}`}
-          >
-            <Check
-              className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${isDark ? "text-[#ff869b]" : "text-[#a4314a]"}`}
-            />
+          <li key={feature} className="flex gap-3 text-[13px] leading-5 text-white/72">
+            <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#ff7f98]" />
             {feature}
           </li>
         ))}
