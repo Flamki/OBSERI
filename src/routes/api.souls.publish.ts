@@ -44,6 +44,7 @@ export const Route = createFileRoute("/api/souls/publish")({
             ownerKey: request.headers.get("x-obseri-publish-key") ?? "",
             widgetToken: value.channels?.widgetToken ?? "",
             ownerUserId: user.id,
+            ownerEmail: user.email,
           });
           return Response.json(
             {

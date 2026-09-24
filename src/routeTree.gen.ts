@@ -16,6 +16,7 @@ import { Route as AiChatbotTrainedOnYourWebsiteRouteImport } from './routes/ai-c
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WidgetSoulIdRouteImport } from './routes/widget.$soulId'
+import { Route as DemoSoulIdRouteImport } from './routes/demo.$soulId'
 import { Route as AuthPathnameRouteImport } from './routes/auth.$pathname'
 import { Route as ApiWorkspaceRouteImport } from './routes/api.workspace'
 import { Route as ApiScanRouteImport } from './routes/api.scan'
@@ -75,6 +76,11 @@ const IndexRoute = IndexRouteImport.update({
 const WidgetSoulIdRoute = WidgetSoulIdRouteImport.update({
   id: '/widget/$soulId',
   path: '/widget/$soulId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DemoSoulIdRoute = DemoSoulIdRouteImport.update({
+  id: '/demo/$soulId',
+  path: '/demo/$soulId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthPathnameRoute = AuthPathnameRouteImport.update({
@@ -212,6 +218,7 @@ export interface FileRoutesByFullPath {
   '/api/scan': typeof ApiScanRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/auth/$pathname': typeof AuthPathnameRoute
+  '/demo/$soulId': typeof DemoSoulIdRoute
   '/widget/$soulId': typeof WidgetSoulIdRoute
   '/api/billing/cancel': typeof ApiBillingCancelRoute
   '/api/billing/change': typeof ApiBillingChangeRoute
@@ -245,6 +252,7 @@ export interface FileRoutesByTo {
   '/api/scan': typeof ApiScanRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/auth/$pathname': typeof AuthPathnameRoute
+  '/demo/$soulId': typeof DemoSoulIdRoute
   '/widget/$soulId': typeof WidgetSoulIdRoute
   '/api/billing/cancel': typeof ApiBillingCancelRoute
   '/api/billing/change': typeof ApiBillingChangeRoute
@@ -279,6 +287,7 @@ export interface FileRoutesById {
   '/api/scan': typeof ApiScanRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/auth/$pathname': typeof AuthPathnameRoute
+  '/demo/$soulId': typeof DemoSoulIdRoute
   '/widget/$soulId': typeof WidgetSoulIdRoute
   '/api/billing/cancel': typeof ApiBillingCancelRoute
   '/api/billing/change': typeof ApiBillingChangeRoute
@@ -314,6 +323,7 @@ export interface FileRouteTypes {
     | '/api/scan'
     | '/api/workspace'
     | '/auth/$pathname'
+    | '/demo/$soulId'
     | '/widget/$soulId'
     | '/api/billing/cancel'
     | '/api/billing/change'
@@ -347,6 +357,7 @@ export interface FileRouteTypes {
     | '/api/scan'
     | '/api/workspace'
     | '/auth/$pathname'
+    | '/demo/$soulId'
     | '/widget/$soulId'
     | '/api/billing/cancel'
     | '/api/billing/change'
@@ -380,6 +391,7 @@ export interface FileRouteTypes {
     | '/api/scan'
     | '/api/workspace'
     | '/auth/$pathname'
+    | '/demo/$soulId'
     | '/widget/$soulId'
     | '/api/billing/cancel'
     | '/api/billing/change'
@@ -414,6 +426,7 @@ export interface RootRouteChildren {
   ApiScanRoute: typeof ApiScanRoute
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   AuthPathnameRoute: typeof AuthPathnameRoute
+  DemoSoulIdRoute: typeof DemoSoulIdRoute
   WidgetSoulIdRoute: typeof WidgetSoulIdRoute
   ApiBillingCancelRoute: typeof ApiBillingCancelRoute
   ApiBillingChangeRoute: typeof ApiBillingChangeRoute
@@ -481,6 +494,13 @@ declare module '@tanstack/react-router' {
       path: '/widget/$soulId'
       fullPath: '/widget/$soulId'
       preLoaderRoute: typeof WidgetSoulIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/demo/$soulId': {
+      id: '/demo/$soulId'
+      path: '/demo/$soulId'
+      fullPath: '/demo/$soulId'
+      preLoaderRoute: typeof DemoSoulIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/$pathname': {
@@ -703,6 +723,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiScanRoute: ApiScanRoute,
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   AuthPathnameRoute: AuthPathnameRoute,
+  DemoSoulIdRoute: DemoSoulIdRoute,
   WidgetSoulIdRoute: WidgetSoulIdRoute,
   ApiBillingCancelRoute: ApiBillingCancelRoute,
   ApiBillingChangeRoute: ApiBillingChangeRoute,

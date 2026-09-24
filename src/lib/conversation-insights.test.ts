@@ -5,9 +5,11 @@ import {
   extractContact,
   firstQuestion,
   isLead,
+  isUnknownAnswer,
   leadsToCsv,
   relativeTime,
   topQuestions,
+  unansweredQuestions,
 } from "@/lib/conversation-insights";
 
 function conversation(
@@ -115,5 +117,43 @@ describe("leadsToCsv", () => {
 
   it("returns the opening question", () => {
     expect(firstQuestion(conversation(["  Hello there  "]))).toBe("Hello there");
+  });
+});
+
+describe("unanswered questions", () => {
+  const fallback = "I don’t have that in my knowledge yet, but I can connect you with our team.";
+
+  function exchange(question: string, reply: string, at = "2026-09-20T10:00:00.000Z") {
+    const value = conversation([question], "none", at);
+    value.messages[1].content = reply;
+    value.messages[1].createdAt = at;
+    return value;
+  }
+
+  it("recognises the configured fallback and first-person unknown replies", () => {
+    expect(isUnknownAnswer(fallback, fallback)).toBe(true);
+    expect(isUnknownAnswer("Hmm, I'm not sure about that one.")).toBe(true);
+    expect(isUnknownAnswer("I couldn’t find anything about gift cards.")).toBe(true);
+  });
+
+  it("does not flag factual negative answers", () => {
+    expect(isUnknownAnswer("We don't have a store in Paris, but we ship there.")).toBe(false);
+    expect(isUnknownAnswer("Yes, shipping to Canada takes 5–7 days.", fallback)).toBe(false);
+  });
+
+  it("groups repeated questions and ranks the most frequent first", () => {
+    const result = unansweredQuestions(
+      [
+        exchange("Do you sell gift cards?", fallback, "2026-09-20T10:00:00.000Z"),
+        exchange("do you sell gift cards", fallback, "2026-09-22T10:00:00.000Z"),
+        exchange("Where is your warehouse?", "I'm not sure about that."),
+        exchange("Do you ship to Canada?", "Yes, in 5–7 days."),
+      ],
+      fallback,
+    );
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({ question: "Do you sell gift cards?", count: 2 });
+    expect(result[0].lastAskedAt).toBe("2026-09-22T10:00:00.000Z");
+    expect(result[1].question).toBe("Where is your warehouse?");
   });
 });

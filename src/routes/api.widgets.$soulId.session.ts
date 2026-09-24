@@ -14,7 +14,12 @@ export const Route = createFileRoute("/api/widgets/$soulId/session")({
           if (!record || !record.soul.channels.widgetEnabled) {
             return jsonError("This widget is unavailable.", 404, headers);
           }
-          if (!originAllowed(origin, record.soul.channels.allowedDomains)) {
+          // The owner can switch on a shareable demo, served only from Obseri's own origin.
+          const demoRequest =
+            record.soul.channels.demoEnabled === true &&
+            Boolean(origin) &&
+            origin === new URL(request.url).origin;
+          if (!demoRequest && !originAllowed(origin, record.soul.channels.allowedDomains)) {
             return jsonError("This domain is not allowed to load the widget.", 403, headers);
           }
           const allowed = await consumeRateLimit(`session:${params.soulId}:${origin}`, 30, 60);

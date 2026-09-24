@@ -135,4 +135,10 @@
   root.appendChild(frame);
   root.appendChild(launcher);
   document.body.appendChild(root);
+
+  if (script.dataset.autoOpen === "true") {
+    window.setTimeout(function () {
+      launcher.click();
+    }, 700);
+  }
 })();

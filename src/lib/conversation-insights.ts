@@ -106,3 +106,85 @@ export function leadsToCsv(conversations: SoulConversation[]): string {
   });
   return [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
 }
+
+function normalizeText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[’‘]/g, "'")
+    .replace(/[^\p{L}\p{N}'\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// First-person "I don't know" phrasings only, so factual negatives such as
+// "We don't have a store in Paris" are not mistaken for missing knowledge.
+const UNKNOWN_ANSWER_PATTERNS = [
+  /\bi (?:don't|do not) (?:have|know)\b/,
+  /\bi(?:'m| am) not sure\b/,
+  /\bi (?:couldn't|could not|can't|cannot) find\b/,
+  /\bi (?:don't|do not) see (?:that|this|any)\b/,
+  /\bnot in my knowledge\b/,
+  /\bi'm unable to (?:find|answer)\b/,
+];
+
+/** True when an assistant reply says the answer is not in the website's knowledge. */
+export function isUnknownAnswer(content: string, unknownResponse?: string): boolean {
+  const reply = normalizeText(content);
+  if (!reply) return false;
+  const fallback = normalizeText(unknownResponse ?? "").slice(0, 48);
+  if (fallback.length >= 12 && reply.includes(fallback)) return true;
+  return UNKNOWN_ANSWER_PATTERNS.some((pattern) => pattern.test(reply));
+}
+
+export type UnansweredQuestion = {
+  question: string;
+  count: number;
+  lastAskedAt: string;
+  conversationId: string;
+};
+
+/**
+ * Visitor questions the agent could not answer, grouped case- and punctuation-insensitively,
+ * most frequent first and then most recent.
+ */
+export function unansweredQuestions(
+  conversations: SoulConversation[],
+  unknownResponse?: string,
+  limit = 20,
+): UnansweredQuestion[] {
+  const groups = new Map<string, UnansweredQuestion>();
+  for (const conversation of conversations) {
+    conversation.messages.forEach((message, index) => {
+      if (message.role !== "assistant" || !isUnknownAnswer(message.content, unknownResponse)) {
+        return;
+      }
+      const question = conversation.messages
+        .slice(0, index)
+        .reverse()
+        .find((candidate) => candidate.role === "visitor")
+        ?.content.trim();
+      if (!question) return;
+      const key = normalizeText(question);
+      if (!key) return;
+      const askedAt = message.createdAt || conversation.updatedAt;
+      const entry = groups.get(key);
+      if (entry) {
+        entry.count += 1;
+        if (Date.parse(askedAt) > Date.parse(entry.lastAskedAt)) {
+          entry.lastAskedAt = askedAt;
+          entry.conversationId = conversation.id;
+        }
+      } else {
+        groups.set(key, {
+          question,
+          count: 1,
+          lastAskedAt: askedAt,
+          conversationId: conversation.id,
+        });
+      }
+    });
+  }
+  return [...groups.values()]
+    .sort((a, b) => b.count - a.count || Date.parse(b.lastAskedAt) - Date.parse(a.lastAskedAt))
+    .slice(0, limit);
+}

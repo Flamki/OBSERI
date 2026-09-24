@@ -142,6 +142,12 @@ export type ChannelConfig = {
   webhookSecret: string;
   publishKey: string;
   widgetToken: string;
+  /** Email the owner once when a website conversation becomes a lead. Defaults to on. */
+  leadAlertsEnabled?: boolean;
+  /** Where lead alerts go. Empty means the email of the account that publishes. */
+  leadAlertEmail?: string;
+  /** Let the shareable obseri.com demo page load this widget. Defaults to off. */
+  demoEnabled?: boolean;
 };
 
 export type SoulMessage = {
@@ -243,6 +249,9 @@ export function createSoul(siteUrl: string, name?: string): Soul {
       webhookSecret: createSecret(),
       publishKey: createCredential("obspub"),
       widgetToken: createCredential("obswgt"),
+      leadAlertsEnabled: true,
+      leadAlertEmail: "",
+      demoEnabled: false,
     },
     conversations: [],
   };

@@ -22,6 +22,18 @@ function EmbeddedSoul() {
   const conversationId = useRef(crypto.randomUUID());
   const context = readWidgetContext();
 
+  // The iframe must stay see-through around the chat card; the app shell paints a dark body.
+  useEffect(() => {
+    const html = document.documentElement;
+    const previous = [html.style.background, document.body.style.background];
+    html.style.background = "transparent";
+    document.body.style.background = "transparent";
+    return () => {
+      html.style.background = previous[0];
+      document.body.style.background = previous[1];
+    };
+  }, []);
+
   useEffect(() => {
     const controller = new AbortController();
     if (!context.session) {
@@ -45,7 +57,7 @@ function EmbeddedSoul() {
   }, [context.session, soulId]);
 
   return (
-    <main className="obs-app min-h-screen bg-transparent p-2 text-[#0b0b0c]">
+    <main className="obs-app obs-widget min-h-screen bg-transparent p-2 text-[#0b0b0c]">
       {soul ? (
         <SoulChat
           soul={soul}
