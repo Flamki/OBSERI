@@ -119,15 +119,7 @@ export const Route = createFileRoute("/")({
         },
       },
     ],
-    links: [
-      { rel: "canonical", href: "https://obseri.com/" },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400;500&display=swap",
-      },
-    ],
+    links: [{ rel: "canonical", href: "https://obseri.com/" }],
   }),
   component: Index,
 });

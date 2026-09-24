@@ -117,7 +117,11 @@ export const Route = createFileRoute("/api/chat/stream")({
           if (error instanceof BillingStoreError)
             return errorResponse(error.message, error.status, error.code);
           console.error("soul_voice_stream_failed", error);
-          return errorResponse("The soul could not answer right now.", 500, "voice_stream_failed");
+          return errorResponse(
+            "Sorry, I couldn’t answer that just now. Please try again.",
+            500,
+            "voice_stream_failed",
+          );
         }
       },
     },

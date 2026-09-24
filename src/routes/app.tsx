@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
+  ArrowRight,
+  ArrowUpRight,
   AudioLines,
   BookOpen,
   Check,
@@ -16,6 +18,7 @@ import {
   FileText,
   Fingerprint,
   Globe2,
+  LayoutDashboard,
   LoaderCircle,
   LogOut,
   Menu,
@@ -52,10 +55,21 @@ import {
   type KnowledgeBase,
   type KnowledgeSource,
   type Soul,
+  type SoulConversation,
   type SoulMessage,
   type SoulWorkspace,
 } from "@/lib/soul";
 import { rankKnowledgeChunks, type ChatResponse } from "@/lib/conversation";
+import {
+  countSince,
+  extractContact,
+  firstQuestion,
+  isLead,
+  leadsToCsv,
+  relativeTime,
+  topQuestions,
+} from "@/lib/conversation-insights";
+import type { OwnerConversation } from "@/lib/integration-store";
 import { streamWebsiteCrawl } from "@/lib/crawl-client";
 import type { CrawlProgressEvent } from "@/lib/knowledge";
 import {
@@ -106,6 +120,7 @@ export const Route = createFileRoute("/app")({
 });
 
 type StudioView =
+  | "overview"
   | "knowledge"
   | "personality"
   | "voice"
@@ -121,6 +136,7 @@ const STORAGE_KEY = "obseri.soul-studio.v1";
 const SIDEBAR_STORAGE_KEY = "obseri.sidebar-collapsed.v1";
 
 const PAGE_META: Record<StudioView, { title: string; description: string }> = {
+  overview: { title: "Overview", description: "How your website agent is doing." },
   knowledge: { title: "Knowledge", description: "The pages and facts your soul can use." },
   personality: {
     title: "Personality",
@@ -128,10 +144,10 @@ const PAGE_META: Record<StudioView, { title: string; description: string }> = {
   },
   voice: { title: "Voice", description: "Choose how your website sounds." },
   playground: {
-    title: "Agent",
+    title: "Preview",
     description: "Experience your website and its soul exactly as a visitor will.",
   },
-  deploy: { title: "Integrate", description: "Publish the widget and connect your systems." },
+  deploy: { title: "Install", description: "Publish the widget and connect your systems." },
   conversations: {
     title: "Conversations",
     description: "Understand what visitors are asking for.",
@@ -141,6 +157,9 @@ const PAGE_META: Record<StudioView, { title: string; description: string }> = {
   settings: { title: "Settings", description: "Manage the selected website and its data." },
   help: { title: "Help", description: "Get support and find the right next step." },
 };
+
+/** Visitor conversations from the live widget plus Studio test sessions. */
+type StudioConversation = SoulConversation & { origin: string };
 
 type StudioUser = {
   id: string;
@@ -166,7 +185,7 @@ function AuthenticatedStudio() {
 
   if (session.isPending || !session.data?.user) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#f7f7f5] text-[#6f746c]">
+      <div className="flex h-screen items-center justify-center bg-[#f6f6f6] text-[#73726d]">
         <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Securing your workspace…
       </div>
     );
@@ -176,7 +195,7 @@ function AuthenticatedStudio() {
 
 function SoulStudio({ user }: { user: StudioUser }) {
   const [workspace, setWorkspace] = useState<SoulWorkspace>(DEMO_WORKSPACE);
-  const [view, setView] = useState<StudioView>("playground");
+  const [view, setView] = useState<StudioView>("overview");
   const [hydrated, setHydrated] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -187,6 +206,10 @@ function SoulStudio({ user }: { user: StudioUser }) {
   const [crawlEvents, setCrawlEvents] = useState<Record<string, CrawlProgressEvent[]>>({});
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [activePlan, setActivePlan] = useState<BillingPlan>(BILLING_PLANS.free);
+  const [visitorConversations, setVisitorConversations] = useState<
+    Record<string, OwnerConversation[]>
+  >({});
+  const [focusConversationId, setFocusConversationId] = useState<string | null>(null);
   const lastPersistedWorkspace = useRef<SoulWorkspace>(EMPTY_WORKSPACE);
 
   useEffect(() => {
@@ -301,6 +324,47 @@ function SoulStudio({ user }: { user: StudioUser }) {
     workspace.souls.find((candidate) => candidate.id === workspace.activeSoulId) ??
     workspace.souls[0] ??
     null;
+  const soulId = soul?.id ?? null;
+
+  useEffect(() => {
+    if (!hydrated || !soulId) return;
+    let active = true;
+    const load = () => {
+      if (document.visibilityState === "hidden") return;
+      void authFetch(`/api/souls/${encodeURIComponent(soulId)}/conversations?limit=200`, {
+        cache: "no-store",
+      })
+        .then(async (response) => {
+          if (!response.ok) return;
+          const payload = (await response.json()) as { conversations?: OwnerConversation[] };
+          if (active && Array.isArray(payload.conversations)) {
+            setVisitorConversations((current) => ({
+              ...current,
+              [soulId]: payload.conversations ?? [],
+            }));
+          }
+        })
+        .catch(() => undefined);
+    };
+    load();
+    const timer = window.setInterval(load, 60_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [hydrated, soulId]);
+
+  const allConversations: StudioConversation[] = soul
+    ? [
+        ...(visitorConversations[soul.id] ?? []),
+        ...soul.conversations.map((conversation) => ({ ...conversation, origin: "" })),
+      ].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+    : [];
+
+  function openConversation(id: string) {
+    setFocusConversationId(id);
+    navigate("conversations");
+  }
 
   function updateSoul(updater: (current: Soul) => Soul) {
     if (!soul) return;
@@ -319,7 +383,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
     setMobileNav(false);
     setProfileOpen(false);
     const params = new URLSearchParams(window.location.search);
-    if (next === "playground") params.delete("view");
+    if (next === "overview") params.delete("view");
     else params.set("view", next);
     const query = params.toString();
     window.history.replaceState(
@@ -593,12 +657,13 @@ function SoulStudio({ user }: { user: StudioUser }) {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-[#f7f7f5] font-sans text-[#191b18]">
+    <div className="obs-app h-screen overflow-hidden bg-[#fafaf9] text-[#0b0b0c]">
       <div className="flex h-full">
         <Sidebar
           workspace={workspace}
           soul={soul}
           view={view}
+          leadCount={allConversations.filter(isLead).length}
           collapsed={sidebarCollapsed}
           mobileOpen={mobileNav}
           onClose={() => setMobileNav(false)}
@@ -612,6 +677,9 @@ function SoulStudio({ user }: { user: StudioUser }) {
           <Topbar
             workspace={workspace}
             soul={soul}
+            view={view}
+            user={user}
+            plan={activePlan}
             sidebarCollapsed={sidebarCollapsed}
             profileOpen={profileOpen}
             onMenu={() => setMobileNav(true)}
@@ -629,6 +697,16 @@ function SoulStudio({ user }: { user: StudioUser }) {
           >
             {!soul ? (
               <EmptyState onCreate={openCreateWebsite} />
+            ) : view === "overview" ? (
+              <OverviewView
+                soul={soul}
+                user={user}
+                plan={activePlan}
+                conversations={allConversations}
+                onNavigate={navigate}
+                onOpenConversation={openConversation}
+                onRefresh={() => void refreshKnowledge()}
+              />
             ) : view === "knowledge" ? (
               <KnowledgeView
                 soul={soul}
@@ -660,7 +738,13 @@ function SoulStudio({ user }: { user: StudioUser }) {
                 onUpgrade={() => navigate("billing")}
               />
             ) : view === "conversations" ? (
-              <ConversationsView soul={soul} onTest={() => navigate("playground")} />
+              <ConversationsView
+                soul={soul}
+                conversations={allConversations}
+                focusId={focusConversationId}
+                onTest={() => navigate("playground")}
+                onInstall={() => navigate("deploy")}
+              />
             ) : view === "billing" ? (
               <ProfileWorkspaceView
                 workspace={workspace}
@@ -702,7 +786,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
         />
       )}
       {notice && (
-        <div className="fixed bottom-5 left-1/2 z-[80] -translate-x-1/2 rounded-xl border border-black/10 bg-[#191b18] px-4 py-3 text-sm font-medium text-white shadow-xl">
+        <div className="fixed bottom-5 left-1/2 z-[80] -translate-x-1/2 rounded-xl border border-black/10 bg-[#1a1a19] px-4 py-3 text-sm font-medium text-white shadow-xl">
           {notice}
         </div>
       )}
@@ -724,6 +808,7 @@ function Sidebar({
   workspace,
   soul,
   view,
+  leadCount,
   collapsed,
   mobileOpen,
   onClose,
@@ -735,6 +820,7 @@ function Sidebar({
   workspace: SoulWorkspace;
   soul: Soul | null;
   view: StudioView;
+  leadCount: number;
   collapsed: boolean;
   mobileOpen: boolean;
   onClose: () => void;
@@ -744,13 +830,37 @@ function Sidebar({
   onSoulChange: (id: string) => void;
 }) {
   const [soulMenuOpen, setSoulMenuOpen] = useState(false);
-  const items: Array<{ id: StudioView; label: string; icon: ReactNode }> = [
-    { id: "playground", label: "Agent", icon: <Monitor /> },
-    { id: "knowledge", label: "Knowledge", icon: <BookOpen /> },
-    { id: "personality", label: "Personality", icon: <Fingerprint /> },
-    { id: "voice", label: "Voice", icon: <Mic2 /> },
-    { id: "deploy", label: "Integrate", icon: <Code2 /> },
-    { id: "conversations", label: "Conversations", icon: <MessageCircle /> },
+  const groups: Array<{
+    label: string;
+    items: Array<{ id: StudioView; label: string; icon: ReactNode; badge?: number }>;
+  }> = [
+    { label: "", items: [{ id: "overview", label: "Overview", icon: <LayoutDashboard /> }] },
+    {
+      label: "Build",
+      items: [
+        { id: "knowledge", label: "Knowledge", icon: <BookOpen /> },
+        { id: "personality", label: "Personality", icon: <Fingerprint /> },
+        { id: "voice", label: "Voice", icon: <Mic2 /> },
+      ],
+    },
+    {
+      label: "Launch",
+      items: [
+        { id: "playground", label: "Preview", icon: <Monitor /> },
+        { id: "deploy", label: "Install", icon: <Code2 /> },
+      ],
+    },
+    {
+      label: "Results",
+      items: [
+        {
+          id: "conversations",
+          label: "Conversations",
+          icon: <MessageCircle />,
+          badge: leadCount,
+        },
+      ],
+    },
   ];
   return (
     <>
@@ -762,7 +872,7 @@ function Sidebar({
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-[252px] shrink-0 flex-col overflow-hidden border-r border-[#e3e4e0] bg-white transition-[width,transform] duration-300 ease-out lg:static lg:translate-x-0 ${collapsed ? "lg:w-[72px]" : "lg:w-[252px]"} ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-[252px] shrink-0 flex-col overflow-hidden border-r border-[#e3e3e1] bg-white transition-[width,transform] duration-300 ease-out lg:static lg:translate-x-0 ${collapsed ? "lg:w-[72px]" : "lg:w-[252px]"} ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div
           className={`flex h-16 shrink-0 items-center justify-between px-5 transition-[padding] duration-300 ${collapsed ? "lg:px-4" : "lg:px-5"}`}
@@ -770,11 +880,11 @@ function Sidebar({
           <button
             type="button"
             onClick={() => {
-              onNavigate("playground");
+              onNavigate("overview");
               onClose();
             }}
             className="inline-flex min-w-0 items-center overflow-hidden"
-            aria-label="Open Agent workspace"
+            aria-label="Open overview"
           >
             <img
               src="/obseri-logo-dark.svg"
@@ -789,7 +899,7 @@ function Sidebar({
           </button>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-[#6f736d] hover:bg-[#f2f3f0] lg:hidden"
+            className="rounded-lg p-2 text-[#73726d] hover:bg-[#f2f2f1] lg:hidden"
           >
             <X className="h-4 w-4" />
           </button>
@@ -813,13 +923,13 @@ function Sidebar({
                 }
                 setSoulMenuOpen((current) => !current);
               }}
-              className={`flex w-full min-w-0 items-center gap-2.5 rounded-xl border border-[#dedfdb] bg-white p-2 text-left shadow-sm transition hover:border-[#cfd2cb] hover:bg-[#fafbf9] ${collapsed ? "lg:justify-center lg:p-1.5" : ""}`}
+              className={`flex w-full min-w-0 items-center gap-2.5 rounded-xl border border-[#dfdedb] bg-white p-2 text-left shadow-sm transition hover:border-[#d1d0cc] hover:bg-[#fafafa] ${collapsed ? "lg:justify-center lg:p-1.5" : ""}`}
               aria-expanded={soulMenuOpen}
               aria-label={collapsed ? `Open ${soul?.name || "website"} menu` : undefined}
               title={collapsed ? soul?.name || "Choose a website" : undefined}
             >
               <span
-                className={`flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-black/5 bg-[#f3f5f0] ${collapsed ? "lg:h-8 lg:w-8" : ""}`}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-black/5 bg-[#f3f3f2] ${collapsed ? "lg:h-8 lg:w-8" : ""}`}
               >
                 <img
                   src={websiteFaviconUrl(soul?.siteUrl || "https://obseri.com")}
@@ -831,19 +941,19 @@ function Sidebar({
                 <span className="block truncate text-sm font-semibold">
                   {soul?.name || "Website"}
                 </span>
-                <span className="mt-0.5 block truncate text-[11px] text-[#858a82]">
+                <span className="mt-0.5 block truncate text-[11px] text-[#8c8980]">
                   {soul ? safeHost(soul.siteUrl) : "Choose a website"}
                 </span>
               </span>
               <ChevronDown
-                className={`h-4 w-4 shrink-0 text-[#858982] transition ${soulMenuOpen ? "rotate-180" : ""} ${collapsed ? "lg:hidden" : ""}`}
+                className={`h-4 w-4 shrink-0 text-[#8c897f] transition ${soulMenuOpen ? "rotate-180" : ""} ${collapsed ? "lg:hidden" : ""}`}
               />
             </button>
           </div>
 
           {soulMenuOpen && (
-            <div className="absolute left-3 right-3 top-[56px] z-[60] overflow-hidden rounded-xl border border-[#dfe1dc] bg-white p-1.5 shadow-[0_16px_40px_rgba(28,32,25,0.14)]">
-              <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#999d96]">
+            <div className="absolute left-3 right-3 top-[56px] z-[60] overflow-hidden rounded-xl border border-[#e0dfdd] bg-white p-1.5 shadow-[0_16px_40px_rgba(28,32,25,0.14)]">
+              <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9f9c94]">
                 Your websites
               </p>
               <div className="max-h-52 overflow-y-auto">
@@ -854,9 +964,9 @@ function Sidebar({
                       onSoulChange(candidate.id);
                       setSoulMenuOpen(false);
                     }}
-                    className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition ${candidate.id === soul?.id ? "bg-[#f0f5eb]" : "hover:bg-[#f5f6f3]"}`}
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition ${candidate.id === soul?.id ? "bg-[#f1f0ef]" : "hover:bg-[#f5f5f4]"}`}
                   >
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md border border-black/5 bg-[#f3f5f0]">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md border border-black/5 bg-[#f3f3f2]">
                       <img
                         src={websiteFaviconUrl(candidate.siteUrl)}
                         alt=""
@@ -866,23 +976,23 @@ function Sidebar({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-xs font-semibold">{candidate.name}</span>
-                      <span className="mt-0.5 block truncate text-[10px] text-[#8a8e87]">
+                      <span className="mt-0.5 block truncate text-[10px] text-[#908d85]">
                         {safeHost(candidate.siteUrl)}
                       </span>
                     </span>
-                    {candidate.id === soul?.id && <Check className="h-3.5 w-3.5 text-[#6f9948]" />}
+                    {candidate.id === soul?.id && <Check className="h-3.5 w-3.5 text-[#0b0b0c]" />}
                   </button>
                 ))}
               </div>
-              <div className="my-1 h-px bg-[#eceee9]" />
+              <div className="my-1 h-px bg-[#ececeb]" />
               <button
                 onClick={() => {
                   setSoulMenuOpen(false);
                   onNew();
                 }}
-                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-[#557b32] hover:bg-[#f0f5eb]"
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-[#0b0b0c] hover:bg-[#f1f0ef]"
               >
-                <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[#d9e3cf] bg-white">
+                <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[#dbdad7] bg-white">
                   <Plus className="h-3.5 w-3.5" />
                 </span>
                 Add another website
@@ -892,27 +1002,48 @@ function Sidebar({
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-2">
-          <div className="space-y-1">
-            {items.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => onNavigate(item.id)}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${collapsed ? "lg:justify-center lg:px-0" : ""} ${view === item.id ? "bg-[#efefed] text-[#171916]" : "text-[#666a64] hover:bg-[#f5f5f3] hover:text-[#171916]"}`}
-                aria-label={item.label}
-                aria-current={view === item.id ? "page" : undefined}
-                title={collapsed ? item.label : undefined}
-              >
-                <span className="[&_svg]:h-[18px] [&_svg]:w-[18px]">{item.icon}</span>
-                <span className={collapsed ? "lg:hidden" : ""}>{item.label}</span>
-              </button>
-            ))}
-          </div>
+          {groups.map((group) => (
+            <div key={group.label || "home"} className={group.label ? "mt-5" : ""}>
+              {group.label && (
+                <p
+                  className={`obs-mono mb-1.5 px-3 text-[10px] font-medium uppercase tracking-[0.14em] text-[#a3a29d] ${collapsed ? "lg:hidden" : ""}`}
+                >
+                  {group.label}
+                </p>
+              )}
+              <div className="space-y-0.5">
+                {group.items.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => onNavigate(item.id)}
+                    className={`relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${collapsed ? "lg:justify-center lg:px-0" : ""} ${view === item.id ? "bg-[#0b0b0c] text-white" : "text-[#5f5e5a] hover:bg-[#f3f3f1] hover:text-[#0b0b0c]"}`}
+                    aria-label={item.label}
+                    aria-current={view === item.id ? "page" : undefined}
+                    title={collapsed ? item.label : undefined}
+                  >
+                    <span className="[&_svg]:h-[18px] [&_svg]:w-[18px]">{item.icon}</span>
+                    <span className={`flex-1 text-left ${collapsed ? "lg:hidden" : ""}`}>
+                      {item.label}
+                    </span>
+                    {Boolean(item.badge) && (
+                      <span
+                        className={`min-w-5 rounded-full px-1.5 py-0.5 text-center text-[11px] font-semibold ${view === item.id ? "bg-white/20 text-white" : "bg-[#ff5c7a] text-white"} ${collapsed ? "lg:absolute lg:right-1.5 lg:top-1 lg:min-w-4 lg:px-1 lg:py-0 lg:text-[9px]" : ""}`}
+                        title={`${item.badge} leads`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
         </nav>
 
-        <div className="border-t border-[#ecece9] p-3">
+        <div className="border-t border-[#ecebe9] p-3">
           <button
             onClick={() => onNavigate("billing")}
-            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${collapsed ? "lg:justify-center lg:px-0" : ""} ${view === "billing" ? "bg-[#efefed] text-[#171916]" : "text-[#666a64] hover:bg-[#f5f5f3]"}`}
+            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${collapsed ? "lg:justify-center lg:px-0" : ""} ${view === "billing" ? "bg-[#0b0b0c] text-white" : "text-[#5f5e5a] hover:bg-[#f3f3f1]"}`}
             aria-label="Plans and billing"
             title={collapsed ? "Plans and billing" : undefined}
           >
@@ -921,7 +1052,7 @@ function Sidebar({
           </button>
           <button
             onClick={() => onNavigate("settings")}
-            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${collapsed ? "lg:justify-center lg:px-0" : ""} ${view === "settings" ? "bg-[#efefed] text-[#171916]" : "text-[#666a64] hover:bg-[#f5f5f3]"}`}
+            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${collapsed ? "lg:justify-center lg:px-0" : ""} ${view === "settings" ? "bg-[#0b0b0c] text-white" : "text-[#5f5e5a] hover:bg-[#f3f3f1]"}`}
             aria-label="Settings"
             title={collapsed ? "Settings" : undefined}
           >
@@ -930,7 +1061,7 @@ function Sidebar({
           </button>
           <button
             onClick={() => onNavigate("help")}
-            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${collapsed ? "lg:justify-center lg:px-0" : ""} ${view === "help" ? "bg-[#efefed] text-[#171916]" : "text-[#666a64] hover:bg-[#f5f5f3]"}`}
+            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${collapsed ? "lg:justify-center lg:px-0" : ""} ${view === "help" ? "bg-[#0b0b0c] text-white" : "text-[#5f5e5a] hover:bg-[#f3f3f1]"}`}
             aria-label="Help"
             title={collapsed ? "Help" : undefined}
           >
@@ -946,6 +1077,9 @@ function Sidebar({
 function Topbar({
   workspace,
   soul,
+  view,
+  user,
+  plan,
   sidebarCollapsed,
   profileOpen,
   onMenu,
@@ -955,6 +1089,9 @@ function Topbar({
 }: {
   workspace: SoulWorkspace;
   soul: Soul | null;
+  view: StudioView;
+  user: StudioUser;
+  plan: BillingPlan;
   sidebarCollapsed: boolean;
   profileOpen: boolean;
   onMenu: () => void;
@@ -971,17 +1108,17 @@ function Topbar({
   }, [profileOpen]);
 
   return (
-    <header className="z-30 flex h-16 shrink-0 items-center justify-between border-b border-[#e3e4e0] bg-white/95 px-4 backdrop-blur sm:px-6 lg:px-8">
+    <header className="z-30 flex h-16 shrink-0 items-center justify-between border-b border-[#e3e3e1] bg-white/95 px-4 backdrop-blur sm:px-6 lg:px-8">
       <div className="flex min-w-0 items-center gap-3">
         <button
           onClick={onMenu}
-          className="rounded-lg p-2 text-[#666a64] hover:bg-[#f2f3f0] lg:hidden"
+          className="rounded-lg p-2 text-[#6a6964] hover:bg-[#f2f2f1] lg:hidden"
         >
           <Menu className="h-5 w-5" />
         </button>
         <button
           onClick={onToggleSidebar}
-          className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#626760] transition hover:bg-[#f1f2ef] hover:text-[#171916] lg:flex"
+          className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#666561] transition hover:bg-[#f1f1f0] hover:text-[#181817] lg:flex"
           aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-expanded={!sidebarCollapsed}
           title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -992,76 +1129,88 @@ function Topbar({
             <PanelLeftClose className="h-[18px] w-[18px]" />
           )}
         </button>
-        <div className="relative z-50">
-          {setupOpen && (
-            <button
-              className="fixed inset-0 z-40 cursor-default"
-              onClick={() => setSetupOpen(false)}
-              aria-label="Close setup progress"
-            />
-          )}
-          <button
-            onClick={() => {
-              if (profileOpen) onProfile();
-              setSetupOpen((current) => !current);
-            }}
-            className={`relative z-50 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-sm font-extrabold tracking-[-0.05em] transition ${setupOpen ? "border-[#a8c88b] bg-[#f0f7e9] text-[#355d18]" : "border-[#dedfdb] bg-white text-[#20231f] hover:border-[#c7d6b9] hover:bg-[#f7faf4]"}`}
-            aria-label="Open setup progress"
-            aria-expanded={setupOpen}
-            title={`${completeSteps} of ${setupSteps.length} setup steps complete`}
-          >
-            <img src="/obseri-pulse-mark.svg" alt="" className="h-5 w-5" />
-            <span
-              className={`absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-white px-0.5 text-[8px] font-bold tracking-normal text-white ${completeSteps === setupSteps.length && setupSteps.length ? "bg-[#65953a]" : "bg-[#20231f]"}`}
-            >
-              {completeSteps}
-            </span>
-          </button>
-          {setupOpen && soul && (
-            <SetupProgressMenu
-              soul={soul}
-              steps={setupSteps}
-              onNavigate={(next) => {
-                setSetupOpen(false);
-                onNavigate(next);
-              }}
-            />
-          )}
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold tracking-[-0.01em]">{workspace.name}</p>
-          {soul ? (
-            <a
-              href={soul.siteUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-0.5 flex max-w-full items-center gap-1.5 truncate text-xs text-[#7a7e77] transition hover:text-[#4f792c]"
-              title={`Open ${safeHost(soul.siteUrl)}`}
-            >
-              <Globe2 className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{safeHost(soul.siteUrl)}</span>
-            </a>
-          ) : (
-            <p className="mt-0.5 text-xs text-[#7a7e77]">No website selected</p>
-          )}
-        </div>
+        <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-sm">
+          <span className="hidden truncate text-[#8a8984] sm:inline">
+            {soul?.name ?? workspace.name}
+          </span>
+          <ChevronRight className="hidden h-3.5 w-3.5 shrink-0 text-[#c4c3be] sm:block" />
+          <span className="truncate font-semibold tracking-[-0.01em]">{PAGE_META[view].title}</span>
+        </nav>
       </div>
       <div className="flex items-center gap-2">
+        {soul && completeSteps < setupSteps.length && (
+          <div className="relative z-50 hidden sm:block">
+            {setupOpen && (
+              <button
+                className="fixed inset-0 z-40 cursor-default"
+                onClick={() => setSetupOpen(false)}
+                aria-label="Close setup progress"
+              />
+            )}
+            <button
+              onClick={() => {
+                if (profileOpen) onProfile();
+                setSetupOpen((current) => !current);
+              }}
+              className="relative z-50 inline-flex h-9 items-center gap-2 rounded-full border border-[#e2e2df] bg-white pl-2 pr-3.5 text-[13px] font-medium transition hover:bg-[#f5f5f3]"
+              aria-label="Open setup progress"
+              aria-expanded={setupOpen}
+            >
+              <span
+                className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                style={{
+                  background: `conic-gradient(#ff5c7a ${(completeSteps / setupSteps.length) * 360}deg, #d9d8d4 0deg)`,
+                }}
+              >
+                <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white text-[8px] text-[#0b0b0c]">
+                  {completeSteps}
+                </span>
+              </span>
+              Setup {completeSteps}/{setupSteps.length}
+            </button>
+            {setupOpen && (
+              <div className="absolute right-0 top-11">
+                <SetupProgressMenu
+                  soul={soul}
+                  steps={setupSteps}
+                  onNavigate={(next) => {
+                    setSetupOpen(false);
+                    onNavigate(next);
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+        {soul && (
+          <a
+            href={soul.siteUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="hidden h-9 items-center gap-1.5 rounded-full px-3 text-[13px] text-[#6f6e69] transition hover:bg-[#f3f3f1] hover:text-[#0b0b0c] md:inline-flex"
+            title={`Open ${safeHost(soul.siteUrl)}`}
+          >
+            <Globe2 className="h-3.5 w-3.5" /> {safeHost(soul.siteUrl)}
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
         <div className="relative z-50">
           <button
             onClick={() => {
               setSetupOpen(false);
               onProfile();
             }}
-            className="flex items-center gap-2 rounded-full border border-[#dedfdb] bg-white p-1 pr-2 shadow-sm hover:bg-[#f7f7f5]"
+            className="flex items-center gap-2 rounded-full border border-[#dfdedb] bg-white p-1 pr-2 shadow-sm hover:bg-[#f6f6f6]"
             aria-expanded={profileOpen}
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#20221f] text-xs font-semibold text-white">
-              BB
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0b0b0c] text-xs font-semibold text-white">
+              {userInitials(user)}
             </span>
-            <ChevronDown className="h-3.5 w-3.5 text-[#747870]" />
+            <ChevronDown className="h-3.5 w-3.5 text-[#777671]" />
           </button>
-          {profileOpen && <ProfileMenu soul={soul} onNavigate={onNavigate} />}
+          {profileOpen && (
+            <ProfileMenu soul={soul} workspace={workspace} plan={plan} onNavigate={onNavigate} />
+          )}
         </div>
       </div>
     </header>
@@ -1126,20 +1275,20 @@ function SetupProgressMenu({
   const percentage = Math.round((complete / steps.length) * 100);
 
   return (
-    <div className="absolute left-0 top-12 z-50 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[#dfe1dc] bg-white shadow-[0_20px_60px_rgba(25,29,22,0.18)]">
-      <div className="border-b border-[#eceee9] p-4">
+    <div className="z-50 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[#e0dfdd] bg-white shadow-[0_20px_60px_rgba(25,29,22,0.18)]">
+      <div className="border-b border-[#ececeb] p-4">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-sm font-semibold">Website setup</p>
-            <p className="mt-1 truncate text-xs text-[#777c74]">{soul.name}</p>
+            <p className="mt-1 truncate text-xs text-[#7c7a74]">{soul.name}</p>
           </div>
-          <span className="shrink-0 rounded-full bg-[#f0f3ed] px-2.5 py-1 text-[11px] font-semibold text-[#5d6359]">
+          <span className="shrink-0 rounded-full bg-[#f1f0ef] px-2.5 py-1 text-[11px] font-semibold text-[#615f5b]">
             {complete} of {steps.length}
           </span>
         </div>
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#e8ebe5]">
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#e9e9e7]">
           <div
-            className="h-full rounded-full bg-[#75a847] transition-[width] duration-500"
+            className="h-full rounded-full bg-[#0b0b0c] transition-[width] duration-500"
             style={{ width: `${percentage}%` }}
           />
         </div>
@@ -1150,25 +1299,25 @@ function SetupProgressMenu({
           <button
             key={step.view}
             onClick={() => onNavigate(step.view)}
-            className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-[#f5f6f3]"
+            className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-[#f5f5f4]"
           >
             <span
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl [&_svg]:h-4 [&_svg]:w-4 ${step.done ? "bg-[#eaf4df] text-[#547d2e]" : "bg-[#f0f1ee] text-[#747971]"}`}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl [&_svg]:h-4 [&_svg]:w-4 ${step.done ? "bg-[#ebeae8] text-[#0b0b0c]" : "bg-[#f0f0ef] text-[#797771]"}`}
             >
               {step.done ? <Check /> : step.icon}
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-semibold">{step.title}</span>
-              <span className="mt-0.5 block truncate text-xs text-[#7a7f77]">{step.detail}</span>
+              <span className="mt-0.5 block truncate text-xs text-[#7f7d77]">{step.detail}</span>
             </span>
-            <ChevronRight className="h-4 w-4 shrink-0 text-[#a1a59e] transition group-hover:translate-x-0.5 group-hover:text-[#555b52]" />
+            <ChevronRight className="h-4 w-4 shrink-0 text-[#a6a49d] transition group-hover:translate-x-0.5 group-hover:text-[#595854]" />
           </button>
         ))}
       </div>
 
-      <div className="flex items-center gap-2 border-t border-[#eceee9] bg-[#fafbf9] px-4 py-3 text-xs text-[#6f756b]">
+      <div className="flex items-center gap-2 border-t border-[#ececeb] bg-[#fafafa] px-4 py-3 text-xs text-[#73726d]">
         <span
-          className={`h-2 w-2 rounded-full ${complete === steps.length ? "bg-[#70a43f]" : "bg-[#c4a14e]"}`}
+          className={`h-2 w-2 rounded-full ${complete === steps.length ? "bg-[#22c55e]" : "bg-[#c4a14e]"}`}
         />
         {complete === steps.length
           ? "Your website soul is fully set up."
@@ -1178,50 +1327,74 @@ function SetupProgressMenu({
   );
 }
 
+function userInitials(user: { name?: string | null; email?: string | null } | undefined) {
+  const displayName = user?.name || user?.email?.split("@")[0] || "";
+  return (
+    displayName
+      .split(/[\s._-]+/)
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "O"
+  );
+}
+
 function ProfileMenu({
   soul,
+  workspace,
+  plan,
   onNavigate,
 }: {
   soul: Soul | null;
+  workspace: SoulWorkspace;
+  plan: BillingPlan;
   onNavigate: (view: StudioView) => void;
 }) {
   const session = authClient.useSession();
   const user = session.data?.user;
   const displayName = user?.name || user?.email?.split("@")[0] || "Obseri user";
-  const initials = displayName
-    .split(/\s+/)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+  const initials = userInitials(user);
+  const pageLimit = plan.limits.indexedPages;
+  const pagesUsed = soul?.knowledge.pages.length ?? 0;
+  const websiteLimit = plan.limits.websites;
   return (
-    <div className="absolute right-0 top-12 z-50 w-[310px] overflow-hidden rounded-2xl border border-[#dedfdb] bg-white p-2 shadow-[0_18px_55px_rgba(0,0,0,.14)]">
+    <div className="absolute right-0 top-12 z-50 w-[310px] overflow-hidden rounded-2xl border border-[#dfdedb] bg-white p-2 shadow-[0_18px_55px_rgba(0,0,0,.14)]">
       <div className="p-3">
         <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#20221f] text-sm font-semibold text-white">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#212120] text-sm font-semibold text-white">
             {initials || "O"}
           </span>
           <div>
             <p className="text-sm font-semibold">{displayName}</p>
-            <p className="max-w-[210px] truncate text-xs text-[#7b7f78]">{user?.email}</p>
+            <p className="max-w-[210px] truncate text-xs text-[#7f7d78]">{user?.email}</p>
           </div>
         </div>
       </div>
-      <div className="rounded-xl border border-[#e5e6e2] bg-[#fafaf8] p-3">
+      <div className="rounded-xl border border-[#e5e5e3] bg-[#f9f9f9] p-3">
         <div className="flex items-center justify-between">
-          <span className="text-xs text-[#73776f]">Plan and usage</span>
-          <span className="rounded-md bg-[#20221f] px-2 py-1 text-xs font-semibold text-white">
-            Active
+          <span className="text-xs text-[#767570]">Current plan</span>
+          <span className="rounded-full bg-[#0b0b0c] px-2.5 py-1 text-xs font-semibold text-white">
+            {plan.name}
           </span>
         </div>
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#e3e4df]">
-          <div className="h-full w-[42%] rounded-full bg-[#7da84c]" />
-        </div>
-        <p className="mt-2 text-xs text-[#777b74]">
-          {soul?.knowledge.pages.length ?? 0} pages learned
+        {pageLimit !== null && (
+          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#e3e2e0]">
+            <div
+              className="h-full rounded-full bg-[#0b0b0c]"
+              style={{ width: `${Math.min(100, (pagesUsed / Math.max(pageLimit, 1)) * 100)}%` }}
+            />
+          </div>
+        )}
+        <p className="mt-2 text-xs text-[#7b7974]">
+          {pagesUsed.toLocaleString("en-IN")}
+          {pageLimit !== null ? ` of ${pageLimit.toLocaleString("en-IN")}` : ""} pages ·{" "}
+          {workspace.souls.length}
+          {websiteLimit !== null ? ` of ${websiteLimit}` : ""} website
+          {(websiteLimit ?? workspace.souls.length) === 1 ? "" : "s"}
         </p>
       </div>
-      <div className="my-2 h-px bg-[#ecece9]" />
+      <div className="my-2 h-px bg-[#ecebe9]" />
       <MenuRow
         icon={<UserRound />}
         label="Profile and workspace"
@@ -1233,7 +1406,7 @@ function ProfileMenu({
         onClick={() => onNavigate("billing")}
       />
       <MenuRow icon={<Settings />} label="Settings" onClick={() => onNavigate("settings")} />
-      <div className="my-2 h-px bg-[#ecece9]" />
+      <div className="my-2 h-px bg-[#ecebe9]" />
       <button
         type="button"
         onClick={() => {
@@ -1241,7 +1414,7 @@ function ProfileMenu({
           localStorage.removeItem(STORAGE_KEY);
           void authClient.signOut().finally(() => window.location.replace("/auth/sign-in"));
         }}
-        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[#555a53] hover:bg-[#f3f4f1]"
+        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[#595854] hover:bg-[#f3f3f2]"
       >
         <LogOut className="h-4 w-4" />
         Sign out
@@ -1262,7 +1435,7 @@ function MenuRow({
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[#4f534d] hover:bg-[#f3f4f1] [&_svg]:h-4 [&_svg]:w-4"
+      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[#52514e] hover:bg-[#f3f3f2] [&_svg]:h-4 [&_svg]:w-4"
     >
       {icon}
       {label}
@@ -1357,16 +1530,16 @@ function KnowledgeView({
       )}
       <div className="grid min-h-[calc(100vh-64px)] xl:grid-cols-[minmax(0,1fr)_420px]">
         <Card className="h-full overflow-hidden border-b-0 p-0 xl:border-r">
-          <div className="flex flex-col gap-5 border-b border-[#e8eae5] px-5 py-5 sm:px-6">
+          <div className="flex flex-col gap-5 border-b border-[#e9e8e6] px-5 py-5 sm:px-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="flex items-center gap-2.5">
                   <h2 className="text-[15px] font-semibold">Knowledge library</h2>
-                  <span className="rounded-full bg-[#edf4e6] px-2 py-0.5 text-[10px] font-semibold text-[#5e823a]">
+                  <span className="rounded-full bg-[#eeedec] px-2 py-0.5 text-[10px] font-semibold text-[#0b0b0c]">
                     {knowledge.pages.filter((page) => page.enabled !== false).length} active
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-[#7c8179]">
+                <p className="mt-1 text-xs text-[#817f79]">
                   {sources.length} {sources.length === 1 ? "source" : "sources"} · {blockCount}{" "}
                   searchable blocks
                 </p>
@@ -1393,44 +1566,44 @@ function KnowledgeView({
               </div>
             </div>
           </div>
-          <div className="flex flex-col gap-3 border-b border-[#e8eae5] px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div className="flex flex-col gap-3 border-b border-[#e9e8e6] px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div className="relative w-full sm:max-w-[380px]">
-              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#92968f]" />
+              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#98958d]" />
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search titles, URLs, and content"
-                className="h-9 w-full rounded-lg border border-[#dfe1dc] bg-white pl-9 pr-3 text-xs outline-none focus:border-[#9fbb83]"
+                className="h-9 w-full rounded-lg border border-[#e0dfdd] bg-white pl-9 pr-3 text-xs outline-none focus:border-[#b4b4b0]"
               />
             </div>
-            <p className="text-[11px] text-[#7d827a]">{pages.length} documents</p>
+            <p className="text-[11px] text-[#82807a]">{pages.length} documents</p>
           </div>
           {!pages.length && soul.knowledge.status === "crawling" ? (
-            <div className="flex items-center gap-3 px-6 py-8 text-sm text-[#666a63]">
-              <LoaderCircle className="h-4 w-4 animate-spin text-[#709c43]" />
+            <div className="flex items-center gap-3 px-6 py-8 text-sm text-[#6a6863]">
+              <LoaderCircle className="h-4 w-4 animate-spin text-[#0b0b0c]" />
               Pages will appear here when they are ready.
             </div>
           ) : pages.length ? (
-            <div className="divide-y divide-[#ecece9]">
+            <div className="divide-y divide-[#ecebe9]">
               {pages.map((page) => (
                 <button
                   key={page.id}
                   onClick={() => setSelectedPageId(page.id)}
-                  className="flex w-full items-center gap-3.5 px-5 py-3.5 text-left transition hover:bg-[#fafbf9] sm:px-6"
+                  className="flex w-full items-center gap-3.5 px-5 py-3.5 text-left transition hover:bg-[#fafafa] sm:px-6"
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#e5e8e1] bg-[#f5f7f3] text-[#687165]">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#e6e5e3] bg-[#f5f5f4] text-[#6e6d68]">
                     <FileText className="h-[15px] w-[15px]" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-semibold text-[#252824]">
+                    <p className="truncate text-[13px] font-semibold text-[#272725]">
                       {page.title || safeHost(page.url)}
                     </p>
-                    <p className="mt-1 truncate text-[11px] text-[#858a82]">
+                    <p className="mt-1 truncate text-[11px] text-[#8c8980]">
                       {knowledgePagePath(page.url)}
                     </p>
                   </div>
                   <span
-                    className={`hidden rounded-full px-2 py-1 text-[10px] font-medium sm:block ${page.enabled === false ? "bg-[#f0f1ee] text-[#8b8f88]" : page.changeType === "changed" || page.changeType === "new" ? "bg-[#edf4e6] text-[#5b8037]" : "bg-[#f3f4f1] text-[#747970]"}`}
+                    className={`hidden rounded-full px-2 py-1 text-[10px] font-medium sm:block ${page.enabled === false ? "bg-[#f0f0ef] text-[#918e86]" : page.changeType === "changed" || page.changeType === "new" ? "bg-[#eeedec] text-[#0b0b0c]" : "bg-[#f3f3f2] text-[#787671]"}`}
                   >
                     {page.enabled === false
                       ? "Excluded"
@@ -1440,10 +1613,10 @@ function KnowledgeView({
                           ? "Updated"
                           : `${page.chunks.length} blocks`}
                   </span>
-                  <span className="hidden text-[10px] text-[#8b8f88] md:block">
+                  <span className="hidden text-[10px] text-[#918e86] md:block">
                     {formatBytes(page.sizeBytes ?? 0)}
                   </span>
-                  <ChevronRight className="h-3.5 w-3.5 text-[#9a9e97]" />
+                  <ChevronRight className="h-3.5 w-3.5 text-[#a09d95]" />
                 </button>
               ))}
             </div>
@@ -1469,21 +1642,21 @@ function KnowledgeView({
           <details open className="h-full">
             <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 sm:px-6">
               <div className="flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#f0f4ec] text-[#5e823a]">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#f1f0ef] text-[#0b0b0c]">
                   <Sparkles className="h-4 w-4" />
                 </span>
                 <div>
                   <h3 className="text-sm font-semibold">Retrieval lab</h3>
-                  <p className="mt-0.5 text-[11px] text-[#7e837b]">
+                  <p className="mt-0.5 text-[11px] text-[#83817b]">
                     See exactly what the assistant will retrieve before it answers.
                   </p>
                 </div>
               </div>
-              <ChevronDown className="h-4 w-4 text-[#8c9189]" />
+              <ChevronDown className="h-4 w-4 text-[#939087]" />
             </summary>
-            <div className="border-t border-[#e8eae5] px-5 py-5 sm:px-6">
+            <div className="border-t border-[#e9e8e6] px-5 py-5 sm:px-6">
               <div className="relative">
-                <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8e938b]" />
+                <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#959289]" />
                 <input
                   value={testQuery}
                   onChange={(event) => setTestQuery(event.target.value)}
@@ -1502,22 +1675,22 @@ function KnowledgeView({
                             knowledge.pages.find((page) => page.url === hit.pageUrl)?.id ?? null,
                           )
                         }
-                        className="flex w-full gap-3 rounded-xl border border-[#e5e7e2] p-3 text-left hover:bg-[#fafbf9]"
+                        className="flex w-full gap-3 rounded-xl border border-[#e6e5e3] p-3 text-left hover:bg-[#fafafa]"
                       >
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#eef4e8] text-[10px] font-bold text-[#5b8037]">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#efeeed] text-[10px] font-bold text-[#0b0b0c]">
                           {index + 1}
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="flex items-center justify-between gap-3">
                             <span className="truncate text-xs font-semibold">{hit.pageTitle}</span>
-                            <span className="shrink-0 text-[10px] text-[#6d736a]">
+                            <span className="shrink-0 text-[10px] text-[#72706b]">
                               score {hit.score.toFixed(2)}
                             </span>
                           </span>
-                          <span className="mt-1 line-clamp-2 block text-[11px] leading-5 text-[#747970]">
+                          <span className="mt-1 line-clamp-2 block text-[11px] leading-5 text-[#787671]">
                             {hit.text}
                           </span>
-                          <span className="mt-1.5 block text-[10px] text-[#8b8f88]">
+                          <span className="mt-1.5 block text-[10px] text-[#918e86]">
                             Matched {hit.matchedTerms.join(", ")}
                             {hit.phraseMatch ? " · exact phrase" : ""}
                           </span>
@@ -1525,7 +1698,7 @@ function KnowledgeView({
                       </button>
                     ))
                   ) : (
-                    <p className="rounded-xl bg-[#f7f8f5] p-4 text-xs text-[#777c74]">
+                    <p className="rounded-xl bg-[#f7f7f6] p-4 text-xs text-[#7c7a74]">
                       No grounded evidence matched. The assistant will use the configured “I don’t
                       know” response.
                     </p>
@@ -1656,10 +1829,10 @@ function AddKnowledgeSourceDialog({
         onSubmit={submit}
         className="relative w-full max-w-[560px] rounded-2xl border border-black/10 bg-white shadow-[0_30px_90px_rgba(0,0,0,.18)]"
       >
-        <div className="flex items-start justify-between border-b border-[#e8eae5] px-6 py-5">
+        <div className="flex items-start justify-between border-b border-[#e9e8e6] px-6 py-5">
           <div>
             <h2 className="text-lg font-semibold tracking-[-0.02em]">Add knowledge source</h2>
-            <p className="mt-1 text-xs text-[#7d827a]">
+            <p className="mt-1 text-xs text-[#82807a]">
               Connect a site or add trusted text your agent can cite.
             </p>
           </div>
@@ -1668,11 +1841,11 @@ function AddKnowledgeSourceDialog({
           </button>
         </div>
         <div className="p-6">
-          <div className="grid grid-cols-2 gap-2 rounded-xl bg-[#f3f4f1] p-1">
+          <div className="grid grid-cols-2 gap-2 rounded-xl bg-[#f3f3f2] p-1">
             <button
               type="button"
               onClick={() => setKind("website")}
-              className={`rounded-lg px-3 py-2 text-xs font-semibold ${kind === "website" ? "bg-white shadow-sm" : "text-[#747970]"}`}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold ${kind === "website" ? "bg-white shadow-sm" : "text-[#787671]"}`}
             >
               <Globe2 className="mr-2 inline h-3.5 w-3.5" />
               Website crawl
@@ -1680,7 +1853,7 @@ function AddKnowledgeSourceDialog({
             <button
               type="button"
               onClick={() => setKind("manual")}
-              className={`rounded-lg px-3 py-2 text-xs font-semibold ${kind === "manual" ? "bg-white shadow-sm" : "text-[#747970]"}`}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold ${kind === "manual" ? "bg-white shadow-sm" : "text-[#787671]"}`}
             >
               <FileText className="mr-2 inline h-3.5 w-3.5" />
               Paste text
@@ -1753,7 +1926,7 @@ function AddKnowledgeSourceDialog({
                   className="clean-input font-mono text-xs"
                 />
               </Field>
-              <div className="mt-4 rounded-xl border border-[#e2e8dc] bg-[#f6faf2] p-3 text-[11px] leading-5 text-[#617153]">
+              <div className="mt-4 rounded-xl border border-[#e3e3e1] bg-[#f6f6f6] p-3 text-[11px] leading-5 text-[#65635f]">
                 Obseri respects robots.txt, discovers sitemaps and llms.txt, removes duplicate
                 pages, and shows every crawl step live.
               </div>
@@ -1788,7 +1961,7 @@ function AddKnowledgeSourceDialog({
             <p className="mt-4 rounded-xl bg-[#fff3ef] p-3 text-xs text-[#984c3b]">{error}</p>
           )}
         </div>
-        <div className="flex justify-end gap-2 border-t border-[#e8eae5] px-6 py-4">
+        <div className="flex justify-end gap-2 border-t border-[#e9e8e6] px-6 py-4">
           <button type="button" onClick={onClose} className="secondary-button">
             Cancel
           </button>
@@ -1830,13 +2003,13 @@ function KnowledgeDocumentDialog({
       aria-modal="true"
     >
       <div className="mx-auto flex h-full max-w-[1180px] flex-col overflow-hidden rounded-2xl border border-black/10 bg-white shadow-[0_30px_100px_rgba(0,0,0,.2)]">
-        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-[#e5e7e2] px-5 py-4 sm:px-6">
+        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-[#e6e5e3] px-5 py-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#e4e7e0] bg-[#f5f7f3]">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#e5e4e2] bg-[#f5f5f4]">
               <Globe2 className="h-4 w-4" />
             </span>
             <div className="min-w-0">
-              <p className="text-xs text-[#858a82]">Knowledge document</p>
+              <p className="text-xs text-[#8c8980]">Knowledge document</p>
               <h2 className="truncate text-[15px] font-semibold">{page.title}</h2>
             </div>
           </div>
@@ -1874,11 +2047,11 @@ function KnowledgeDocumentDialog({
           </div>
         </header>
         <div className="grid min-h-0 flex-1 md:grid-cols-[330px_1fr]">
-          <aside className="overflow-y-auto border-r border-[#e5e7e2] bg-[#fafbf9] p-5 sm:p-6">
-            <div className="flex items-center justify-between rounded-xl border border-[#e3e5e0] bg-white p-3">
+          <aside className="overflow-y-auto border-r border-[#e6e5e3] bg-[#fafafa] p-5 sm:p-6">
+            <div className="flex items-center justify-between rounded-xl border border-[#e4e3e1] bg-white p-3">
               <div>
                 <p className="text-xs font-semibold">Use in answers</p>
-                <p className="mt-0.5 text-[10px] text-[#858a82]">Exclude without deleting</p>
+                <p className="mt-0.5 text-[10px] text-[#8c8980]">Exclude without deleting</p>
               </div>
               <Toggle checked={page.enabled !== false} onChange={onToggle} />
             </div>
@@ -1922,14 +2095,14 @@ function KnowledgeDocumentDialog({
             <div className="mx-auto max-w-[760px]">
               <div className="mb-5 flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8a8f87]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#918e85]">
                     Normalized content
                   </p>
-                  <p className="mt-1 text-xs text-[#777c74]">
+                  <p className="mt-1 text-xs text-[#7c7a74]">
                     This is the clean evidence sent to retrieval, not raw page HTML.
                   </p>
                 </div>
-                <span className="rounded-lg bg-[#f2f4f0] px-2.5 py-1.5 text-[10px] text-[#71766e]">
+                <span className="rounded-lg bg-[#f3f2f1] px-2.5 py-1.5 text-[10px] text-[#75746f]">
                   {page.chunks.length} chunks
                 </span>
               </div>
@@ -1937,17 +2110,17 @@ function KnowledgeDocumentDialog({
                 <textarea
                   value={content}
                   onChange={(event) => setContent(event.target.value)}
-                  className="min-h-[520px] w-full resize-none rounded-xl border border-[#b6c9a4] bg-white p-5 font-mono text-xs leading-6 outline-none ring-4 ring-[#eff5e9]"
+                  className="min-h-[520px] w-full resize-none rounded-xl border border-[#bab8b3] bg-white p-5 font-mono text-xs leading-6 outline-none ring-4 ring-[#f0efee]"
                 />
               ) : (
-                <article className="whitespace-pre-wrap rounded-xl border border-[#e3e5e0] bg-[#fcfcfb] p-5 text-sm leading-7 text-[#3f443d]">
+                <article className="whitespace-pre-wrap rounded-xl border border-[#e4e3e1] bg-[#fcfcfb] p-5 text-sm leading-7 text-[#42413f]">
                   {content || "No readable content."}
                 </article>
               )}
               {!!revisions.length && (
                 <div className="mt-6">
                   <h3 className="text-xs font-semibold">Revision history</h3>
-                  <div className="mt-2 divide-y divide-[#eceee9] rounded-xl border border-[#e3e5e0]">
+                  <div className="mt-2 divide-y divide-[#ececeb] rounded-xl border border-[#e4e3e1]">
                     {[...revisions]
                       .reverse()
                       .slice(0, 8)
@@ -1959,7 +2132,7 @@ function KnowledgeDocumentDialog({
                           <span className="font-medium capitalize">
                             {revision.reason.replace("_", " ")}
                           </span>
-                          <span className="text-[#858a82]">
+                          <span className="text-[#8c8980]">
                             {formatDateTime(revision.capturedAt)} ·{" "}
                             {revision.wordCount.toLocaleString()} words
                           </span>
@@ -1987,14 +2160,14 @@ function DocumentMeta({
 }) {
   return (
     <div>
-      <dt className="font-semibold text-[#4b5049]">{label}</dt>
-      <dd className="mt-1 break-words leading-5 text-[#7d827a]">
+      <dt className="font-semibold text-[#4f4e4a]">{label}</dt>
+      <dd className="mt-1 break-words leading-5 text-[#82807a]">
         {link && /^https?:\/\//.test(value) ? (
           <a
             href={value}
             target="_blank"
             rel="noreferrer"
-            className="text-[#567c32] hover:underline"
+            className="text-[#0b0b0c] hover:underline"
           >
             {value} <ExternalLink className="inline h-3 w-3" />
           </a>
@@ -2169,13 +2342,13 @@ function CrawlProgressPanel({ events }: { events: CrawlProgressEvent[] }) {
     return (
       <section
         className={`flex flex-col gap-3 rounded-2xl border px-5 py-4 sm:flex-row sm:items-center sm:justify-between ${
-          failed ? "border-[#efd7cf] bg-[#fff8f5]" : "border-[#dce8d2] bg-[#f7fbf3]"
+          failed ? "border-[#efd7cf] bg-[#fff8f5]" : "border-[#dfdedb] bg-[#f7f7f7]"
         }`}
       >
         <div className="flex min-w-0 items-center gap-3">
           <span
             className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-              failed ? "bg-[#ffebe5] text-[#a14f39]" : "bg-[#e7f2dd] text-[#5f8738]"
+              failed ? "bg-[#ffebe5] text-[#a14f39]" : "bg-[#e9e8e6] text-[#0b0b0c]"
             }`}
           >
             {failed ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}
@@ -2184,17 +2357,17 @@ function CrawlProgressPanel({ events }: { events: CrawlProgressEvent[] }) {
             <p className="text-xs font-semibold">
               {failed ? "Website crawl stopped" : "Knowledge is up to date"}
             </p>
-            <p className="mt-0.5 truncate text-xs text-[#747a71]">
+            <p className="mt-0.5 truncate text-xs text-[#797772]">
               {latest?.message ?? "Website processing finished."}
             </p>
           </div>
         </div>
         {!failed && (
-          <div className="flex items-center gap-3 pl-11 text-[11px] text-[#6f766b] sm:pl-0">
+          <div className="flex items-center gap-3 pl-11 text-[11px] text-[#74726d] sm:pl-0">
             <span>{stats.fetched} read</span>
-            <span className="h-1 w-1 rounded-full bg-[#b8bdb3]" />
+            <span className="h-1 w-1 rounded-full bg-[#bcbab4]" />
             <span>{stats.indexed} learned</span>
-            <span className="h-1 w-1 rounded-full bg-[#b8bdb3]" />
+            <span className="h-1 w-1 rounded-full bg-[#bcbab4]" />
             <span>{stats.duplicates + stats.blocked + stats.skipped} filtered</span>
           </div>
         )}
@@ -2203,7 +2376,7 @@ function CrawlProgressPanel({ events }: { events: CrawlProgressEvent[] }) {
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-[#dde2d8] bg-white shadow-[0_12px_35px_rgba(36,46,29,0.06)]">
+    <section className="overflow-hidden rounded-2xl border border-[#dfdedb] bg-white shadow-[0_12px_35px_rgba(36,46,29,0.06)]">
       <div className="flex flex-col gap-5 p-5 sm:p-6">
         <div className="flex items-start gap-4">
           <span
@@ -2211,8 +2384,8 @@ function CrawlProgressPanel({ events }: { events: CrawlProgressEvent[] }) {
               failed
                 ? "bg-[#fff0eb] text-[#a14f39]"
                 : complete
-                  ? "bg-[#edf6e6] text-[#5f8738]"
-                  : "bg-[#f0f5eb] text-[#668d40]"
+                  ? "bg-[#efeeed] text-[#0b0b0c]"
+                  : "bg-[#f1f0ef] text-[#0b0b0c]"
             }`}
           >
             {failed ? (
@@ -2233,33 +2406,33 @@ function CrawlProgressPanel({ events }: { events: CrawlProgressEvent[] }) {
                       ? "Website knowledge ready"
                       : "Learning your website"}
                 </p>
-                <p className="mt-1 truncate text-sm text-[#71766e]">
+                <p className="mt-1 truncate text-sm text-[#75746f]">
                   {latest?.message ?? "Preparing the crawler and checking website rules"}
                 </p>
               </div>
-              <span className="rounded-full bg-[#f2f3f0] px-3 py-1 text-xs font-semibold tabular-nums text-[#666b63]">
+              <span className="rounded-full bg-[#f2f2f1] px-3 py-1 text-xs font-semibold tabular-nums text-[#6a6964]">
                 {progress}%
               </span>
             </div>
-            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[#eceee9]">
+            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[#ececeb]">
               <div
-                className={`h-full rounded-full transition-[width] duration-500 ${failed ? "bg-[#c86e56]" : "bg-[#78a64b]"}`}
+                className={`h-full rounded-full transition-[width] duration-500 ${failed ? "bg-[#c86e56]" : "bg-[#0b0b0c]"}`}
                 style={{ width: `${progress}%` }}
               />
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-[#e6e8e3] bg-[#e6e8e3] sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-[#e7e6e4] bg-[#e7e6e4] sm:grid-cols-4">
           {[
             ["Discovered", stats.discovered],
             ["Read", stats.fetched],
             ["Learned", stats.indexed],
             ["Filtered", stats.skipped + stats.duplicates + stats.blocked],
           ].map(([label, value]) => (
-            <div key={label} className="bg-[#fafbf9] px-4 py-3">
+            <div key={label} className="bg-[#fafafa] px-4 py-3">
               <p className="text-lg font-semibold tabular-nums">{value}</p>
-              <p className="mt-0.5 text-xs text-[#7b8078]">{label}</p>
+              <p className="mt-0.5 text-xs text-[#807e78]">{label}</p>
             </div>
           ))}
         </div>
@@ -2273,14 +2446,14 @@ function CrawlProgressPanel({ events }: { events: CrawlProgressEvent[] }) {
               >
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center">
                   {index === 0 && !complete && !failed ? (
-                    <LoaderCircle className="h-4 w-4 animate-spin text-[#78a64b]" />
+                    <LoaderCircle className="h-4 w-4 animate-spin text-[#0b0b0c]" />
                   ) : (
-                    <Check className="h-3.5 w-3.5 text-[#8b9188]" />
+                    <Check className="h-3.5 w-3.5 text-[#928f87]" />
                   )}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-[#646961]">{event.message}</span>
+                <span className="min-w-0 flex-1 truncate text-[#686762]">{event.message}</span>
                 {event.url && (
-                  <span className="hidden max-w-[260px] truncate text-xs text-[#959991] lg:block">
+                  <span className="hidden max-w-[260px] truncate text-xs text-[#9a9890] lg:block">
                     {crawlUrlLabel(event.url)}
                   </span>
                 )}
@@ -2309,7 +2482,7 @@ function PersonalityView({
       hideHeader
     >
       <div className="grid min-h-[calc(100vh-64px)] xl:grid-cols-[minmax(0,1fr)_400px]">
-        <div className="min-w-0 xl:border-r xl:border-[#e5e6e2]">
+        <div className="min-w-0 xl:border-r xl:border-[#e5e5e3]">
           <Card>
             <SectionHeading title="Identity" description="What should visitors call it?" />
             <div className="mt-6 grid gap-5 sm:grid-cols-2">
@@ -2344,10 +2517,10 @@ function PersonalityView({
                 <button
                   key={tone.id}
                   onClick={() => update({ tone: tone.id })}
-                  className={`rounded-xl border px-4 py-3 text-left transition ${soul.personality.tone === tone.id ? "border-[#8aaf62] bg-[#f1f7ea]" : "border-[#e1e2de] hover:bg-[#fafaf8]"}`}
+                  className={`rounded-xl border px-4 py-3 text-left transition ${soul.personality.tone === tone.id ? "border-[#0b0b0c] bg-[#f1f1f0]" : "border-[#e2e1de] hover:bg-[#f9f9f9]"}`}
                 >
                   <p className="text-sm font-semibold capitalize">{tone.id}</p>
-                  <p className="mt-1 text-xs text-[#7b7f78]">{tone.detail}</p>
+                  <p className="mt-1 text-xs text-[#7f7d78]">{tone.detail}</p>
                 </button>
               ))}
             </div>
@@ -2398,26 +2571,26 @@ function PersonalityView({
             </Field>
           </Card>
         </div>
-        <div className="min-w-0 bg-[#fafaf8]">
-          <Card className="h-full border-b-0 bg-[#fafaf8]">
-            <p className="text-xs font-semibold uppercase tracking-[.12em] text-[#7a7e77]">
+        <div className="min-w-0 bg-[#f9f9f9]">
+          <Card className="h-full border-b-0 bg-[#f9f9f9]">
+            <p className="text-xs font-semibold uppercase tracking-[.12em] text-[#7e7c77]">
               Preview
             </p>
             <div className="mt-6 flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#eaf4df] font-semibold text-[#4c7327]">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#ebeae8] font-semibold text-[#0b0b0c]">
                 {soul.personality.name.charAt(0)}
               </span>
               <div>
                 <p className="font-semibold">{soul.personality.name}</p>
-                <p className="text-sm text-[#787c75]">{soul.personality.role}</p>
+                <p className="text-sm text-[#7c7a75]">{soul.personality.role}</p>
               </div>
             </div>
-            <div className="mt-6 rounded-2xl rounded-tl-md bg-[#f0f1ee] p-4 text-sm leading-6 text-[#363a35]">
+            <div className="mt-6 rounded-2xl rounded-tl-md bg-[#f0f0ef] p-4 text-sm leading-6 text-[#393836]">
               {soul.personality.greeting}
             </div>
-            <div className="mt-6 border-t border-[#ecece9] pt-5">
+            <div className="mt-6 border-t border-[#ecebe9] pt-5">
               <p className="text-sm font-medium">Current character</p>
-              <p className="mt-2 text-sm leading-6 text-[#73776f]">
+              <p className="mt-2 text-sm leading-6 text-[#767570]">
                 {soul.personality.tone}, {soul.personality.traits.join(", ") || "helpful"}
               </p>
             </div>
@@ -2949,13 +3122,13 @@ function VoiceView({
   return (
     <Page title="Voice" description="" hideHeader>
       <div className="grid min-h-[calc(100dvh-76px)] items-start xl:grid-cols-[minmax(0,1fr)_440px]">
-        <div className="min-w-0 xl:border-r xl:border-[#e5e6e2]">
-          <section className="overflow-hidden border-b border-[#e5e6e2] bg-white">
-            <div className="relative overflow-hidden bg-[#11130f] p-6 text-white sm:p-7">
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_10%,rgba(183,247,116,.15),transparent_34%),radial-gradient(circle_at_8%_100%,rgba(116,150,247,.13),transparent_38%)]" />
+        <div className="min-w-0 xl:border-r xl:border-[#e5e5e3]">
+          <section className="overflow-hidden border-b border-[#e5e5e3] bg-white">
+            <div className="relative overflow-hidden bg-[#121110] p-6 text-white sm:p-7">
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_10%,rgba(255,92,122,.15),transparent_34%),radial-gradient(circle_at_8%_100%,rgba(116,150,247,.13),transparent_38%)]" />
               <div className="relative flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/50">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#b7f774] shadow-[0_0_12px_rgba(183,247,116,.7)]" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#ff5c7a] shadow-[0_0_12px_rgba(255,92,122,.7)]" />
                   Active voice
                 </div>
                 <div className="flex items-center gap-3">
@@ -2979,7 +3152,7 @@ function VoiceView({
                 </div>
                 <button
                   onClick={() => void previewVoice(activeVoice)}
-                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-white px-5 text-xs font-semibold text-[#171a17] transition hover:bg-[#b7f774]"
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-white px-5 text-xs font-semibold text-[#191918] transition hover:bg-[#ff5c7a]"
                 >
                   <Play
                     className={`h-4 w-4 fill-current ${playingId === activeVoice.id ? "animate-pulse" : ""}`}
@@ -3003,7 +3176,7 @@ function VoiceView({
               <label className="block">
                 <span className="flex items-center justify-between text-sm font-medium">
                   <span>Preview script</span>
-                  <span className="text-xs font-normal text-[#8a8e87]">
+                  <span className="text-xs font-normal text-[#908d85]">
                     {previewText.length}/240
                   </span>
                 </span>
@@ -3016,7 +3189,7 @@ function VoiceView({
                 />
               </label>
 
-              <div className="mt-6 grid gap-x-6 border-t border-[#ecece9] pt-1 sm:grid-cols-2">
+              <div className="mt-6 grid gap-x-6 border-t border-[#ecebe9] pt-1 sm:grid-cols-2">
                 <Range
                   label="Speed"
                   value={soul.voice.speed}
@@ -3035,25 +3208,25 @@ function VoiceView({
                 />
               </div>
 
-              <div className="mt-6 flex flex-col gap-4 border-t border-[#ecece9] pt-5 sm:flex-row sm:items-end sm:justify-between">
+              <div className="mt-6 flex flex-col gap-4 border-t border-[#ecebe9] pt-5 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <p className="text-sm font-medium">Voice engine</p>
-                  <p className="mt-1 text-xs text-[#7b7f78]">
+                  <p className="mt-1 text-xs text-[#7f7d78]">
                     Neural voices stay consistent across devices. Browser voices start instantly.
                   </p>
                 </div>
-                <div className="flex rounded-xl bg-[#f1f2ef] p-1 text-xs font-semibold">
+                <div className="flex rounded-xl bg-[#f1f1f0] p-1 text-xs font-semibold">
                   <button
                     onClick={() => {
                       if (neuralVoices[0]) void selectVoice(neuralVoices[0]);
                     }}
-                    className={`rounded-lg px-3 py-2 transition ${soul.voice.provider === "supertonic" ? "bg-white shadow-sm" : "text-[#777b74]"}`}
+                    className={`rounded-lg px-3 py-2 transition ${soul.voice.provider === "supertonic" ? "bg-white shadow-sm" : "text-[#7b7974]"}`}
                   >
                     Neural
                   </button>
                   <button
                     onClick={() => void selectVoice(defaultVoice)}
-                    className={`rounded-lg px-3 py-2 transition ${soul.voice.provider === "browser" ? "bg-white shadow-sm" : "text-[#777b74]"}`}
+                    className={`rounded-lg px-3 py-2 transition ${soul.voice.provider === "browser" ? "bg-white shadow-sm" : "text-[#7b7974]"}`}
                   >
                     Browser
                   </button>
@@ -3062,7 +3235,7 @@ function VoiceView({
                     onClick={() => {
                       if (customVoices[0]) void selectVoice(customVoices[0]);
                     }}
-                    className={`rounded-lg px-3 py-2 transition disabled:cursor-not-allowed disabled:opacity-40 ${soul.voice.provider === "voicebox" ? "bg-white shadow-sm" : "text-[#777b74]"}`}
+                    className={`rounded-lg px-3 py-2 transition disabled:cursor-not-allowed disabled:opacity-40 ${soul.voice.provider === "voicebox" ? "bg-white shadow-sm" : "text-[#7b7974]"}`}
                   >
                     Voicebox
                   </button>
@@ -3078,11 +3251,11 @@ function VoiceView({
               </span>
               <div>
                 <h3 className="text-sm font-semibold">Clone an authorized voice</h3>
-                <p className="mt-1 max-w-lg text-sm leading-6 text-[#747870]">
+                <p className="mt-1 max-w-lg text-sm leading-6 text-[#777671]">
                   Create a custom profile from a clean sample you own or have permission to use.
                 </p>
-                <p className="mt-2 flex items-center gap-1.5 text-xs text-[#777b74]">
-                  <ShieldCheck className="h-3.5 w-3.5 text-[#638c3b]" /> Consent is recorded with
+                <p className="mt-2 flex items-center gap-1.5 text-xs text-[#7b7974]">
+                  <ShieldCheck className="h-3.5 w-3.5 text-[#0b0b0c]" /> Consent is recorded with
                   every clone.
                 </p>
               </div>
@@ -3090,7 +3263,7 @@ function VoiceView({
             <button
               onClick={() => setCloneOpen(true)}
               disabled={!voicebox.connected}
-              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-[#dfe0dc] px-4 text-xs font-semibold transition hover:bg-[#f6f6f4] disabled:cursor-not-allowed disabled:opacity-45"
+              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-[#e0dfdc] px-4 text-xs font-semibold transition hover:bg-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-45"
             >
               <Upload className="h-4 w-4" /> Clone voice
             </button>
@@ -3098,15 +3271,15 @@ function VoiceView({
         </div>
 
         <section className="flex h-[calc(100dvh-76px)] min-h-[590px] min-w-0 flex-col overflow-hidden bg-white xl:sticky xl:top-0">
-          <div className="border-b border-[#ecece9] px-5 pt-5">
+          <div className="border-b border-[#ecebe9] px-5 pt-5">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <h2 className="font-semibold">Voice library</h2>
-                <p className="mt-1 text-xs text-[#7c8079]">
+                <p className="mt-1 text-xs text-[#807e79]">
                   Explore and choose your website voice.
                 </p>
               </div>
-              <span className="rounded-full bg-[#f1f2ef] px-2.5 py-1 text-xs font-medium text-[#696d66]">
+              <span className="rounded-full bg-[#f1f1f0] px-2.5 py-1 text-xs font-medium text-[#6d6b66]">
                 {tabVoices.length} voices
               </span>
             </div>
@@ -3117,7 +3290,7 @@ function VoiceView({
                   setLibraryTab("explore");
                   setLanguageFilter("all");
                 }}
-                className={`border-b-2 px-3 pb-3 font-medium transition ${libraryTab === "explore" ? "border-[#1b1d1a] text-[#1b1d1a]" : "border-transparent text-[#8a8e87]"}`}
+                className={`border-b-2 px-3 pb-3 font-medium transition ${libraryTab === "explore" ? "border-[#1c1c1b] text-[#1c1c1b]" : "border-transparent text-[#908d85]"}`}
               >
                 Explore
               </button>
@@ -3126,32 +3299,32 @@ function VoiceView({
                   setLibraryTab("mine");
                   setLanguageFilter("all");
                 }}
-                className={`border-b-2 px-3 pb-3 font-medium transition ${libraryTab === "mine" ? "border-[#1b1d1a] text-[#1b1d1a]" : "border-transparent text-[#8a8e87]"}`}
+                className={`border-b-2 px-3 pb-3 font-medium transition ${libraryTab === "mine" ? "border-[#1c1c1b] text-[#1c1c1b]" : "border-transparent text-[#908d85]"}`}
               >
                 My voices
               </button>
             </div>
           </div>
 
-          <div className="border-b border-[#ecece9] p-4">
-            <label className="flex h-11 items-center gap-3 rounded-xl border border-[#dfe0dc] px-3 transition focus-within:border-[#969b93]">
-              <Search className="h-4 w-4 shrink-0 text-[#8a8e87]" />
+          <div className="border-b border-[#ecebe9] p-4">
+            <label className="flex h-11 items-center gap-3 rounded-xl border border-[#e0dfdc] px-3 transition focus-within:border-[#9c9a92]">
+              <Search className="h-4 w-4 shrink-0 text-[#908d85]" />
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search voices"
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#9b9f98]"
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#a09e97]"
               />
               {query && (
                 <button onClick={() => setQuery("")} aria-label="Clear voice search">
-                  <X className="h-4 w-4 text-[#8a8e87]" />
+                  <X className="h-4 w-4 text-[#908d85]" />
                 </button>
               )}
             </label>
             <div className="mt-3 flex gap-2 overflow-x-auto pb-1 text-[11px] font-medium">
               <button
                 onClick={() => setLanguageFilter("all")}
-                className={`shrink-0 rounded-full border px-3 py-1.5 transition ${languageFilter === "all" ? "border-[#7fa653] bg-[#f1f7eb] text-[#53752f]" : "border-[#e0e1dd] text-[#777b74] hover:bg-[#f7f7f5]"}`}
+                className={`shrink-0 rounded-full border px-3 py-1.5 transition ${languageFilter === "all" ? "border-[#0b0b0c] bg-[#f2f1f0] text-[#0b0b0c]" : "border-[#e1e0dd] text-[#7b7974] hover:bg-[#f6f6f6]"}`}
               >
                 All voices
               </button>
@@ -3159,7 +3332,7 @@ function VoiceView({
                 <button
                   key={language}
                   onClick={() => setLanguageFilter(language)}
-                  className={`shrink-0 rounded-full border px-3 py-1.5 transition ${languageFilter === language ? "border-[#7fa653] bg-[#f1f7eb] text-[#53752f]" : "border-[#e0e1dd] text-[#777b74] hover:bg-[#f7f7f5]"}`}
+                  className={`shrink-0 rounded-full border px-3 py-1.5 transition ${languageFilter === language ? "border-[#0b0b0c] bg-[#f2f1f0] text-[#0b0b0c]" : "border-[#e1e0dd] text-[#7b7974] hover:bg-[#f6f6f6]"}`}
                 >
                   {language.toUpperCase()}
                 </button>
@@ -3176,7 +3349,7 @@ function VoiceView({
                   return (
                     <div
                       key={voice.id}
-                      className={`group flex items-center gap-1 rounded-2xl transition duration-200 ${selected ? "bg-[linear-gradient(100deg,#f3f8ed,#fff7f8)] shadow-[0_8px_24px_rgba(49,51,46,.06)]" : "hover:bg-[#f7f7f5]"}`}
+                      className={`group flex items-center gap-1 rounded-2xl transition duration-200 ${selected ? "bg-[linear-gradient(100deg,#f3f3f2,#fff7f8)] shadow-[0_8px_24px_rgba(49,51,46,.06)]" : "hover:bg-[#f6f6f6]"}`}
                     >
                       <button
                         onClick={() => void selectVoice(voice)}
@@ -3201,12 +3374,12 @@ function VoiceView({
                               </span>
                             )}
                           </span>
-                          <span className="mt-1 block truncate text-xs text-[#7c8079]">
+                          <span className="mt-1 block truncate text-xs text-[#807e79]">
                             {voice.detail}
                           </span>
                         </span>
                         {selected && (
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1d1f1c] text-white">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1e1e1d] text-white">
                             <Check className="h-3.5 w-3.5" />
                           </span>
                         )}
@@ -3214,7 +3387,7 @@ function VoiceView({
                       <button
                         onClick={() => void previewVoice(voice)}
                         aria-label={`${playing ? "Stop" : "Preview"} ${voice.name}`}
-                        className="mr-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#4f544d] transition hover:bg-white hover:shadow-sm"
+                        className="mr-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#53524e] transition hover:bg-white hover:shadow-sm"
                       >
                         {preparingId === voice.id ? (
                           <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -3230,21 +3403,21 @@ function VoiceView({
               </div>
             ) : (
               <div className="flex h-full min-h-52 flex-col items-center justify-center px-6 text-center">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#f1f2ef] text-[#777b74]">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#f1f1f0] text-[#7b7974]">
                   <AudioLines className="h-5 w-5" />
                 </span>
                 <p className="mt-4 text-sm font-semibold">No voices found</p>
-                <p className="mt-1 text-xs leading-5 text-[#858981]">
+                <p className="mt-1 text-xs leading-5 text-[#8b887f]">
                   Try another search or clear the language filter.
                 </p>
               </div>
             )}
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t border-[#ecece9] px-4 py-3 text-[11px] text-[#7c8079]">
+          <div className="flex items-center justify-between gap-3 border-t border-[#ecebe9] px-4 py-3 text-[11px] text-[#807e79]">
             <span className="flex items-center gap-2">
               <span
-                className={`h-1.5 w-1.5 rounded-full ${voicebox.connected ? "bg-[#73a447]" : "bg-[#b8bbb5]"}`}
+                className={`h-1.5 w-1.5 rounded-full ${voicebox.connected ? "bg-[#22c55e]" : "bg-[#bcbab4]"}`}
               />
               {libraryTab === "explore" && soul.voice.provider === "browser"
                 ? `${deviceVoices.length} device voices ready`
@@ -3255,7 +3428,7 @@ function VoiceView({
             <button
               onClick={() => setCloneOpen(true)}
               disabled={!voicebox.connected}
-              className="font-semibold text-[#4f544d] disabled:opacity-40"
+              className="font-semibold text-[#53524e] disabled:opacity-40"
             >
               + Clone voice
             </button>
@@ -3309,7 +3482,7 @@ function PlaygroundView({
     { id: "dark", label: "Midnight", detail: "Focused and cinematic" },
     { id: "glass", label: "Glass", detail: "Soft and translucent" },
   ];
-  const accents = ["#b6ff60", "#8fbd5b", "#7dd3fc", "#c4b5fd", "#fda4af", "#fbbf24"];
+  const accents = ["#ff5c7a", "#0b0b0c", "#7dd3fc", "#c4b5fd", "#fda4af", "#fbbf24"];
   const updateAppearance = (patch: Partial<Soul["appearance"]>) =>
     onUpdate((current) => ({
       ...current,
@@ -3350,23 +3523,23 @@ function PlaygroundView({
   }
 
   return (
-    <div className="relative h-full min-h-[560px] overflow-hidden bg-[#e8eae5]">
-      <section className="absolute inset-0 flex min-w-0 flex-col overflow-hidden bg-[#e9ebe6]">
+    <div className="relative h-full min-h-[560px] overflow-hidden bg-[#e9e8e6]">
+      <section className="absolute inset-0 flex min-w-0 flex-col overflow-hidden bg-[#eae9e7]">
         <div className="absolute inset-0 flex items-stretch justify-center overflow-hidden p-0">
           <div className="flex h-full min-h-[560px] w-full flex-col overflow-hidden bg-white">
-            <div className="hidden h-11 shrink-0 items-center gap-3 border-b border-[#e7e9e4] bg-[#f8f8f6] px-3">
+            <div className="hidden h-11 shrink-0 items-center gap-3 border-b border-[#e8e7e5] bg-[#f7f7f7] px-3">
               <div className="hidden gap-1.5 sm:flex">
                 <span className="h-2.5 w-2.5 rounded-full bg-[#ff6b61]" />
                 <span className="h-2.5 w-2.5 rounded-full bg-[#f2bd45]" />
-                <span className="h-2.5 w-2.5 rounded-full bg-[#65c466]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#22c55e]" />
               </div>
               <form onSubmit={openAddress} className="flex min-w-0 flex-1 items-center gap-2">
-                <Globe2 className="h-3.5 w-3.5 shrink-0 text-[#90958d]" />
+                <Globe2 className="h-3.5 w-3.5 shrink-0 text-[#96948b]" />
                 <input
                   value={address}
                   onChange={(event) => setAddress(event.target.value)}
                   aria-label="Preview website URL"
-                  className="min-w-0 flex-1 bg-transparent text-xs text-[#5f645c] outline-none"
+                  className="min-w-0 flex-1 bg-transparent text-xs text-[#63615d] outline-none"
                 />
               </form>
               <button
@@ -3374,7 +3547,7 @@ function PlaygroundView({
                   setFrameLoading(true);
                   setFrameKey((current) => current + 1);
                 }}
-                className="rounded-md p-1.5 text-[#747970] hover:bg-[#e9ebe6]"
+                className="rounded-md p-1.5 text-[#787671] hover:bg-[#eae9e7]"
                 aria-label="Reload website preview"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${frameLoading ? "animate-spin" : ""}`} />
@@ -3383,7 +3556,7 @@ function PlaygroundView({
                 href={previewUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-md p-1.5 text-[#747970] hover:bg-[#e9ebe6]"
+                className="rounded-md p-1.5 text-[#787671] hover:bg-[#eae9e7]"
                 aria-label="Open website in a new tab"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
@@ -3423,7 +3596,7 @@ function PlaygroundView({
               {assistantMode === "closed" && (
                 <button
                   onClick={() => setAssistantMode("voice")}
-                  className={`absolute bottom-12 z-30 flex items-center gap-3 rounded-full border border-black/10 bg-white py-2 pl-2 pr-5 text-sm font-medium text-[#20221f] shadow-[0_12px_36px_rgba(24,29,20,.15)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_42px_rgba(24,29,20,.18)] ${
+                  className={`absolute bottom-12 z-30 flex items-center gap-3 rounded-full border border-black/10 bg-white py-2 pl-2 pr-5 text-sm font-medium text-[#212120] shadow-[0_12px_36px_rgba(24,29,20,.15)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_42px_rgba(24,29,20,.18)] ${
                     soul.appearance.position === "bottom-right"
                       ? "right-4 sm:right-5"
                       : "left-4 sm:left-5"
@@ -3442,12 +3615,12 @@ function PlaygroundView({
                 </button>
               )}
 
-              <div className="absolute inset-x-0 bottom-0 z-20 flex h-9 items-center justify-between border-t border-black/10 bg-white/95 px-4 text-[11px] text-[#747970] backdrop-blur-xl">
+              <div className="absolute inset-x-0 bottom-0 z-20 flex h-9 items-center justify-between border-t border-black/10 bg-white/95 px-4 text-[11px] text-[#787671] backdrop-blur-xl">
                 <span className="flex min-w-0 items-center gap-2 truncate">
-                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#72a648]" />
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#22c55e]" />
                   Live simulation · voice and chat in one conversation
                 </span>
-                <span className="hidden shrink-0 text-[#9a9e97] sm:inline">
+                <span className="hidden shrink-0 text-[#a09d95] sm:inline">
                   {safeHost(previewUrl)}
                 </span>
               </div>
@@ -3465,22 +3638,22 @@ function PlaygroundView({
       )}
 
       <aside
-        className={`absolute inset-y-0 right-0 z-50 flex w-[330px] max-w-[calc(100%-28px)] flex-col overflow-hidden border-l border-[#dfe1dc] bg-white shadow-[-20px_0_55px_rgba(20,24,18,.16)] transition-transform duration-300 ${customizeOpen ? "translate-x-0" : "translate-x-full"}`}
+        className={`absolute inset-y-0 right-0 z-50 flex w-[330px] max-w-[calc(100%-28px)] flex-col overflow-hidden border-l border-[#e0dfdd] bg-white shadow-[-20px_0_55px_rgba(20,24,18,.16)] transition-transform duration-300 ${customizeOpen ? "translate-x-0" : "translate-x-full"}`}
       >
-        <div className="border-b border-[#eceee9] p-5">
+        <div className="border-b border-[#ececeb] p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold">Visitor experience</p>
-              <p className="mt-1 text-xs leading-5 text-[#7d827a]">
+              <p className="mt-1 text-xs leading-5 text-[#82807a]">
                 Tune it while using the real assistant.
               </p>
             </div>
-            <span className="rounded-full bg-[#edf5e6] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[.12em] text-[#5d8438]">
+            <span className="rounded-full bg-[#eeeeed] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[.12em] text-[#0b0b0c]">
               Live
             </span>
             <button
               onClick={() => setCustomizeOpen(false)}
-              className="rounded-lg p-2 text-[#777c74] hover:bg-[#f0f2ed]"
+              className="rounded-lg p-2 text-[#7c7a74] hover:bg-[#f0f0ef]"
               aria-label="Close customization drawer"
             >
               <X className="h-4 w-4" />
@@ -3493,24 +3666,24 @@ function PlaygroundView({
 
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-5">
           <form onSubmit={openAddress}>
-            <label className="text-xs font-semibold uppercase tracking-[.12em] text-[#8b9088]">
+            <label className="text-xs font-semibold uppercase tracking-[.12em] text-[#928f86]">
               Preview URL
             </label>
-            <div className="mt-2 flex items-center gap-2 rounded-xl border border-[#dde0da] px-3">
-              <Globe2 className="h-4 w-4 shrink-0 text-[#92978f]" />
+            <div className="mt-2 flex items-center gap-2 rounded-xl border border-[#dfdedb] px-3">
+              <Globe2 className="h-4 w-4 shrink-0 text-[#98968e]" />
               <input
                 value={address}
                 onChange={(event) => setAddress(event.target.value)}
                 className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none"
               />
-              <button type="submit" className="text-xs font-semibold text-[#5e8738]">
+              <button type="submit" className="text-xs font-semibold text-[#0b0b0c]">
                 Go
               </button>
             </div>
           </form>
 
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[.12em] text-[#8b9088]">
+            <p className="text-xs font-semibold uppercase tracking-[.12em] text-[#928f86]">
               Chat style
             </p>
             <div className="mt-3 grid gap-2">
@@ -3520,16 +3693,16 @@ function PlaygroundView({
                   onClick={() => updateAppearance({ theme: theme.id })}
                   className={`flex items-center justify-between rounded-xl border p-3 text-left transition ${
                     soul.appearance.theme === theme.id
-                      ? "border-[#8fbd5b] bg-[#f3f8ed]"
-                      : "border-[#e4e6e1] hover:border-[#cfd3ca] hover:bg-[#fafbf8]"
+                      ? "border-[#ff5c7a] bg-[#f3f3f2]"
+                      : "border-[#e5e4e2] hover:border-[#d1d0cc] hover:bg-[#fafaf9]"
                   }`}
                 >
                   <span>
                     <span className="block text-sm font-semibold">{theme.label}</span>
-                    <span className="mt-0.5 block text-xs text-[#81867e]">{theme.detail}</span>
+                    <span className="mt-0.5 block text-xs text-[#88857c]">{theme.detail}</span>
                   </span>
                   {soul.appearance.theme === theme.id && (
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1d211b] text-white">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1f1e1d] text-white">
                       <Check className="h-3.5 w-3.5" />
                     </span>
                   )}
@@ -3539,7 +3712,7 @@ function PlaygroundView({
           </div>
 
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[.12em] text-[#8b9088]">
+            <p className="text-xs font-semibold uppercase tracking-[.12em] text-[#928f86]">
               Accent
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -3549,7 +3722,7 @@ function PlaygroundView({
                   onClick={() => updateAppearance({ accent })}
                   className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition hover:scale-105 ${
                     soul.appearance.accent.toLowerCase() === accent.toLowerCase()
-                      ? "border-[#22251f]"
+                      ? "border-[#232321]"
                       : "border-transparent"
                   }`}
                   aria-label={`Use accent ${accent}`}
@@ -3560,7 +3733,7 @@ function PlaygroundView({
                   />
                 </button>
               ))}
-              <label className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[#dde0da] bg-[#f6f7f4] text-xs text-[#777c74] hover:bg-[#eef0eb]">
+              <label className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[#dfdedb] bg-[#f6f6f5] text-xs text-[#7c7a74] hover:bg-[#eeeeed]">
                 +
                 <input
                   type="color"
@@ -3574,8 +3747,8 @@ function PlaygroundView({
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Launcher">
-              <div className="flex h-11 items-center gap-2 rounded-lg border border-[#dedfdb] bg-[#f7f8f5] px-3 text-sm font-medium text-[#4f544c]">
-                <Phone className="h-4 w-4 text-[#6f9948]" /> Voice + chat
+              <div className="flex h-11 items-center gap-2 rounded-lg border border-[#dfdedb] bg-[#f7f7f6] px-3 text-sm font-medium text-[#52514e]">
+                <Phone className="h-4 w-4 text-[#0b0b0c]" /> Voice + chat
               </div>
             </Field>
             <Field label="Position">
@@ -3594,11 +3767,11 @@ function PlaygroundView({
             </Field>
           </div>
 
-          <div className="rounded-xl border border-[#e2e5de] bg-[#f8f9f6] p-4">
+          <div className="rounded-xl border border-[#e3e2e0] bg-[#f8f8f7] p-4">
             <div className="flex items-center gap-2 text-sm font-semibold">
-              <MessageCircle className="h-4 w-4 text-[#719d47]" /> Two ways to connect
+              <MessageCircle className="h-4 w-4 text-[#0b0b0c]" /> Two ways to connect
             </div>
-            <p className="mt-2 text-xs leading-5 text-[#777c74]">
+            <p className="mt-2 text-xs leading-5 text-[#7c7a74]">
               Visitors can start a hands-free voice call or open the normal text chat. Both use the
               same knowledge, personality, citations, and selected voice.
             </p>
@@ -3609,7 +3782,7 @@ function PlaygroundView({
             <ChevronRight className="h-4 w-4" />
           </button>
 
-          <p className="text-center text-[11px] leading-4 text-[#92968f]">
+          <p className="text-center text-[11px] leading-4 text-[#98958d]">
             If a site blocks embedded previews, open it in a new tab. The installed widget is
             unaffected.
           </p>
@@ -3623,11 +3796,11 @@ function PlaygroundView({
       >
         <button
           onClick={() => setCustomizeOpen((current) => !current)}
-          className="flex h-12 w-full items-center justify-center gap-2 px-3 text-sm font-semibold text-[#343832] transition hover:bg-[#f3f5f0]"
+          className="flex h-12 w-full items-center justify-center gap-2 px-3 text-sm font-semibold text-[#373633] transition hover:bg-[#f3f3f2]"
           aria-label={customizeOpen ? "Close customization drawer" : "Open customization drawer"}
           title="Customize visitor experience"
         >
-          <WandSparkles className="h-4 w-4 text-[#6f9948]" />
+          <WandSparkles className="h-4 w-4 text-[#0b0b0c]" />
           <span>Customize</span>
           {customizeOpen ? (
             <ChevronRight className="h-4 w-4" />
@@ -3640,7 +3813,7 @@ function PlaygroundView({
             setFrameLoading(true);
             setFrameKey((current) => current + 1);
           }}
-          className="flex h-11 w-full items-center justify-center border-t border-black/10 text-[#555a52] transition hover:bg-[#f3f5f0]"
+          className="flex h-11 w-full items-center justify-center border-t border-black/10 text-[#595753] transition hover:bg-[#f3f3f2]"
           aria-label="Refresh website preview"
           title="Refresh website"
         >
@@ -3650,7 +3823,7 @@ function PlaygroundView({
           href={previewUrl}
           target="_blank"
           rel="noreferrer"
-          className="flex h-11 w-full items-center justify-center border-t border-black/10 text-[#555a52] transition hover:bg-[#f3f5f0]"
+          className="flex h-11 w-full items-center justify-center border-t border-black/10 text-[#595753] transition hover:bg-[#f3f3f2]"
           aria-label="Open website in a new tab"
           title="Open website"
         >
@@ -3747,16 +3920,16 @@ function DeployView({
       description="Publish once, then paste one script into your site."
       hideHeader
     >
-      <div className="flex h-12 items-center gap-6 border-b border-[#e5e6e2] bg-[#fafaf8] px-6 sm:px-8">
+      <div className="flex h-12 items-center gap-6 border-b border-[#e5e5e3] bg-[#f9f9f9] px-6 sm:px-8">
         <button
           onClick={() => setTab("widget")}
-          className={`h-full border-b-2 px-1 text-sm font-medium ${tab === "widget" ? "border-[#1d201c] text-[#171916]" : "border-transparent text-[#70746d]"}`}
+          className={`h-full border-b-2 px-1 text-sm font-medium ${tab === "widget" ? "border-[#1f1e1d] text-[#181817]" : "border-transparent text-[#74726d]"}`}
         >
           Website widget
         </button>
         <button
           onClick={() => setTab("webhook")}
-          className={`h-full border-b-2 px-1 text-sm font-medium ${tab === "webhook" ? "border-[#1d201c] text-[#171916]" : "border-transparent text-[#70746d]"}`}
+          className={`h-full border-b-2 px-1 text-sm font-medium ${tab === "webhook" ? "border-[#1f1e1d] text-[#181817]" : "border-transparent text-[#74726d]"}`}
         >
           Webhooks
         </button>
@@ -3777,14 +3950,14 @@ function DeployView({
       </div>
       {tab === "widget" ? (
         <div className="grid min-h-[calc(100vh-112px)] xl:grid-cols-[minmax(0,1fr)_440px]">
-          <div className="min-w-0 xl:border-r xl:border-[#e5e6e2]">
+          <div className="min-w-0 xl:border-r xl:border-[#e5e5e3]">
             <Card>
               <SectionHeading
                 title="Install the widget"
                 description="Paste this before the closing </body> tag."
               />
-              <div className="relative mt-5 overflow-hidden rounded-xl bg-[#1b1d1a] p-5">
-                <pre className="overflow-x-auto whitespace-pre-wrap text-sm leading-6 text-[#dce8d4]">
+              <div className="relative mt-5 overflow-hidden rounded-xl bg-[#1c1c1b] p-5">
+                <pre className="overflow-x-auto whitespace-pre-wrap text-sm leading-6 text-[#e0dfdc]">
                   <code>{code}</code>
                 </pre>
                 <button
@@ -3807,7 +3980,7 @@ function DeployView({
                       type="color"
                       value={soul.appearance.accent}
                       onChange={(event) => updateAppearance({ accent: event.target.value })}
-                      className="h-11 w-12 rounded-lg border border-[#dedfdb] bg-white p-1"
+                      className="h-11 w-12 rounded-lg border border-[#dfdedb] bg-white p-1"
                     />
                     <input
                       value={soul.appearance.accent}
@@ -3846,23 +4019,23 @@ function DeployView({
                   />
                 </Field>
                 <Field label="Launcher">
-                  <div className="flex h-11 items-center gap-2 rounded-lg border border-[#dedfdb] bg-[#f7f8f5] px-3 text-sm font-medium text-[#4f544c]">
-                    <Phone className="h-4 w-4 text-[#6f9948]" /> Voice + chat
+                  <div className="flex h-11 items-center gap-2 rounded-lg border border-[#dfdedb] bg-[#f7f7f6] px-3 text-sm font-medium text-[#52514e]">
+                    <Phone className="h-4 w-4 text-[#0b0b0c]" /> Voice + chat
                   </div>
                 </Field>
               </div>
             </Card>
           </div>
-          <div className="bg-[#f2f2ee] p-5 xl:sticky xl:top-0 xl:h-[calc(100vh-112px)]">
-            <div className="h-full bg-[#ecece7] p-3">
+          <div className="bg-[#f1f0ef] p-5 xl:sticky xl:top-0 xl:h-[calc(100vh-112px)]">
+            <div className="h-full bg-[#ebeae8] p-3">
               <div className="relative h-full min-h-[610px] overflow-hidden bg-white">
-                <div className="border-b border-[#ecece9] p-4">
-                  <div className="h-3 w-24 rounded-full bg-[#e8e9e5]" />
+                <div className="border-b border-[#ecebe9] p-4">
+                  <div className="h-3 w-24 rounded-full bg-[#e8e8e6]" />
                 </div>
                 <div className="p-6">
-                  <div className="h-7 w-3/4 rounded-md bg-[#ecece8]" />
-                  <div className="mt-3 h-3 w-full rounded bg-[#f1f1ee]" />
-                  <div className="mt-2 h-3 w-4/5 rounded bg-[#f1f1ee]" />
+                  <div className="h-7 w-3/4 rounded-md bg-[#ebebe9]" />
+                  <div className="mt-3 h-3 w-full rounded bg-[#f0f0ef]" />
+                  <div className="mt-2 h-3 w-4/5 rounded bg-[#f0f0ef]" />
                 </div>
                 <div
                   className={`absolute bottom-20 ${soul.appearance.position === "bottom-right" ? "right-4" : "left-4"} h-[520px] w-[360px] max-w-[calc(100%-32px)] transition ${previewMode === "closed" ? "pointer-events-none translate-y-3 opacity-0" : "translate-y-0 opacity-100"}`}
@@ -3880,7 +4053,7 @@ function DeployView({
                 {previewMode === "closed" && (
                   <button
                     onClick={() => setPreviewMode("voice")}
-                    className={`absolute bottom-4 flex items-center gap-2.5 rounded-full border border-black/10 bg-white py-1.5 pl-1.5 pr-4 text-xs font-semibold text-[#20221f] shadow-[0_10px_28px_rgba(24,29,20,.14)] transition hover:-translate-y-0.5 ${soul.appearance.position === "bottom-right" ? "right-4" : "left-4"}`}
+                    className={`absolute bottom-4 flex items-center gap-2.5 rounded-full border border-black/10 bg-white py-1.5 pl-1.5 pr-4 text-xs font-semibold text-[#212120] shadow-[0_10px_28px_rgba(24,29,20,.14)] transition hover:-translate-y-0.5 ${soul.appearance.position === "bottom-right" ? "right-4" : "left-4"}`}
                     aria-label="Open voice chat preview"
                   >
                     <span
@@ -3895,14 +4068,14 @@ function DeployView({
                 )}
               </div>
             </div>
-            <p className="mt-2 text-center text-xs text-[#858981]">Live widget preview</p>
+            <p className="mt-2 text-center text-xs text-[#8b887f]">Live widget preview</p>
           </div>
         </div>
       ) : (
         <div className="min-h-[calc(100vh-112px)]">
           {!webhookAvailable ? (
             <div className="mx-auto flex min-h-[calc(100vh-112px)] max-w-3xl items-center px-5 py-10 sm:px-8">
-              <div className="w-full rounded-3xl border border-[#e2e4df] bg-[#fafaf8] p-7 sm:p-10">
+              <div className="w-full rounded-3xl border border-[#e3e2e0] bg-[#f9f9f9] p-7 sm:p-10">
                 <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#fff0f3] text-[#c23d58]">
                   <Webhook className="h-5 w-5" />
                 </span>
@@ -3912,7 +4085,7 @@ function DeployView({
                 <h2 className="mt-2 text-3xl font-semibold tracking-[-0.04em]">
                   Connect conversations to your stack.
                 </h2>
-                <p className="mt-3 max-w-xl text-sm leading-6 text-[#70756d]">
+                <p className="mt-3 max-w-xl text-sm leading-6 text-[#74736e]">
                   Signed conversation and lead webhooks are available on Growth and higher. Your
                   widget and chat remain live on {plan.name}.
                 </p>
@@ -3950,7 +4123,7 @@ function DeployView({
                   />
                   <button
                     onClick={() => void copy(soul.channels.webhookSecret, "Signing secret copied.")}
-                    className="rounded-xl border border-[#dfe0dc] px-3 hover:bg-[#f5f5f3]"
+                    className="rounded-xl border border-[#e0dfdc] px-3 hover:bg-[#f5f4f3]"
                   >
                     <Clipboard className="h-4 w-4" />
                   </button>
@@ -3959,12 +4132,12 @@ function DeployView({
               <button
                 onClick={() => void testWebhook()}
                 disabled={!soul.channels.webhookUrl || busy}
-                className="mt-6 inline-flex items-center gap-2 rounded-xl border border-[#dfe0dc] px-4 py-2.5 text-sm font-semibold hover:bg-[#f5f5f3] disabled:opacity-40"
+                className="mt-6 inline-flex items-center gap-2 rounded-xl border border-[#e0dfdc] px-4 py-2.5 text-sm font-semibold hover:bg-[#f5f4f3] disabled:opacity-40"
               >
                 <Webhook className="h-4 w-4" />
                 Send test event
               </button>
-              <div className="mt-6 rounded-xl bg-[#f3f5f0] p-4 text-sm leading-6 text-[#62675f]">
+              <div className="mt-6 rounded-xl bg-[#f3f3f2] p-4 text-sm leading-6 text-[#666460]">
                 Events include a timestamp, unique event ID, idempotency key, and HMAC-SHA256
                 signature.
               </div>
@@ -3976,82 +4149,628 @@ function DeployView({
   );
 }
 
-function ConversationsView({ soul, onTest }: { soul: Soul; onTest: () => void }) {
-  const [selected, setSelected] = useState(soul.conversations[0]?.id ?? "");
-  const conversation =
-    soul.conversations.find((item) => item.id === selected) ?? soul.conversations[0];
+function greeting(date = new Date()) {
+  const hour = date.getHours();
+  if (hour < 5) return "Working late";
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+function visitorName(conversation: StudioConversation) {
+  const contact = extractContact(conversation);
+  if (contact.email) return contact.email;
+  if (contact.phone) return contact.phone;
+  if (conversation.channel === "playground") return "Studio test";
+  const host = conversation.origin ? safeHost(conversation.origin) : "";
+  return host ? `Visitor on ${host}` : conversation.visitorLabel || "Website visitor";
+}
+
+const INTENT_STYLES: Record<SoulConversation["leadIntent"], { label: string; className: string }> =
+  {
+    high: { label: "Hot lead", className: "bg-[#ffe4ea] text-[#c0264a]" },
+    medium: { label: "Warm lead", className: "bg-[#fff1dc] text-[#9a5b10]" },
+    low: { label: "Browsing", className: "bg-[#f1f1ef] text-[#6f6e69]" },
+    none: { label: "Question", className: "bg-[#f1f1ef] text-[#6f6e69]" },
+  };
+
+function IntentBadge({ intent }: { intent: SoulConversation["leadIntent"] }) {
+  const style = INTENT_STYLES[intent];
   return (
-    <Page
-      title="Visitor conversations"
-      description="Review questions, answer quality, and buying intent."
-      hideHeader
+    <span
+      className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${style.className}`}
     >
-      {soul.conversations.length ? (
-        <div className="grid min-h-[calc(100vh-64px)] overflow-hidden bg-white lg:grid-cols-[340px_1fr]">
-          <div className="border-b border-[#e7e8e4] lg:border-b-0 lg:border-r">
-            <div className="border-b border-[#ecece9] p-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#92968f]" />
-                <input placeholder="Search conversations" className="clean-input pl-9" />
-              </div>
-            </div>
-            {soul.conversations.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setSelected(item.id)}
-                className={`w-full border-b border-[#f0f0ed] p-4 text-left ${conversation?.id === item.id ? "bg-[#f4f5f1]" : "hover:bg-[#fafaf8]"}`}
+      {style.label}
+    </span>
+  );
+}
+
+function OverviewView({
+  soul,
+  user,
+  plan,
+  conversations,
+  onNavigate,
+  onOpenConversation,
+  onRefresh,
+}: {
+  soul: Soul;
+  user: StudioUser;
+  plan: BillingPlan;
+  conversations: StudioConversation[];
+  onNavigate: (view: StudioView) => void;
+  onOpenConversation: (id: string) => void;
+  onRefresh: () => void;
+}) {
+  const steps = getSetupSteps(soul);
+  const complete = steps.filter((step) => step.done).length;
+  const nextStep = steps.find((step) => !step.done);
+  const visitorConversations = conversations.filter((item) => item.channel !== "playground");
+  const leads = conversations.filter(isLead);
+  const firstName = (user.name || user.email?.split("@")[0] || "").split(/[\s._-]+/)[0];
+  const pageLimit = plan.limits.indexedPages;
+  const pages = soul.knowledge.pages.length;
+  const questions = topQuestions(
+    visitorConversations.length ? visitorConversations : conversations,
+  );
+  const crawling = soul.knowledge.status === "crawling";
+
+  const stats: Array<{ label: string; value: string; detail: string; view: StudioView }> = [
+    {
+      label: "Conversations",
+      value: visitorConversations.length.toLocaleString("en-IN"),
+      detail: `${countSince(visitorConversations, 7)} in the last 7 days`,
+      view: "conversations",
+    },
+    {
+      label: "Leads",
+      value: leads.length.toLocaleString("en-IN"),
+      detail: `${leads.filter((item) => item.leadIntent === "high").length} hot · ${countSince(leads, 7)} this week`,
+      view: "conversations",
+    },
+    {
+      label: "Pages learned",
+      value: pages.toLocaleString("en-IN"),
+      detail:
+        pageLimit !== null
+          ? `of ${pageLimit.toLocaleString("en-IN")} on ${plan.name}`
+          : `on ${plan.name}`,
+      view: "knowledge",
+    },
+    {
+      label: "Voice",
+      value: soul.voice.enabled ? soul.voice.profileName || "On" : "Off",
+      detail: soul.voice.enabled ? "Visitors can talk out loud" : "Text chat only",
+      view: "voice",
+    },
+  ];
+
+  return (
+    <div className="min-h-full bg-[#fafaf9]">
+      <div className="mx-auto max-w-[1180px] px-5 py-8 sm:px-8 lg:py-10">
+        <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-sm text-[#8a8984]">
+              <StatusBadge status={soul.status} />
+              <a
+                href={soul.siteUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="truncate hover:text-[#0b0b0c]"
               >
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold">{item.visitorLabel}</p>
-                  <span className="text-xs text-[#858981]">{item.messages.length} msgs</span>
-                </div>
-                <p className="mt-2 truncate text-sm text-[#777b74]">
-                  {item.messages.find((message) => message.role === "visitor")?.content}
+                {safeHost(soul.siteUrl)}
+              </a>
+            </p>
+            <h1 className="mt-3 text-[clamp(1.8rem,3.4vw,2.6rem)] font-semibold leading-[1.05] tracking-[-0.045em]">
+              {greeting()}
+              {firstName ? `, ${firstName[0].toUpperCase()}${firstName.slice(1)}` : ""}.
+            </h1>
+            <p className="mt-2 text-[15px] text-[#6f6e69]">
+              {leads.length
+                ? `${soul.personality.name || soul.name} has found ${leads.length} lead${leads.length === 1 ? "" : "s"} for you so far.`
+                : soul.status === "live"
+                  ? `${soul.personality.name || soul.name} is live and ready for your next visitor.`
+                  : `Finish setup to put ${soul.personality.name || soul.name} in front of real visitors.`}
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onNavigate("playground")}
+              className="inline-flex h-11 items-center gap-2 rounded-full border border-[#e2e2df] bg-white px-5 text-sm font-medium transition hover:bg-[#f5f5f3]"
+            >
+              <Play className="h-4 w-4" /> Preview agent
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate(soul.status === "live" ? "conversations" : "deploy")}
+              className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b0b0c] px-5 text-sm font-medium text-white transition hover:bg-[#2a2a2e]"
+            >
+              {soul.status === "live" ? (
+                <>
+                  <MessageCircle className="h-4 w-4" /> View conversations
+                </>
+              ) : (
+                <>
+                  <Code2 className="h-4 w-4" /> Install on website
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {complete < steps.length && (
+          <section className="mt-8 overflow-hidden rounded-[24px] border border-[#ebebe8] bg-white">
+            <div className="flex flex-col justify-between gap-4 border-b border-[#f0f0ee] p-5 sm:flex-row sm:items-center sm:p-6">
+              <div>
+                <p className="text-[15px] font-semibold">Get your agent live</p>
+                <p className="mt-1 text-sm text-[#7a7974]">
+                  {complete} of {steps.length} done. Most websites finish in under ten minutes.
                 </p>
+              </div>
+              {nextStep && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate(nextStep.view)}
+                  className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-[#0b0b0c] px-4 text-sm font-medium text-white transition hover:bg-[#2a2a2e]"
+                >
+                  Continue: {nextStep.title} <ArrowRight className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <div className="h-1 bg-[#f0f0ee]">
+              <div
+                className="h-full bg-gradient-to-r from-[#ff8ba0] to-[#b39cff] transition-[width] duration-700"
+                style={{ width: `${(complete / steps.length) * 100}%` }}
+              />
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4">
+              {steps.map((step, index) => (
+                <button
+                  key={step.view}
+                  type="button"
+                  onClick={() => onNavigate(step.view)}
+                  className={`group flex items-start gap-3 border-[#f0f0ee] p-5 text-left transition hover:bg-[#fafaf9] ${index ? "border-t sm:border-t-0 sm:border-l" : ""}`}
+                >
+                  <span
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl [&_svg]:h-4 [&_svg]:w-4 ${step.done ? "bg-[#0b0b0c] text-white" : "bg-[#f3f3f1] text-[#7a7974]"}`}
+                  >
+                    {step.done ? <Check /> : step.icon}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold">{step.title}</span>
+                    <span className="mt-0.5 block text-xs leading-5 text-[#8a8984]">
+                      {step.detail}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {stats.map((stat) => (
+            <button
+              key={stat.label}
+              type="button"
+              onClick={() => onNavigate(stat.view)}
+              className="group rounded-[20px] border border-[#ebebe8] bg-white p-5 text-left transition hover:border-[#dcdcd8] hover:shadow-[0_8px_24px_-12px_rgba(0,0,0,.12)]"
+            >
+              <p className="flex items-center justify-between text-[13px] text-[#7a7974]">
+                {stat.label}
+                <ArrowUpRight className="h-4 w-4 text-[#b4b3ae] transition group-hover:text-[#0b0b0c]" />
+              </p>
+              <p className="mt-3 truncate text-[26px] font-semibold leading-none tracking-[-0.04em] sm:text-[30px]">
+                {stat.value}
+              </p>
+              <p className="mt-2 truncate text-xs text-[#8a8984]">{stat.detail}</p>
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+          <section className="rounded-[24px] border border-[#ebebe8] bg-white">
+            <div className="flex items-center justify-between border-b border-[#f0f0ee] px-5 py-4 sm:px-6">
+              <div>
+                <h2 className="text-[15px] font-semibold">Latest leads</h2>
+                <p className="mt-0.5 text-xs text-[#8a8984]">
+                  Visitors who showed buying intent or left contact details
+                </p>
+              </div>
+              {leads.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate("conversations")}
+                  className="text-sm font-medium text-[#0b0b0c] hover:underline"
+                >
+                  View all
+                </button>
+              )}
+            </div>
+            {leads.length ? (
+              <ul className="divide-y divide-[#f0f0ee]">
+                {leads.slice(0, 5).map((lead) => (
+                  <li key={lead.id}>
+                    <button
+                      type="button"
+                      onClick={() => onOpenConversation(lead.id)}
+                      className="flex w-full items-center gap-4 px-5 py-4 text-left transition hover:bg-[#fafaf9] sm:px-6"
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f3f3f1] text-xs font-semibold text-[#5f5e5a]">
+                        {visitorName(lead).slice(0, 1).toUpperCase()}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-2">
+                          <span className="truncate text-sm font-semibold">
+                            {visitorName(lead)}
+                          </span>
+                          <IntentBadge intent={lead.leadIntent} />
+                        </span>
+                        <span className="mt-0.5 block truncate text-[13px] text-[#7a7974]">
+                          “{firstQuestion(lead)}”
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-xs text-[#9a9994]">
+                        {relativeTime(lead.updatedAt)}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="flex flex-col items-center px-6 py-12 text-center">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f3f3f1] text-[#7a7974]">
+                  <UserRound className="h-5 w-5" />
+                </span>
+                <p className="mt-4 text-sm font-semibold">No leads yet</p>
+                <p className="mt-1 max-w-xs text-[13px] leading-5 text-[#8a8984]">
+                  {soul.status === "live"
+                    ? "When a visitor shows buying intent or shares their details, they’ll appear here."
+                    : "Install the widget on your website and leads will start arriving here."}
+                </p>
+                {soul.status !== "live" && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigate("deploy")}
+                    className="mt-4 inline-flex h-9 items-center gap-2 rounded-full border border-[#e2e2df] px-4 text-sm font-medium hover:bg-[#f5f5f3]"
+                  >
+                    Install widget <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
+
+          <div className="grid gap-4">
+            <section className="rounded-[24px] border border-[#ebebe8] bg-white p-5 sm:p-6">
+              <h2 className="text-[15px] font-semibold">What visitors ask</h2>
+              {questions.length ? (
+                <ol className="mt-4 space-y-2.5">
+                  {questions.map((item, index) => (
+                    <li key={item.question} className="flex items-start gap-3 text-sm">
+                      <span className="obs-mono mt-0.5 w-4 shrink-0 text-xs text-[#a3a29d]">
+                        {index + 1}
+                      </span>
+                      <span className="min-w-0 flex-1 leading-5 text-[#3d3d3a]">
+                        {item.question}
+                      </span>
+                      {item.count > 1 && (
+                        <span className="shrink-0 rounded-full bg-[#f3f3f1] px-2 py-0.5 text-[11px] font-medium text-[#6f6e69]">
+                          ×{item.count}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="mt-3 text-[13px] leading-5 text-[#8a8984]">
+                  Visitor questions will show up here, so you can see what your website isn’t
+                  answering on its own.
+                </p>
+              )}
+            </section>
+
+            <section className="rounded-[24px] border border-[#ebebe8] bg-white p-5 sm:p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-[15px] font-semibold">Knowledge</h2>
+                  <p className="mt-1 text-[13px] text-[#8a8984]">
+                    {crawling
+                      ? "Learning your website now…"
+                      : soul.knowledge.lastCrawledAt
+                        ? `Last refreshed ${relativeTime(soul.knowledge.lastCrawledAt)}`
+                        : "Not learned yet"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onRefresh}
+                  disabled={crawling}
+                  className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full border border-[#e2e2df] px-3.5 text-[13px] font-medium transition hover:bg-[#f5f5f3] disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${crawling ? "animate-spin" : ""}`} />
+                  Refresh
+                </button>
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                {[
+                  ["Pages", pages],
+                  ["Sources", soul.knowledge.sources?.length || (pages ? 1 : 0)],
+                  ["Issues", soul.knowledge.errors.length],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-2xl bg-[#f7f7f5] px-2 py-3">
+                    <p className="text-lg font-semibold tracking-[-0.03em]">{value}</p>
+                    <p className="text-[11px] text-[#8a8984]">{label}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type ConversationFilter = "all" | "leads" | "visitors" | "tests";
+
+function ConversationsView({
+  soul,
+  conversations,
+  focusId,
+  onTest,
+  onInstall,
+}: {
+  soul: Soul;
+  conversations: StudioConversation[];
+  focusId: string | null;
+  onTest: () => void;
+  onInstall: () => void;
+}) {
+  const [filter, setFilter] = useState<ConversationFilter>("all");
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState(focusId ?? conversations[0]?.id ?? "");
+
+  useEffect(() => {
+    if (focusId) setSelected(focusId);
+  }, [focusId]);
+
+  const counts: Record<ConversationFilter, number> = {
+    all: conversations.length,
+    leads: conversations.filter(isLead).length,
+    visitors: conversations.filter((item) => item.channel !== "playground").length,
+    tests: conversations.filter((item) => item.channel === "playground").length,
+  };
+  const needle = query.trim().toLowerCase();
+  const visible = conversations.filter((item) => {
+    if (filter === "leads" && !isLead(item)) return false;
+    if (filter === "visitors" && item.channel === "playground") return false;
+    if (filter === "tests" && item.channel !== "playground") return false;
+    if (!needle) return true;
+    return (
+      visitorName(item).toLowerCase().includes(needle) ||
+      item.messages.some((message) => message.content.toLowerCase().includes(needle))
+    );
+  });
+  const conversation = visible.find((item) => item.id === selected) ?? visible[0];
+  const contact = conversation ? extractContact(conversation) : {};
+
+  function downloadLeads() {
+    const blob = new Blob([leadsToCsv(conversations)], { type: "text/csv;charset=utf-8" });
+    const href = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    anchor.download = `${safeHost(soul.siteUrl)}-leads-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(href);
+  }
+
+  if (!conversations.length) {
+    return (
+      <div className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-[#fafaf9] p-6">
+        <div className="max-w-md text-center">
+          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-[#5f5e5a] shadow-[0_1px_2px_rgba(0,0,0,.05)]">
+            <MessageCircle className="h-6 w-6" />
+          </span>
+          <h2 className="mt-6 text-2xl font-semibold tracking-[-0.04em]">No conversations yet</h2>
+          <p className="mt-3 text-sm leading-6 text-[#7a7974]">
+            Every visitor conversation and lead from your website lands here. Try your agent in
+            Preview, or install it on your website to start collecting real ones.
+          </p>
+          <div className="mt-6 flex justify-center gap-2">
+            <button
+              type="button"
+              onClick={onTest}
+              className="inline-flex h-10 items-center gap-2 rounded-full border border-[#e2e2df] bg-white px-4 text-sm font-medium hover:bg-[#f5f5f3]"
+            >
+              <Play className="h-4 w-4" /> Preview agent
+            </button>
+            <button
+              type="button"
+              onClick={onInstall}
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-[#0b0b0c] px-4 text-sm font-medium text-white hover:bg-[#2a2a2e]"
+            >
+              <Code2 className="h-4 w-4" /> Install widget
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid min-h-[calc(100vh-64px)] bg-white lg:grid-cols-[380px_1fr]">
+      <aside className="flex min-h-0 flex-col border-b border-[#ececea] lg:border-b-0 lg:border-r">
+        <div className="space-y-3 border-b border-[#ececea] p-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-[17px] font-semibold tracking-[-0.02em]">Conversations</h1>
+            <button
+              type="button"
+              onClick={downloadLeads}
+              disabled={!counts.leads}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#e2e2df] px-3 text-xs font-medium transition hover:bg-[#f5f5f3] disabled:opacity-40"
+              title="Download leads as CSV"
+            >
+              <Download className="h-3.5 w-3.5" /> Export leads
+            </button>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9a9994]" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search messages, emails…"
+              className="clean-input rounded-full pl-9"
+              aria-label="Search conversations"
+            />
+          </div>
+          <div className="flex gap-1 overflow-x-auto [scrollbar-width:none]" role="tablist">
+            {(
+              [
+                ["all", "All"],
+                ["leads", "Leads"],
+                ["visitors", "Visitors"],
+                ["tests", "Tests"],
+              ] as Array<[ConversationFilter, string]>
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={filter === id}
+                onClick={() => setFilter(id)}
+                className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition ${filter === id ? "bg-[#0b0b0c] text-white" : "text-[#5f5e5a] hover:bg-[#f3f3f1]"}`}
+              >
+                {label}
+                <span className={filter === id ? "text-white/60" : "text-[#a3a29d]"}>
+                  {counts[id]}
+                </span>
               </button>
             ))}
           </div>
-          <div className="min-h-[560px] p-6 lg:p-8">
-            <div className="flex items-center justify-between border-b border-[#ecece9] pb-5">
-              <div>
-                <h3 className="font-semibold">{conversation?.visitorLabel}</h3>
-                <p className="mt-1 text-sm text-[#777b74]">
-                  {conversation?.channel} · {conversation?.leadIntent} intent
-                </p>
+        </div>
+        <div className="max-h-[42vh] min-h-0 flex-1 overflow-y-auto lg:max-h-none">
+          {visible.length ? (
+            visible.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setSelected(item.id)}
+                className={`w-full border-b border-[#f1f1ef] px-4 py-3.5 text-left transition ${conversation?.id === item.id ? "bg-[#f5f5f3]" : "hover:bg-[#fafaf9]"}`}
+              >
+                <div className="flex items-center gap-2">
+                  <p className="min-w-0 flex-1 truncate text-sm font-semibold">
+                    {visitorName(item)}
+                  </p>
+                  <span className="shrink-0 text-[11px] text-[#9a9994]">
+                    {relativeTime(item.updatedAt)}
+                  </span>
+                </div>
+                <p className="mt-1 truncate text-[13px] text-[#7a7974]">{firstQuestion(item)}</p>
+                <div className="mt-2 flex items-center gap-1.5">
+                  <IntentBadge intent={item.leadIntent} />
+                  <span className="text-[11px] text-[#a3a29d]">
+                    {item.channel === "playground" ? "Studio test" : "Website"} ·{" "}
+                    {item.messages.length} messages
+                  </span>
+                </div>
+              </button>
+            ))
+          ) : (
+            <p className="p-6 text-center text-sm text-[#8a8984]">Nothing matches this filter.</p>
+          )}
+        </div>
+      </aside>
+
+      {conversation ? (
+        <section className="flex min-h-0 flex-col">
+          <header className="flex flex-col gap-4 border-b border-[#ececea] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 className="truncate text-[17px] font-semibold tracking-[-0.02em]">
+                  {visitorName(conversation)}
+                </h2>
+                <IntentBadge intent={conversation.leadIntent} />
               </div>
-              <MoreHorizontal className="h-5 w-5 text-[#8c9089]" />
+              <p className="mt-1 text-xs text-[#8a8984]">
+                {conversation.channel === "playground"
+                  ? "Studio test"
+                  : `Website${conversation.origin ? ` · ${safeHost(conversation.origin)}` : ""}`}{" "}
+                · Started {formatDateTime(conversation.startedAt)}
+              </p>
             </div>
-            <div className="mx-auto mt-6 max-w-2xl space-y-5">
-              {conversation?.messages.map((message) => (
+            {(contact.email || contact.phone) && (
+              <div className="flex shrink-0 flex-wrap gap-2">
+                {contact.email && (
+                  <a
+                    href={`mailto:${contact.email}?subject=${encodeURIComponent(`Following up from ${safeHost(soul.siteUrl)}`)}`}
+                    className="inline-flex h-9 items-center gap-2 rounded-full bg-[#0b0b0c] px-4 text-[13px] font-medium text-white hover:bg-[#2a2a2e]"
+                  >
+                    Email {contact.email.split("@")[0]}
+                  </a>
+                )}
+                {contact.phone && (
+                  <a
+                    href={`tel:${contact.phone.replace(/[^\d+]/g, "")}`}
+                    className="inline-flex h-9 items-center gap-2 rounded-full border border-[#e2e2df] px-4 text-[13px] font-medium hover:bg-[#f5f5f3]"
+                  >
+                    <Phone className="h-3.5 w-3.5" /> Call
+                  </a>
+                )}
+              </div>
+            )}
+          </header>
+          <div className="flex-1 overflow-y-auto bg-[#fafaf9] px-5 py-6 sm:px-8">
+            <div className="mx-auto max-w-2xl space-y-4">
+              {conversation.messages.map((message) => (
                 <div
                   key={message.id}
-                  className={
-                    message.role === "visitor"
-                      ? "ml-auto max-w-[80%] rounded-2xl rounded-br-md bg-[#eeeeeb] p-4"
-                      : "max-w-[86%]"
-                  }
+                  className={message.role === "visitor" ? "flex justify-end" : "flex"}
                 >
-                  <p className="text-sm leading-6 text-[#3e423d]">{message.content}</p>
+                  <div className={message.role === "visitor" ? "max-w-[80%]" : "max-w-[86%]"}>
+                    <div
+                      className={
+                        message.role === "visitor"
+                          ? "rounded-2xl rounded-br-md bg-[#0b0b0c] px-4 py-3 text-sm leading-6 text-white"
+                          : "rounded-2xl rounded-bl-md border border-[#ececea] bg-white px-4 py-3 text-sm leading-6 text-[#2f2f2c]"
+                      }
+                    >
+                      {message.content}
+                    </div>
+                    {message.citations?.length ? (
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {message.citations.slice(0, 3).map((citation) => (
+                          <a
+                            key={citation.chunkId}
+                            href={citation.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex max-w-[240px] items-center gap-1 truncate rounded-full border border-[#e7e7e4] bg-white px-2.5 py-1 text-[11px] text-[#6f6e69] hover:text-[#0b0b0c]"
+                          >
+                            <BookOpen className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{citation.title}</span>
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
+                    <p
+                      className={`mt-1 text-[11px] text-[#a3a29d] ${message.role === "visitor" ? "text-right" : ""}`}
+                    >
+                      {relativeTime(message.createdAt)}
+                    </p>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
-        </div>
+        </section>
       ) : (
-        <Card className="flex min-h-[calc(100vh-64px)] items-center justify-center border-b-0">
-          <EmptyPanel
-            icon={<MessageCircle />}
-            title="No conversations yet"
-            detail="Preview your agent or publish the widget. Conversations will appear here."
-            action={
-              <button onClick={onTest} className="primary-button">
-                Open Agent
-              </button>
-            }
-          />
-        </Card>
+        <div className="flex items-center justify-center p-8 text-sm text-[#8a8984]">
+          Select a conversation.
+        </div>
       )}
-    </Page>
+    </div>
   );
 }
 
@@ -4059,15 +4778,15 @@ function HelpView() {
   return (
     <Page title="Help" description="Get a direct answer from the Obseri team." hideHeader>
       <div className="grid min-h-[calc(100vh-64px)] lg:grid-cols-[minmax(0,1fr)_400px]">
-        <section className="flex flex-col justify-between border-b border-[#e5e6e2] p-6 sm:p-8 lg:border-b-0 lg:border-r lg:p-10">
+        <section className="flex flex-col justify-between border-b border-[#e5e5e3] p-6 sm:p-8 lg:border-b-0 lg:border-r lg:p-10">
           <div>
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#edf4e6] text-[#5c8336]">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#eeedec] text-[#0b0b0c]">
               <MessageCircle className="h-5 w-5" />
             </span>
             <h2 className="mt-7 max-w-xl text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
               Talk to a real person.
             </h2>
-            <p className="mt-4 max-w-xl text-sm leading-7 text-[#737870]">
+            <p className="mt-4 max-w-xl text-sm leading-7 text-[#777671]">
               Send us the website name, the page you were working on, and what you expected to
               happen. Screenshots and exact error text help us resolve issues faster.
             </p>
@@ -4079,20 +4798,20 @@ function HelpView() {
               <ExternalLink className="h-4 w-4" />
             </a>
           </div>
-          <p className="mt-12 text-xs text-[#8a8e87]">
+          <p className="mt-12 text-xs text-[#908d85]">
             Founder-led support during the private pilot.
           </p>
         </section>
 
-        <div className="bg-[#fafaf8]">
-          <section className="border-b border-[#e5e6e2] p-6 sm:p-8">
+        <div className="bg-[#f9f9f9]">
+          <section className="border-b border-[#e5e5e3] p-6 sm:p-8">
             <div className="flex items-start gap-4">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#62675f] shadow-sm">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#666460] shadow-sm">
                 <BookOpen className="h-4 w-4" />
               </span>
               <div>
                 <h3 className="text-sm font-semibold">Before you email</h3>
-                <ul className="mt-3 space-y-2 text-sm leading-6 text-[#747970]">
+                <ul className="mt-3 space-y-2 text-sm leading-6 text-[#787671]">
                   <li>Confirm the correct website is selected.</li>
                   <li>Refresh Knowledge after changing website content.</li>
                   <li>Use Agent to reproduce the visitor experience.</li>
@@ -4102,12 +4821,12 @@ function HelpView() {
           </section>
           <section className="p-6 sm:p-8">
             <div className="flex items-start gap-4">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#5e8439] shadow-sm">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#0b0b0c] shadow-sm">
                 <ShieldCheck className="h-4 w-4" />
               </span>
               <div>
                 <h3 className="text-sm font-semibold">Security reports</h3>
-                <p className="mt-3 text-sm leading-6 text-[#747970]">
+                <p className="mt-3 text-sm leading-6 text-[#787671]">
                   Do not include passwords, API keys, voice samples, or private customer data in a
                   support email. Describe the issue and we will arrange a secure transfer if needed.
                 </p>
@@ -4294,27 +5013,31 @@ function ProfileWorkspaceView({
         role="dialog"
         aria-modal="true"
         aria-labelledby="billing-title"
-        className="fixed inset-0 z-[100] overflow-y-auto bg-[#0b0b0d] text-white"
+        className="obs-app fixed inset-0 z-[100] overflow-y-auto bg-[#fafaf9] text-[#0b0b0c]"
       >
         <button
           type="button"
           onClick={onClose}
           aria-label="Close plans"
-          className="fixed right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-xl border border-white/20 bg-[#18181b]/90 text-white/70 backdrop-blur-xl transition hover:border-white/40 hover:text-white sm:right-6 sm:top-6"
+          className="fixed right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-[#e2e2df] bg-white text-[#5f5e5a] shadow-[0_1px_2px_rgba(0,0,0,.05)] transition hover:bg-[#f5f5f3] hover:text-[#0b0b0c] sm:right-6 sm:top-6"
         >
           <X className="h-5 w-5" />
         </button>
 
-        <div className="mx-auto flex min-h-full max-w-[1880px] flex-col px-4 pb-8 pt-16 sm:px-5 sm:pt-12 lg:px-6">
+        <div className="mx-auto flex min-h-full max-w-[1320px] flex-col px-4 pb-10 pt-16 sm:px-6 sm:pt-14">
           <header className="shrink-0 text-center">
             <h1
               id="billing-title"
-              className="text-[28px] font-medium tracking-[-0.035em] sm:text-[34px]"
+              className="text-[clamp(2rem,4vw,3rem)] font-semibold leading-[1.02] tracking-[-0.05em]"
             >
-              Upgrade your plan
+              Choose the plan that fits your traffic
             </h1>
+            <p className="mx-auto mt-3 max-w-lg text-[15px] leading-6 text-[#6f6e69]">
+              Start free, then upgrade when your agent is bringing in conversations. Change or
+              cancel any time.
+            </p>
             <div
-              className="mx-auto mt-6 grid w-full max-w-[440px] grid-cols-2 rounded-full bg-[#2a2a2d] p-1"
+              className="mx-auto mt-7 grid w-full max-w-[380px] grid-cols-2 rounded-full border border-[#e7e7e4] bg-white p-1"
               aria-label="Billing interval"
             >
               {(["monthly", "annual"] as const).map((value) => (
@@ -4325,8 +5048,8 @@ function ProfileWorkspaceView({
                   onClick={() => setCycle(value)}
                   className={`h-11 rounded-full text-sm font-semibold transition-all ${
                     cycle === value
-                      ? "bg-[#171719] text-white shadow-sm"
-                      : "text-white/55 hover:text-white"
+                      ? "bg-[#0b0b0c] text-white shadow-sm"
+                      : "text-[#5f5e5a] hover:text-[#0b0b0c]"
                   }`}
                 >
                   {value === "annual" ? "Annual · Save 15%" : "Monthly"}
@@ -4336,12 +5059,12 @@ function ProfileWorkspaceView({
           </header>
 
           {billingNotice && (
-            <p className="mx-auto mt-5 max-w-3xl rounded-xl border border-[#ff5c7a]/30 bg-[#ff5c7a]/10 px-4 py-3 text-center text-sm text-[#ffb3c0]">
+            <p className="mx-auto mt-5 max-w-3xl rounded-xl border border-[#ffd0d9] bg-[#fff1f4] px-4 py-3 text-center text-sm text-[#b3263f]">
               {billingNotice}
             </p>
           )}
 
-          <div className="mt-7 grid flex-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {SELF_SERVE_PLAN_IDS.map((planId) => (
               <PlanCard
                 key={planId}
@@ -4357,18 +5080,18 @@ function ProfileWorkspaceView({
             ))}
           </div>
 
-          <footer className="mt-7 flex shrink-0 flex-col items-center justify-center gap-2 text-center text-sm text-white/52 sm:flex-row">
+          <footer className="mt-8 flex shrink-0 flex-col items-center justify-center gap-2 text-center text-sm text-[#6f6e69] sm:flex-row">
             <span>Need custom capacity, SSO, or a private deployment?</span>
             <a
               href="mailto:flamki@obseri.com?subject=Obseri%20Enterprise"
-              className="font-semibold text-white underline decoration-white/30 underline-offset-4 transition hover:decoration-white"
+              className="font-semibold text-[#0b0b0c] underline decoration-black/25 underline-offset-4 transition hover:decoration-black"
             >
               Talk to enterprise sales
             </a>
           </footer>
 
           {billing?.subscription && (
-            <div className="mx-auto mt-4 flex w-full max-w-3xl flex-wrap items-center justify-center gap-x-3 gap-y-2 text-center text-xs text-white/42">
+            <div className="mx-auto mt-4 flex w-full max-w-3xl flex-wrap items-center justify-center gap-x-3 gap-y-2 text-center text-xs text-[#8a8984]">
               <div>
                 <span className="font-semibold">{billing.plan.name}</span>
                 <span className="ml-2">
@@ -4389,7 +5112,7 @@ function ProfileWorkspaceView({
                     type="button"
                     onClick={() => void cancelSubscription()}
                     disabled={billingBusy !== null}
-                    className="text-xs font-semibold text-white/60 underline underline-offset-4 transition hover:text-white disabled:opacity-50"
+                    className="text-xs font-semibold text-[#5f5e5a] underline underline-offset-4 transition hover:text-[#0b0b0c] disabled:opacity-50"
                   >
                     {billingBusy === "cancel" ? "Scheduling…" : "Cancel at period end"}
                   </button>
@@ -4419,16 +5142,16 @@ function ProfileWorkspaceView({
         }
       >
         {!billingOnly && (
-          <div className="min-w-0 lg:border-r lg:border-[#e5e6e2]">
+          <div className="min-w-0 lg:border-r lg:border-[#e5e5e3]">
             <Card>
               <SectionHeading title="Profile" description="The person who owns this workspace." />
               <div className="mt-6 flex items-center gap-4">
-                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#20221f] font-semibold text-white">
+                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#212120] font-semibold text-white">
                   {initials || "O"}
                 </span>
                 <div>
                   <p className="font-semibold">{displayName}</p>
-                  <p className="mt-1 text-sm text-[#777b74]">Authenticated workspace owner</p>
+                  <p className="mt-1 text-sm text-[#7b7974]">Authenticated workspace owner</p>
                 </div>
               </div>
               <div className="mt-6 grid gap-5 sm:grid-cols-2">
@@ -4452,29 +5175,29 @@ function ProfileWorkspaceView({
             </Card>
           </div>
         )}
-        <div className={billingOnly ? "min-w-0" : "min-w-0 bg-[#fafaf8]"}>
+        <div className={billingOnly ? "min-w-0" : "min-w-0 bg-[#f9f9f9]"}>
           <Card>
             <div className="flex items-center justify-between gap-4">
               <div>
                 <h3 className="font-semibold">{billing?.plan.name ?? "Free"} plan</h3>
-                <p className="mt-1 text-sm text-[#747870]">
+                <p className="mt-1 text-sm text-[#777671]">
                   {billing?.subscription?.currentPeriodEnd
                     ? `${billing.subscription.cancelAtPeriodEnd ? "Ends" : "Renews"} ${new Date(billing.subscription.currentPeriodEnd).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`
                     : "No payment method required"}
                 </p>
               </div>
-              <span className="rounded-lg bg-[#20221f] px-3 py-1.5 text-xs font-semibold text-white">
+              <span className="rounded-lg bg-[#212120] px-3 py-1.5 text-xs font-semibold text-white">
                 {billing?.subscription?.status === "active" ? "Active" : "Free"}
               </span>
             </div>
             <div className="mt-6 grid grid-cols-2 gap-3">
-              <div className="rounded-xl bg-[#f3f4f1] p-4">
+              <div className="rounded-xl bg-[#f3f3f2] p-4">
                 <p className="text-2xl font-semibold">{workspace.souls.length}</p>
-                <p className="mt-1 text-xs text-[#777b74]">Websites</p>
+                <p className="mt-1 text-xs text-[#7b7974]">Websites</p>
               </div>
-              <div className="rounded-xl bg-[#f3f4f1] p-4">
+              <div className="rounded-xl bg-[#f3f3f2] p-4">
                 <p className="text-2xl font-semibold">{learnedPages}</p>
-                <p className="mt-1 text-xs text-[#777b74]">Pages learned</p>
+                <p className="mt-1 text-xs text-[#7b7974]">Pages learned</p>
               </div>
             </div>
             <UsageBar
@@ -4493,7 +5216,7 @@ function ProfileWorkspaceView({
                   type="button"
                   onClick={() => void cancelSubscription()}
                   disabled={billingBusy !== null}
-                  className="mt-5 text-xs font-medium text-[#777b74] underline underline-offset-4 hover:text-[#20221f] disabled:opacity-50"
+                  className="mt-5 text-xs font-medium text-[#7b7974] underline underline-offset-4 hover:text-[#212120] disabled:opacity-50"
                 >
                   {billingBusy === "cancel" ? "Scheduling…" : "Cancel at period end"}
                 </button>
@@ -4502,7 +5225,7 @@ function ProfileWorkspaceView({
         </div>
       </div>
       {billingOnly && (
-        <div className="border-t border-[#e5e6e2] bg-[#fafaf8] px-5 py-8 sm:px-8 lg:px-10">
+        <div className="border-t border-[#e5e5e3] bg-[#f9f9f9] px-5 py-8 sm:px-8 lg:px-10">
           <div className="mx-auto max-w-6xl">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
@@ -4512,17 +5235,17 @@ function ProfileWorkspaceView({
                 <h2 className="mt-2 text-2xl font-semibold tracking-tight">
                   Pay for the capacity you need.
                 </h2>
-                <p className="mt-2 text-sm text-[#747870]">
+                <p className="mt-2 text-sm text-[#777671]">
                   Final checkout prices with hard limits—no surprise usage bill.
                 </p>
               </div>
-              <div className="flex rounded-full border border-[#dfe1dc] bg-white p-1 text-sm">
+              <div className="flex rounded-full border border-[#e0dfdd] bg-white p-1 text-sm">
                 {(["monthly", "annual"] as const).map((value) => (
                   <button
                     key={value}
                     type="button"
                     onClick={() => setCycle(value)}
-                    className={`rounded-full px-4 py-2 font-medium capitalize ${cycle === value ? "bg-[#20221f] text-white" : "text-[#70756d]"}`}
+                    className={`rounded-full px-4 py-2 font-medium capitalize ${cycle === value ? "bg-[#212120] text-white" : "text-[#74736e]"}`}
                   >
                     {value}
                     {value === "annual" ? " · save 15%" : ""}
@@ -4550,7 +5273,7 @@ function ProfileWorkspaceView({
                 />
               ))}
             </div>
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#20221f] px-5 py-4 text-white">
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#212120] px-5 py-4 text-white">
               <div>
                 <p className="font-semibold">Enterprise</p>
                 <p className="mt-0.5 text-sm text-white/60">
@@ -4559,7 +5282,7 @@ function ProfileWorkspaceView({
               </div>
               <a
                 href="mailto:flamki@obseri.com?subject=Obseri%20Enterprise"
-                className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#20221f]"
+                className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#212120]"
               >
                 Contact sales
               </a>
@@ -4588,12 +5311,12 @@ function UsageBar({ label, value, limit }: { label: string; value: number; limit
   return (
     <div className="mt-5">
       <div className="flex items-center justify-between text-xs">
-        <span className="font-medium text-[#555a53]">{label}</span>
-        <span className="text-[#7b7f78]">
+        <span className="font-medium text-[#595854]">{label}</span>
+        <span className="text-[#7f7d78]">
           {value.toLocaleString("en-IN")} / {limit?.toLocaleString("en-IN") ?? "Custom"}
         </span>
       </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e7e9e4]">
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e8e7e5]">
         <div className="h-full rounded-full bg-[#ff5c7a]" style={{ width: `${percentage}%` }} />
       </div>
     </div>
@@ -4640,44 +5363,56 @@ function PlanCard({
   }
   return (
     <article
-      className={`relative flex min-h-[600px] flex-col overflow-hidden rounded-[1.4rem] border p-6 text-white sm:p-7 ${
+      className={`relative flex flex-col overflow-hidden rounded-[24px] border p-6 sm:p-7 ${
         isHighlighted
-          ? "border-[#ff7190]/80 bg-[linear-gradient(180deg,#38233b_0%,#25212e_38%,#1a1a1e_100%)] shadow-[0_24px_80px_rgba(255,92,122,.12)]"
-          : "border-white/[0.12] bg-[#1d1d20]"
+          ? "border-[#0b0b0c] bg-[#0b0b0c] text-white shadow-[0_30px_80px_-30px_rgba(0,0,0,.45)]"
+          : "border-[#ebebe8] bg-white text-[#0b0b0c]"
       }`}
     >
       {isHighlighted ? (
-        <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#ff5c7a,#ffad92,#927fc2)]" />
+        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(255,111,145,.45),rgba(179,156,255,.25)_45%,transparent_70%)] blur-2xl" />
       ) : null}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/44">
+          <p
+            className={`obs-mono text-[11px] font-medium uppercase tracking-[0.14em] ${isHighlighted ? "text-white/50" : "text-[#8a8a8f]"}`}
+          >
             {eyebrow}
           </p>
           <h3 className="mt-3 text-[2rem] font-semibold tracking-[-.04em]">{plan.name}</h3>
         </div>
         {isHighlighted && (
-          <span className="rounded-full bg-[#ff5c7a] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[.14em] text-white">
+          <span className="relative rounded-full bg-white/15 px-3 py-1.5 text-[11px] font-semibold text-white">
             Most popular
           </span>
         )}
       </div>
-      <p className="mt-3 min-h-12 text-[13px] leading-6 text-white/54">{plan.description}</p>
+      <p
+        className={`mt-3 min-h-12 text-[14px] leading-6 ${isHighlighted ? "text-white/60" : "text-[#6f6e69]"}`}
+      >
+        {plan.description}
+      </p>
       <div className="mt-7 min-h-[78px]">
         {monthlyEquivalent === 0 ? (
-          <p className="text-[3.25rem] font-semibold tracking-[-.055em]">{formatInr(0)}</p>
+          <p className="text-[2.75rem] font-semibold tracking-[-.055em]">{formatInr(0)}</p>
         ) : (
           <>
             <div className="flex items-end gap-1.5">
-              <span className="text-[3.25rem] font-semibold leading-none tracking-[-.055em]">
+              <span className="text-[2.75rem] font-semibold leading-none tracking-[-.055em]">
                 {monthlyEquivalent === null ? "Custom" : formatInr(monthlyEquivalent)}
               </span>
               {monthlyEquivalent !== null ? (
-                <span className="pb-1 text-[11px] text-white/42">/ month</span>
+                <span
+                  className={`pb-1 text-[12px] ${isHighlighted ? "text-white/50" : "text-[#8a8a8f]"}`}
+                >
+                  / month
+                </span>
               ) : null}
             </div>
             {total !== null ? (
-              <p className="mt-2 text-[10px] text-white/38">
+              <p
+                className={`mt-2 text-[11px] ${isHighlighted ? "text-white/45" : "text-[#8a8a8f]"}`}
+              >
                 {cycle === "annual" ? `${formatInr(total)} billed yearly` : "Billed monthly"} · GST
                 included
               </p>
@@ -4690,13 +5425,13 @@ function PlanCard({
         onClick={onChoose}
         disabled={current || busy || plan.id === "free"}
         className={`mt-5 inline-flex h-12 items-center justify-center gap-2 rounded-full text-sm font-bold transition disabled:cursor-default ${
-          current
-            ? "border border-white/10 bg-transparent text-white/42"
-            : plan.id === "free"
-              ? "border border-white/10 bg-transparent text-white/42"
-              : isHighlighted
-                ? "bg-[#ff5c7a] text-white shadow-[0_12px_30px_rgba(255,92,122,.2)] hover:bg-[#ff7690] disabled:opacity-60"
-                : "bg-white text-[#17171a] hover:bg-[#f1f1f1] disabled:opacity-60"
+          current || plan.id === "free"
+            ? isHighlighted
+              ? "border border-white/15 bg-transparent text-white/50"
+              : "border border-[#e7e7e4] bg-[#fafaf9] text-[#8a8a8f]"
+            : isHighlighted
+              ? "bg-white text-[#0b0b0c] hover:bg-[#f0f0ee] disabled:opacity-60"
+              : "bg-[#0b0b0c] text-white hover:bg-[#2a2a2e] disabled:opacity-60"
         }`}
       >
         {current
@@ -4709,17 +5444,27 @@ function PlanCard({
         {!current && !busy && plan.id !== "free" ? <ChevronRight className="h-3.5 w-3.5" /> : null}
       </button>
 
-      <div className="my-7 h-px bg-white/10" />
+      <div className={`my-7 h-px ${isHighlighted ? "bg-white/10" : "bg-[#efefec]"}`} />
       <ul className="space-y-3.5">
         {limitRows.map((label) => (
-          <li key={label} className="flex gap-3 text-[13px] leading-5 text-white/72">
-            <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#ff7f98]" />
+          <li
+            key={label}
+            className={`flex gap-3 text-[13px] leading-5 ${isHighlighted ? "text-white/75" : "text-[#3d3d3a]"}`}
+          >
+            <Check
+              className={`mt-0.5 h-4 w-4 shrink-0 ${isHighlighted ? "text-[#ff8ba0]" : "text-[#0b0b0c]"}`}
+            />
             {label}
           </li>
         ))}
         {plan.features.slice(0, plan.id === "free" ? 2 : 3).map((feature) => (
-          <li key={feature} className="flex gap-3 text-[13px] leading-5 text-white/72">
-            <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#ff7f98]" />
+          <li
+            key={feature}
+            className={`flex gap-3 text-[13px] leading-5 ${isHighlighted ? "text-white/75" : "text-[#3d3d3a]"}`}
+          >
+            <Check
+              className={`mt-0.5 h-4 w-4 shrink-0 ${isHighlighted ? "text-[#ff8ba0]" : "text-[#0b0b0c]"}`}
+            />
             {feature}
           </li>
         ))}
@@ -4754,14 +5499,14 @@ function SettingsView({
   return (
     <Page title="Settings" description="Manage the selected website and its data." hideHeader>
       <div className="grid min-h-[calc(100vh-64px)] lg:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="min-w-0 lg:border-r lg:border-[#e5e6e2]">
+        <div className="min-w-0 lg:border-r lg:border-[#e5e5e3]">
           <Card>
             <SectionHeading
               title="Website"
               description="Identity and visitor access for the selected website."
             />
             <div className="mt-6 flex items-center gap-4">
-              <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-black/5 bg-[#f3f5f0]">
+              <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-black/5 bg-[#f3f3f2]">
                 <img
                   src={websiteFaviconUrl(soul.siteUrl)}
                   alt=""
@@ -4774,7 +5519,7 @@ function SettingsView({
                   href={soul.siteUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-1 block truncate text-sm text-[#6c8f4b] hover:underline"
+                  className="mt-1 block truncate text-sm text-[#0b0b0c] hover:underline"
                 >
                   {safeHost(soul.siteUrl)}
                 </a>
@@ -4789,10 +5534,10 @@ function SettingsView({
                 className="clean-input"
               />
             </Field>
-            <div className="mt-6 flex items-center justify-between rounded-xl border border-[#e3e5df] p-4">
+            <div className="mt-6 flex items-center justify-between rounded-xl border border-[#e3e3e1] p-4">
               <div>
                 <p className="text-sm font-semibold">Visitor widget</p>
-                <p className="mt-1 text-xs text-[#777b74]">Allow voice and chat on this website.</p>
+                <p className="mt-1 text-xs text-[#7b7974]">Allow voice and chat on this website.</p>
               </div>
               <Toggle
                 checked={soul.channels.widgetEnabled}
@@ -4806,15 +5551,15 @@ function SettingsView({
             </div>
           </Card>
         </div>
-        <div className="min-w-0 bg-[#fafaf8]">
+        <div className="min-w-0 bg-[#f9f9f9]">
           <Card>
             <h3 className="font-semibold">Website data</h3>
-            <p className="mt-2 text-sm leading-6 text-[#747870]">
+            <p className="mt-2 text-sm leading-6 text-[#777671]">
               Download this website’s knowledge, personality, voice, and configuration.
             </p>
             <button
               onClick={() => exportSoul(soul)}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-[#dfe0dc] px-4 py-2.5 text-sm font-semibold hover:bg-[#f5f5f3]"
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-[#e0dfdc] px-4 py-2.5 text-sm font-semibold hover:bg-[#f5f4f3]"
             >
               <Download className="h-4 w-4" />
               Export website
@@ -4872,20 +5617,20 @@ function CreateSoulDialog({
       <button className="absolute inset-0" onClick={onClose} aria-label="Close" />
       <form
         onSubmit={submit}
-        className="relative w-full max-w-lg rounded-2xl border border-[#dedfdb] bg-white p-6 shadow-2xl sm:p-7"
+        className="relative w-full max-w-lg rounded-2xl border border-[#dfdedb] bg-white p-6 shadow-2xl sm:p-7"
       >
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-lg p-2 text-[#7d817a] hover:bg-[#f2f3f0]"
+          className="absolute right-4 top-4 rounded-lg p-2 text-[#817f7a] hover:bg-[#f2f2f1]"
         >
           <X className="h-4 w-4" />
         </button>
-        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#eaf4df] text-[#557d30]">
+        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#ebeae8] text-[#0b0b0c]">
           <Globe2 className="h-5 w-5" />
         </span>
         <h2 className="mt-5 text-2xl font-semibold tracking-[-0.03em]">Create a website soul</h2>
-        <p className="mt-2 text-sm leading-6 text-[#747870]">
+        <p className="mt-2 text-sm leading-6 text-[#777671]">
           Enter the website once. Obseri will read its important public pages and build the starting
           knowledge.
         </p>
@@ -4911,7 +5656,7 @@ function CreateSoulDialog({
         )}
         <button
           disabled={!url.trim() || busy}
-          className="mt-7 flex w-full items-center justify-center gap-2 rounded-xl bg-[#1d1f1c] px-4 py-3 text-sm font-semibold text-white disabled:opacity-40"
+          className="mt-7 flex w-full items-center justify-center gap-2 rounded-xl bg-[#1e1e1d] px-4 py-3 text-sm font-semibold text-white disabled:opacity-40"
         >
           {busy ? (
             <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -4970,17 +5715,17 @@ function CloneVoiceDialog({
       <button className="absolute inset-0" onClick={onClose} aria-label="Close" />
       <form
         onSubmit={submit}
-        className="relative max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-[#dedfdb] bg-white p-6 shadow-2xl sm:p-7"
+        className="relative max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-[#dfdedb] bg-white p-6 shadow-2xl sm:p-7"
       >
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-lg p-2 hover:bg-[#f2f3f0]"
+          className="absolute right-4 top-4 rounded-lg p-2 hover:bg-[#f2f2f1]"
         >
           <X className="h-4 w-4" />
         </button>
         <h2 className="text-2xl font-semibold">Clone an authorized voice</h2>
-        <p className="mt-2 text-sm leading-6 text-[#747870]">
+        <p className="mt-2 text-sm leading-6 text-[#777671]">
           Use a clean sample with an exact transcript.
         </p>
         <div className="mt-6 grid gap-5 sm:grid-cols-2">
@@ -5019,14 +5764,14 @@ function CloneVoiceDialog({
             className="clean-input resize-none"
           />
         </Field>
-        <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl bg-[#f5f6f3] p-4">
+        <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl bg-[#f5f5f4] p-4">
           <input
             type="checkbox"
             checked={consent}
             onChange={(event) => setConsent(event.target.checked)}
             className="mt-1"
           />
-          <span className="text-sm leading-6 text-[#565a54]">
+          <span className="text-sm leading-6 text-[#5a5854]">
             I confirm that I own this voice or have explicit permission or a valid license to clone
             and use it.
           </span>
@@ -5036,7 +5781,7 @@ function CloneVoiceDialog({
         )}
         <button
           disabled={!audio || !name || !transcript || !consent || busy}
-          className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[#1d1f1c] px-4 py-3 text-sm font-semibold text-white disabled:opacity-40"
+          className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[#1e1e1d] px-4 py-3 text-sm font-semibold text-white disabled:opacity-40"
         >
           {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Mic2 className="h-4 w-4" />}
           Create voice profile
@@ -5062,12 +5807,12 @@ function Page({
   return (
     <div className="flex min-h-full w-full flex-col bg-white">
       {!hideHeader && (
-        <div className="flex min-h-[76px] shrink-0 items-center justify-between gap-5 border-b border-[#e5e6e2] px-5 py-4 sm:px-7 lg:px-8">
+        <div className="flex min-h-[76px] shrink-0 items-center justify-between gap-5 border-b border-[#e5e5e3] px-5 py-4 sm:px-7 lg:px-8">
           <div className="min-w-0">
-            <h1 className="text-[17px] font-semibold tracking-[-0.015em] text-[#1d201c]">
+            <h1 className="text-[17px] font-semibold tracking-[-0.015em] text-[#1f1e1d]">
               {title}
             </h1>
-            <p className="mt-1 truncate text-xs text-[#7d827a]">{description}</p>
+            <p className="mt-1 truncate text-xs text-[#82807a]">{description}</p>
           </div>
           {action && <div className="shrink-0">{action}</div>}
         </div>
@@ -5078,7 +5823,7 @@ function Page({
 }
 function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <section className={`border-b border-[#e5e6e2] bg-white p-5 sm:p-6 lg:p-7 ${className}`}>
+    <section className={`border-b border-[#e5e5e3] bg-white p-5 sm:p-6 lg:p-7 ${className}`}>
       {children}
     </section>
   );
@@ -5098,7 +5843,7 @@ function Field({
     <label className={`block ${className}`}>
       <span className="mb-2 flex items-center justify-between text-sm font-medium">
         <span>{label}</span>
-        {hint && <span className="text-xs font-normal text-[#8a8e87]">{hint}</span>}
+        {hint && <span className="text-xs font-normal text-[#908d85]">{hint}</span>}
       </span>
       {children}
     </label>
@@ -5108,7 +5853,7 @@ function SectionHeading({ title, description }: { title: string; description: st
   return (
     <div>
       <h3 className="font-semibold">{title}</h3>
-      <p className="mt-1 text-sm text-[#777b74]">{description}</p>
+      <p className="mt-1 text-sm text-[#7b7974]">{description}</p>
     </div>
   );
 }
@@ -5123,8 +5868,11 @@ function StatusBadge({ status }: { status: Soul["status"] }) {
           : "Draft";
   return (
     <span
-      className={`rounded-full px-2.5 py-1 text-xs font-medium ${status === "live" ? "bg-[#eaf4df] text-[#4b7226]" : status === "learning" ? "bg-[#fff4d8] text-[#8b6721]" : "bg-[#f0f1ee] text-[#6f736d]"}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${status === "live" ? "bg-[#e9f9ef] text-[#15803d]" : status === "learning" ? "bg-[#fff4d8] text-[#8b6721]" : "bg-[#f0f0ef] text-[#73726d]"}`}
     >
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${status === "live" ? "bg-[#22c55e]" : status === "learning" ? "animate-pulse bg-[#d99a1e]" : "bg-[#a3a29d]"}`}
+      />
       {label}
     </span>
   );
@@ -5142,11 +5890,11 @@ function EmptyPanel({
 }) {
   return (
     <div className="flex min-h-[300px] flex-col items-center justify-center p-8 text-center">
-      <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#f0f1ee] text-[#747870] [&_svg]:h-5 [&_svg]:w-5">
+      <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#f0f0ef] text-[#777671] [&_svg]:h-5 [&_svg]:w-5">
         {icon}
       </span>
       <h3 className="mt-5 font-semibold">{title}</h3>
-      <p className="mt-2 max-w-sm text-sm leading-6 text-[#7a7e77]">{detail}</p>
+      <p className="mt-2 max-w-sm text-sm leading-6 text-[#7e7c77]">{detail}</p>
       {action && <div className="mt-5">{action}</div>}
     </div>
   );
@@ -5155,11 +5903,11 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="flex min-h-[70vh] items-center justify-center">
       <div className="max-w-md text-center">
-        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eaf4df] text-[#557d30]">
+        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#ebeae8] text-[#0b0b0c]">
           <Globe2 className="h-6 w-6" />
         </span>
         <h2 className="mt-6 text-3xl font-semibold tracking-[-0.04em]">Start with your website</h2>
-        <p className="mt-3 text-sm leading-6 text-[#747870]">
+        <p className="mt-3 text-sm leading-6 text-[#777671]">
           Obseri will learn its public pages and help you turn them into a useful, voiced presence.
         </p>
         <button onClick={onCreate} className="primary-button mt-6">
@@ -5189,7 +5937,7 @@ function Range({
     <label className="mt-6 block">
       <span className="flex items-center justify-between text-sm font-medium">
         <span>{label}</span>
-        <span className="text-[#777b74]">{value.toFixed(2)}</span>
+        <span className="text-[#7b7974]">{value.toFixed(2)}</span>
       </span>
       <input
         type="range"
@@ -5198,7 +5946,7 @@ function Range({
         max={max}
         step={step}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="mt-3 w-full accent-[#6f9845]"
+        className="mt-3 w-full accent-[#0b0b0c]"
       />
     </label>
   );
@@ -5208,7 +5956,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (checked: b
     <button
       onClick={() => onChange(!checked)}
       aria-pressed={checked}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition ${checked ? "bg-[#6f9845]" : "bg-[#d7d9d4]"}`}
+      className={`relative h-6 w-11 shrink-0 rounded-full transition ${checked ? "bg-[#0b0b0c]" : "bg-[#d9d8d4]"}`}
     >
       <span
         className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition ${checked ? "left-6" : "left-1"}`}
@@ -5394,7 +6142,7 @@ const DEMO_SOUL: Soul = {
     cloneConsentRecorded: false,
   },
   appearance: {
-    accent: "#8fbd5b",
+    accent: "#ff5c7a",
     position: "bottom-right",
     launcher: "pill",
     theme: "light",

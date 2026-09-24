@@ -281,6 +281,51 @@ export async function persistConversation(input: {
   });
 }
 
+export type OwnerConversation = SoulConversation & { origin: string };
+
+/**
+ * Visitor conversations recorded by a published widget, readable only by the account that
+ * published the soul. Most recent first.
+ */
+export async function listOwnerConversations(input: {
+  soulId: string;
+  ownerUserId: string;
+  limit?: number;
+}): Promise<OwnerConversation[]> {
+  const limit = Math.min(Math.max(Math.trunc(input.limit ?? 100), 1), 250);
+  const rows = await db()<
+    {
+      conversation_id: string;
+      origin: string;
+      channel: SoulConversation["channel"];
+      visitor_label: string;
+      lead_intent: SoulConversation["leadIntent"];
+      messages: SoulConversation["messages"];
+      started_at: Date;
+      updated_at: Date;
+    }[]
+  >`
+    select c.conversation_id, c.origin, c.channel, c.visitor_label, c.lead_intent,
+           c.messages, c.started_at, c.updated_at
+    from obseri_conversations c
+    join obseri_published_souls p on p.soul_id = c.soul_id
+    where c.soul_id = ${input.soulId}
+      and p.owner_user_id = ${input.ownerUserId}
+    order by c.updated_at desc
+    limit ${limit}
+  `;
+  return rows.map((row) => ({
+    id: row.conversation_id,
+    origin: row.origin,
+    channel: row.channel,
+    visitorLabel: row.visitor_label,
+    leadIntent: row.lead_intent,
+    messages: Array.isArray(row.messages) ? row.messages : [],
+    startedAt: new Date(row.started_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+  }));
+}
+
 export async function deliverQueuedWebhook(eventId: string): Promise<{
   delivered: boolean;
   status?: number;

@@ -72,7 +72,11 @@ export const Route = createFileRoute("/api/chat")({
           if (error instanceof BillingStoreError)
             return errorResponse(error.message, error.status, error.code);
           console.error("soul_chat_failed", error);
-          return errorResponse("The soul could not answer right now.", 500, "chat_failed");
+          return errorResponse(
+            "Sorry, I couldn’t answer that just now. Please try again.",
+            500,
+            "chat_failed",
+          );
         }
       },
     },
