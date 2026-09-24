@@ -68,8 +68,11 @@ import {
   leadsToCsv,
   relativeTime,
   topQuestions,
+  unansweredQuestions,
+  type UnansweredQuestion,
 } from "@/lib/conversation-insights";
 import type { OwnerConversation } from "@/lib/integration-store";
+import { ORB_STYLES, orbGradient, orbPalette } from "@/lib/voice-appearance";
 import { streamWebsiteCrawl } from "@/lib/crawl-client";
 import type { CrawlProgressEvent } from "@/lib/knowledge";
 import {
@@ -361,6 +364,13 @@ function SoulStudio({ user }: { user: StudioUser }) {
       ].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
     : [];
 
+  function openDemoSharing() {
+    const params = new URLSearchParams(window.location.search);
+    params.set("tab", "demo");
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}?${params}`);
+    navigate("deploy");
+  }
+
   function openConversation(id: string) {
     setFocusConversationId(id);
     navigate("conversations");
@@ -385,6 +395,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
     const params = new URLSearchParams(window.location.search);
     if (next === "overview") params.delete("view");
     else params.set("view", next);
+    if (next !== "deploy") params.delete("tab");
     const query = params.toString();
     window.history.replaceState(
       window.history.state,
@@ -704,12 +715,14 @@ function SoulStudio({ user }: { user: StudioUser }) {
                 plan={activePlan}
                 conversations={allConversations}
                 onNavigate={navigate}
+                onShareDemo={openDemoSharing}
                 onOpenConversation={openConversation}
                 onRefresh={() => void refreshKnowledge()}
               />
             ) : view === "knowledge" ? (
               <KnowledgeView
                 soul={soul}
+                conversations={allConversations}
                 crawlEvents={crawlEvents[soul.id] ?? []}
                 onRefresh={() => void refreshKnowledge()}
                 onAddSource={(source) => crawlKnowledgeSource(source)}
@@ -762,6 +775,8 @@ function SoulStudio({ user }: { user: StudioUser }) {
             ) : view === "settings" ? (
               <SettingsView
                 soul={soul}
+                user={user}
+                onPublish={() => navigate("deploy")}
                 onUpdate={updateSoul}
                 onDelete={() => {
                   setWorkspace((current) => {
@@ -1445,6 +1460,7 @@ function MenuRow({
 
 function KnowledgeView({
   soul,
+  conversations,
   crawlEvents,
   onRefresh,
   onAddSource,
@@ -1452,6 +1468,7 @@ function KnowledgeView({
   onNotice,
 }: {
   soul: Soul;
+  conversations: StudioConversation[];
   crawlEvents: CrawlProgressEvent[];
   onRefresh: () => void;
   onAddSource: (source: KnowledgeSource) => Promise<void>;
@@ -1462,8 +1479,15 @@ function KnowledgeView({
   const [addOpen, setAddOpen] = useState(false);
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [testQuery, setTestQuery] = useState("");
+  const [answering, setAnswering] = useState<string | null>(null);
   const knowledge = normalizeKnowledgeBase(soul.knowledge, soul.siteUrl);
   const sources = knowledge.sources ?? [];
+  const gaps = unansweredQuestions(conversations, soul.personality.unknownResponse);
+  const answeredGaps = new Set(
+    sources
+      .filter((source) => source.type === "manual" && source.name.startsWith(FAQ_SOURCE_PREFIX))
+      .map((source) => source.name.slice(FAQ_SOURCE_PREFIX.length)),
+  );
   const pages = knowledge.pages.filter((page) => {
     const matchesQuery = `${page.title} ${page.url} ${page.description} ${page.content ?? ""}`
       .toLowerCase()
@@ -1528,8 +1552,22 @@ function KnowledgeView({
       {(crawlEvents.length > 0 || soul.knowledge.status === "crawling") && (
         <CrawlProgressPanel events={crawlEvents} />
       )}
+      {answering && (
+        <AnswerQuestionDialog
+          question={answering}
+          agentName={soul.personality.name || "your agent"}
+          onClose={() => setAnswering(null)}
+          onSave={(answer) => {
+            addManualSource(`${FAQ_SOURCE_PREFIX}${answering}`, `${answering}\n\n${answer}`);
+            setAnswering(null);
+          }}
+        />
+      )}
       <div className="grid min-h-[calc(100vh-64px)] xl:grid-cols-[minmax(0,1fr)_420px]">
         <Card className="h-full overflow-hidden border-b-0 p-0 xl:border-r">
+          {gaps.length > 0 && (
+            <KnowledgeGapsPanel gaps={gaps} answered={answeredGaps} onAnswer={setAnswering} />
+          )}
           <div className="flex flex-col gap-5 border-b border-[#e9e8e6] px-5 py-5 sm:px-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -1763,6 +1801,177 @@ function KnowledgeView({
         />
       )}
     </Page>
+  );
+}
+
+const FAQ_SOURCE_PREFIX = "FAQ: ";
+
+function KnowledgeGapsPanel({
+  gaps,
+  answered,
+  onAnswer,
+}: {
+  gaps: UnansweredQuestion[];
+  answered: Set<string>;
+  onAnswer: (question: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const open = gaps.filter((gap) => !answered.has(gap.question));
+  const shown = expanded ? gaps : gaps.slice(0, 3);
+  return (
+    <section className="border-b border-[#e9e8e6] bg-[#fffaf5] px-5 py-5 sm:px-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="flex items-center gap-2 text-[15px] font-semibold">
+            Questions your agent couldn’t answer
+            {open.length > 0 && (
+              <span className="rounded-full bg-[#ff5c7a] px-2 py-0.5 text-[11px] font-semibold text-white">
+                {open.length}
+              </span>
+            )}
+          </h2>
+          <p className="mt-1 text-xs leading-5 text-[#7a7974]">
+            Real visitors asked these. Add an answer once and your agent will use it from now on.
+          </p>
+        </div>
+        {gaps.length > 3 && (
+          <button
+            type="button"
+            onClick={() => setExpanded((value) => !value)}
+            className="shrink-0 text-xs font-medium text-[#0b0b0c] hover:underline"
+          >
+            {expanded ? "Show less" : `Show all ${gaps.length}`}
+          </button>
+        )}
+      </div>
+      <ul className="mt-4 space-y-2">
+        {shown.map((gap) => {
+          const done = answered.has(gap.question);
+          return (
+            <li
+              key={gap.question}
+              className="flex items-center gap-3 rounded-2xl border border-[#f0e6dc] bg-white px-4 py-3"
+            >
+              <span className="min-w-0 flex-1">
+                <span
+                  className={`block truncate text-sm font-medium ${done ? "text-[#9a9994] line-through" : ""}`}
+                >
+                  “{gap.question}”
+                </span>
+                <span className="mt-0.5 block text-[11px] text-[#9a9994]">
+                  Asked {gap.count > 1 ? `${gap.count} times · last ` : ""}
+                  {relativeTime(gap.lastAskedAt)}
+                </span>
+              </span>
+              {done ? (
+                <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-[#15803d]">
+                  <Check className="h-3.5 w-3.5" /> Answered
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onAnswer(gap.question)}
+                  className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-[#0b0b0c] px-3.5 text-xs font-medium text-white hover:bg-[#2a2a2e]"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add answer
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+function AnswerQuestionDialog({
+  question,
+  agentName,
+  onClose,
+  onSave,
+}: {
+  question: string;
+  agentName: string;
+  onClose: () => void;
+  onSave: (answer: string) => void;
+}) {
+  const [answer, setAnswer] = useState("");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (answer.trim().length < 12) {
+      setError("Write a short answer, at least a sentence.");
+      return;
+    }
+    onSave(answer.trim());
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="answer-question-title"
+    >
+      <form
+        onSubmit={submit}
+        className="w-full max-w-[560px] rounded-[24px] border border-[#ebebe8] bg-white p-6 shadow-[0_30px_90px_rgba(0,0,0,.18)] sm:p-7"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="obs-mono text-[11px] uppercase tracking-[0.14em] text-[#8a8a8f]">
+              A visitor asked
+            </p>
+            <h2
+              id="answer-question-title"
+              className="mt-2 text-xl font-semibold leading-7 tracking-[-0.03em]"
+            >
+              “{question}”
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-full p-2 text-[#6f6e69] hover:bg-[#f3f3f1]"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <label className="mt-6 block">
+          <span className="mb-2 block text-sm font-medium">Your answer</span>
+          <textarea
+            autoFocus
+            value={answer}
+            onChange={(event) => setAnswer(event.target.value)}
+            rows={6}
+            placeholder={`Write it the way you’d want ${agentName} to explain it. Include prices, links or conditions.`}
+            className="clean-input resize-none leading-6"
+          />
+        </label>
+        {error && <p className="mt-2 text-xs text-[#b3263f]">{error}</p>}
+        <p className="mt-3 text-xs leading-5 text-[#8a8a8f]">
+          Saved to Knowledge as a manual source. Publish changes from Install to update your live
+          website.
+        </p>
+        <div className="mt-6 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 items-center rounded-full border border-[#e2e2df] px-4 text-sm font-medium hover:bg-[#f5f5f3]"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="inline-flex h-10 items-center gap-2 rounded-full bg-[#0b0b0c] px-5 text-sm font-medium text-white hover:bg-[#2a2a2e]"
+          >
+            <Check className="h-4 w-4" /> Save answer
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 
@@ -3594,25 +3803,15 @@ function PlaygroundView({
               </div>
 
               {assistantMode === "closed" && (
-                <button
-                  onClick={() => setAssistantMode("voice")}
-                  className={`absolute bottom-12 z-30 flex items-center gap-3 rounded-full border border-black/10 bg-white py-2 pl-2 pr-5 text-sm font-medium text-[#212120] shadow-[0_12px_36px_rgba(24,29,20,.15)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_42px_rgba(24,29,20,.18)] ${
+                <WidgetLauncher
+                  soul={soul}
+                  onClick={() => setAssistantMode(soul.appearance.startMode ?? "voice")}
+                  className={`absolute bottom-12 z-30 ${
                     soul.appearance.position === "bottom-right"
                       ? "right-4 sm:right-5"
                       : "left-4 sm:left-5"
                   }`}
-                  aria-label="Open voice chat"
-                >
-                  <span
-                    className="h-10 w-10 shrink-0 rounded-full shadow-[inset_0_0_12px_rgba(255,255,255,.25),0_5px_14px_rgba(56,143,165,.2)]"
-                    style={{
-                      background:
-                        "radial-gradient(circle at 28% 24%,rgba(255,229,76,.98),transparent 31%),radial-gradient(circle at 74% 70%,rgba(47,180,255,.98),transparent 35%),radial-gradient(circle at 24% 78%,rgba(75,205,224,.92),transparent 33%),radial-gradient(circle at 75% 20%,rgba(106,211,237,.88),transparent 31%),#88c8d4",
-                    }}
-                    aria-hidden="true"
-                  />
-                  Voice chat
-                </button>
+                />
               )}
 
               <div className="absolute inset-x-0 bottom-0 z-20 flex h-9 items-center justify-between border-t border-black/10 bg-white/95 px-4 text-[11px] text-[#787671] backdrop-blur-xl">
@@ -3745,12 +3944,9 @@ function PlaygroundView({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Launcher">
-              <div className="flex h-11 items-center gap-2 rounded-lg border border-[#dfdedb] bg-[#f7f7f6] px-3 text-sm font-medium text-[#52514e]">
-                <Phone className="h-4 w-4 text-[#0b0b0c]" /> Voice + chat
-              </div>
-            </Field>
+          <WidgetStyleControls soul={soul} onUpdate={onUpdate} />
+
+          <div className="grid grid-cols-1 gap-3">
             <Field label="Position">
               <select
                 value={soul.appearance.position}
@@ -3847,11 +4043,18 @@ function DeployView({
   onNotice: (message: string) => void;
   onUpgrade: () => void;
 }) {
-  const [tab, setTab] = useState<"widget" | "webhook">("widget");
+  const [tab, setTab] = useState<"widget" | "webhook" | "demo">(() =>
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("tab") === "demo"
+      ? "demo"
+      : "widget",
+  );
   const [busy, setBusy] = useState(false);
   const [previewMode, setPreviewMode] = useState<"closed" | "chat" | "voice">("closed");
   const webhookAvailable = billingPlanIncludesFeature(plan.id, "webhooks");
   const origin = typeof window === "undefined" ? "https://app.obseri.com" : window.location.origin;
+  const demoOn = soul.channels.demoEnabled === true;
+  const demoUrl = `${origin}/demo/${encodeURIComponent(soul.id)}?token=${encodeURIComponent(soul.channels.widgetToken)}`;
   const code = `<script\n  src="${origin}/obseri-widget.js"\n  data-soul-id="${soul.id}"\n  data-widget-token="${soul.channels.widgetToken}"\n  data-position="${soul.appearance.position}"\n  data-accent="${soul.appearance.accent}"\n  async\n></script>`;
   const updateAppearance = (patch: Partial<Soul["appearance"]>) =>
     onUpdate((current) => ({ ...current, appearance: { ...current.appearance, ...patch } }));
@@ -3920,7 +4123,7 @@ function DeployView({
       description="Publish once, then paste one script into your site."
       hideHeader
     >
-      <div className="flex h-12 items-center gap-6 border-b border-[#e5e5e3] bg-[#f9f9f9] px-6 sm:px-8">
+      <div className="flex h-12 items-center gap-6 overflow-x-auto border-b border-[#e5e5e3] bg-[#f9f9f9] px-6 [scrollbar-width:none] sm:px-8">
         <button
           onClick={() => setTab("widget")}
           className={`h-full border-b-2 px-1 text-sm font-medium ${tab === "widget" ? "border-[#1f1e1d] text-[#181817]" : "border-transparent text-[#74726d]"}`}
@@ -3932,6 +4135,12 @@ function DeployView({
           className={`h-full border-b-2 px-1 text-sm font-medium ${tab === "webhook" ? "border-[#1f1e1d] text-[#181817]" : "border-transparent text-[#74726d]"}`}
         >
           Webhooks
+        </button>
+        <button
+          onClick={() => setTab("demo")}
+          className={`h-full border-b-2 px-1 text-sm font-medium ${tab === "demo" ? "border-[#1f1e1d] text-[#181817]" : "border-transparent text-[#74726d]"}`}
+        >
+          Share a demo
         </button>
         <button
           onClick={() => void publish()}
@@ -4018,11 +4227,15 @@ function DeployView({
                     className="clean-input"
                   />
                 </Field>
-                <Field label="Launcher">
-                  <div className="flex h-11 items-center gap-2 rounded-lg border border-[#dfdedb] bg-[#f7f7f6] px-3 text-sm font-medium text-[#52514e]">
-                    <Phone className="h-4 w-4 text-[#0b0b0c]" /> Voice + chat
-                  </div>
-                </Field>
+              </div>
+            </Card>
+            <Card>
+              <SectionHeading
+                title="Voice widget style"
+                description="Make the call feel like your brand. The preview updates as you go."
+              />
+              <div className="mt-5 max-w-xl">
+                <WidgetStyleControls soul={soul} onUpdate={onUpdate} />
               </div>
             </Card>
           </div>
@@ -4051,24 +4264,102 @@ function DeployView({
                   )}
                 </div>
                 {previewMode === "closed" && (
-                  <button
-                    onClick={() => setPreviewMode("voice")}
-                    className={`absolute bottom-4 flex items-center gap-2.5 rounded-full border border-black/10 bg-white py-1.5 pl-1.5 pr-4 text-xs font-semibold text-[#212120] shadow-[0_10px_28px_rgba(24,29,20,.14)] transition hover:-translate-y-0.5 ${soul.appearance.position === "bottom-right" ? "right-4" : "left-4"}`}
-                    aria-label="Open voice chat preview"
-                  >
-                    <span
-                      className="h-9 w-9 rounded-full"
-                      style={{
-                        background:
-                          "radial-gradient(circle at 28% 24%,#ffe54c,transparent 31%),radial-gradient(circle at 74% 70%,#2fb4ff,transparent 35%),radial-gradient(circle at 24% 78%,#4bcde0,transparent 33%),#88c8d4",
-                      }}
-                    />
-                    Voice chat
-                  </button>
+                  <WidgetLauncher
+                    soul={soul}
+                    onClick={() => setPreviewMode(soul.appearance.startMode ?? "voice")}
+                    className={`absolute bottom-4 ${soul.appearance.position === "bottom-right" ? "right-4" : "left-4"}`}
+                  />
                 )}
               </div>
             </div>
             <p className="mt-2 text-center text-xs text-[#8b887f]">Live widget preview</p>
+          </div>
+        </div>
+      ) : tab === "demo" ? (
+        <div className="min-h-[calc(100vh-112px)] bg-[#fafaf9]">
+          <div className="mx-auto max-w-3xl px-5 py-10 sm:px-8">
+            <div className="rounded-[24px] border border-[#ebebe8] bg-white p-6 sm:p-8">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-[22px] font-semibold tracking-[-0.03em]">
+                    Share a live demo
+                  </h2>
+                  <p className="mt-2 max-w-lg text-sm leading-6 text-[#6f6e69]">
+                    Send a prospect one link that shows their own website with this agent already on
+                    it, trained on their pages. No install needed on their side.
+                  </p>
+                </div>
+                <Toggle
+                  checked={demoOn}
+                  onChange={(demoEnabled) => updateChannels({ demoEnabled })}
+                />
+              </div>
+              <div
+                className={`mt-6 flex flex-col gap-2 rounded-2xl border p-2 sm:flex-row sm:items-center ${demoOn ? "border-[#e2e2df] bg-white" : "border-dashed border-[#e2e2df] bg-[#fafaf9]"}`}
+              >
+                <code className="obs-mono min-w-0 flex-1 truncate px-3 py-2 text-[13px] text-[#3d3d3a]">
+                  {demoUrl}
+                </code>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={!demoOn}
+                    onClick={() => void copy(demoUrl, "Demo link copied.")}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#0b0b0c] px-4 text-[13px] font-medium text-white hover:bg-[#2a2a2e] disabled:opacity-40"
+                  >
+                    <Clipboard className="h-3.5 w-3.5" /> Copy link
+                  </button>
+                  <a
+                    href={demoOn ? demoUrl : undefined}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-disabled={!demoOn}
+                    className={`inline-flex h-9 items-center gap-1.5 rounded-full border border-[#e2e2df] px-4 text-[13px] font-medium ${demoOn ? "hover:bg-[#f5f5f3]" : "pointer-events-none opacity-40"}`}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" /> Open
+                  </a>
+                </div>
+              </div>
+              <p className="mt-3 text-xs leading-5 text-[#8a8984]">
+                {demoOn
+                  ? soul.status === "live"
+                    ? "Publish changes after switching the demo on or off. Demo chats appear in Conversations and count toward your plan."
+                    : "Publish this website to activate the link."
+                  : "Switch the demo on, then publish, to get a working link."}
+              </p>
+            </div>
+
+            <div className="mt-4 rounded-[24px] border border-[#ebebe8] bg-white p-6 sm:p-8">
+              <h3 className="text-[15px] font-semibold">Win a prospect in three steps</h3>
+              <ol className="mt-5 space-y-4">
+                {[
+                  [
+                    "Add their website",
+                    "Use “Add another website” in the website menu. Obseri learns their public pages in a few minutes.",
+                  ],
+                  [
+                    "Make it sound like them",
+                    "Pick a name, tone and voice in Personality and Voice, then try a few real questions in Preview.",
+                  ],
+                  [
+                    "Publish and send the link",
+                    "Switch on the demo, publish, and share the link before or during your call.",
+                  ],
+                ].map(([title, body], index) => (
+                  <li key={title} className="flex gap-4">
+                    <span className="obs-mono flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#f3f3f1] text-xs font-medium">
+                      {index + 1}
+                    </span>
+                    <span>
+                      <span className="block text-sm font-semibold">{title}</span>
+                      <span className="mt-0.5 block text-[13px] leading-5 text-[#7a7974]">
+                        {body}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
           </div>
         </div>
       ) : (
@@ -4149,6 +4440,132 @@ function DeployView({
   );
 }
 
+function WidgetLauncher({
+  soul,
+  onClick,
+  className = "",
+}: {
+  soul: Soul;
+  onClick: () => void;
+  className?: string;
+}) {
+  const palette = orbPalette(soul.appearance.orbStyle, soul.appearance.accent);
+  const dark = soul.appearance.theme === "dark";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-3 rounded-full border py-2 pl-2 pr-5 text-sm font-medium shadow-[0_12px_36px_rgba(0,0,0,.15)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_42px_rgba(0,0,0,.2)] ${
+        dark ? "border-white/10 bg-[#0f0f11] text-white" : "border-black/10 bg-white text-[#0b0b0c]"
+      } ${className}`}
+      aria-label={`Open ${soul.appearance.welcomeLabel || "voice chat"}`}
+    >
+      <span
+        aria-hidden="true"
+        className="h-10 w-10 shrink-0 rounded-full shadow-[inset_0_0_12px_rgba(255,255,255,.3)]"
+        style={{ background: orbGradient(palette) }}
+      />
+      {soul.appearance.welcomeLabel || "Voice chat"}
+    </button>
+  );
+}
+
+function WidgetStyleControls({
+  soul,
+  onUpdate,
+}: {
+  soul: Soul;
+  onUpdate: (updater: (soul: Soul) => Soul) => void;
+}) {
+  const updateAppearance = (patch: Partial<Soul["appearance"]>) =>
+    onUpdate((current) => ({ ...current, appearance: { ...current.appearance, ...patch } }));
+  const selectedOrb = soul.appearance.orbStyle ?? "aurora";
+  const startMode = soul.appearance.startMode ?? "voice";
+  return (
+    <div className="space-y-5">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[.12em] text-[#928f86]">Orb</p>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {ORB_STYLES.map((style) => {
+            const selected = selectedOrb === style.id;
+            return (
+              <button
+                key={style.id}
+                type="button"
+                onClick={() => updateAppearance({ orbStyle: style.id })}
+                aria-pressed={selected}
+                className={`flex flex-col items-center gap-2 rounded-xl border p-3 text-xs font-medium transition ${
+                  selected
+                    ? "border-[#0b0b0c] bg-white shadow-[0_0_0_3px_rgba(11,11,12,.06)]"
+                    : "border-[#e5e4e2] hover:border-[#d1d0cc] hover:bg-[#fafaf9]"
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className="h-9 w-9 rounded-full shadow-[inset_0_0_10px_rgba(255,255,255,.35)]"
+                  style={{
+                    background: orbGradient(orbPalette(style.id, soul.appearance.accent)),
+                  }}
+                />
+                {style.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[.12em] text-[#928f86]">Opens on</p>
+        <div className="mt-3 grid grid-cols-2 gap-1 rounded-full border border-[#e5e4e2] bg-[#f7f7f5] p-1">
+          {(
+            [
+              ["voice", "Voice call"],
+              ["chat", "Text chat"],
+            ] as const
+          ).map(([mode, label]) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => updateAppearance({ startMode: mode })}
+              aria-pressed={startMode === mode}
+              className={`h-9 rounded-full text-sm font-medium transition ${
+                startMode === mode
+                  ? "bg-white text-[#0b0b0c] shadow-[0_1px_3px_rgba(0,0,0,.1)]"
+                  : "text-[#6f6e69] hover:text-[#0b0b0c]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <Field label="Launcher text" hint={`${(soul.appearance.welcomeLabel ?? "").length}/28`}>
+        <input
+          value={soul.appearance.welcomeLabel}
+          maxLength={28}
+          placeholder="Voice chat"
+          onChange={(event) => updateAppearance({ welcomeLabel: event.target.value })}
+          className="clean-input"
+        />
+      </Field>
+      <div className="flex items-center justify-between gap-4 rounded-xl border border-[#e3e2e0] p-4">
+        <div>
+          <p className="text-sm font-semibold">Let visitors interrupt</p>
+          <p className="mt-1 text-xs leading-5 text-[#7c7a74]">
+            Talking over {soul.personality.name || "the agent"} stops it mid-sentence, like a real
+            call.
+          </p>
+        </div>
+        <Toggle
+          checked={soul.voice.interruptions !== false}
+          onChange={(interruptions) =>
+            onUpdate((current) => ({ ...current, voice: { ...current.voice, interruptions } }))
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
 function greeting(date = new Date()) {
   const hour = date.getHours();
   if (hour < 5) return "Working late";
@@ -4163,6 +4580,13 @@ function visitorName(conversation: StudioConversation) {
   if (contact.phone) return contact.phone;
   if (conversation.channel === "playground") return "Studio test";
   const host = conversation.origin ? safeHost(conversation.origin) : "";
+  if (
+    host &&
+    typeof window !== "undefined" &&
+    host === window.location.hostname.replace(/^www\./, "")
+  ) {
+    return "Demo visitor";
+  }
   return host ? `Visitor on ${host}` : conversation.visitorLabel || "Website visitor";
 }
 
@@ -4191,6 +4615,7 @@ function OverviewView({
   plan,
   conversations,
   onNavigate,
+  onShareDemo,
   onOpenConversation,
   onRefresh,
 }: {
@@ -4199,6 +4624,7 @@ function OverviewView({
   plan: BillingPlan;
   conversations: StudioConversation[];
   onNavigate: (view: StudioView) => void;
+  onShareDemo: () => void;
   onOpenConversation: (id: string) => void;
   onRefresh: () => void;
 }) {
@@ -4214,6 +4640,7 @@ function OverviewView({
     visitorConversations.length ? visitorConversations : conversations,
   );
   const crawling = soul.knowledge.status === "crawling";
+  const gaps = unansweredQuestions(conversations, soul.personality.unknownResponse);
 
   const stats: Array<{ label: string; value: string; detail: string; view: StudioView }> = [
     {
@@ -4274,6 +4701,13 @@ function OverviewView({
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onShareDemo}
+              className="inline-flex h-11 items-center gap-2 rounded-full border border-[#e2e2df] bg-white px-5 text-sm font-medium transition hover:bg-[#f5f5f3]"
+            >
+              <ExternalLink className="h-4 w-4" /> Share demo
+            </button>
             <button
               type="button"
               onClick={() => onNavigate("playground")}
@@ -4468,6 +4902,22 @@ function OverviewView({
                   Visitor questions will show up here, so you can see what your website isn’t
                   answering on its own.
                 </p>
+              )}
+              {gaps.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate("knowledge")}
+                  className="mt-4 flex w-full items-center gap-3 rounded-2xl bg-[#fff4ec] px-4 py-3 text-left transition hover:bg-[#ffece0]"
+                >
+                  <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-[#ff5c7a] px-1.5 text-xs font-semibold text-white">
+                    {gaps.length}
+                  </span>
+                  <span className="min-w-0 flex-1 text-[13px] leading-5 text-[#6b4a2f]">
+                    question{gaps.length === 1 ? "" : "s"} your agent couldn’t answer. Add the
+                    answers in Knowledge.
+                  </span>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-[#6b4a2f]" />
+                </button>
               )}
             </section>
 
@@ -5489,13 +5939,22 @@ function loadRazorpayScript() {
 
 function SettingsView({
   soul,
+  user,
   onUpdate,
   onDelete,
+  onPublish,
 }: {
   soul: Soul;
+  user: StudioUser;
   onUpdate: (updater: (soul: Soul) => Soul) => void;
   onDelete: () => void;
+  onPublish: () => void;
 }) {
+  const alertsOn = soul.channels.leadAlertsEnabled !== false;
+  const alertEmail = soul.channels.leadAlertEmail ?? "";
+  const alertEmailInvalid =
+    alertEmail.trim().length > 0 &&
+    !/^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]{2,}$/.test(alertEmail.trim());
   return (
     <Page title="Settings" description="Manage the selected website and its data." hideHeader>
       <div className="grid min-h-[calc(100vh-64px)] lg:grid-cols-[minmax(0,1fr)_380px]">
@@ -5548,6 +6007,61 @@ function SettingsView({
                   }))
                 }
               />
+            </div>
+          </Card>
+          <Card>
+            <div className="flex items-start justify-between gap-4">
+              <SectionHeading
+                title="Lead alerts"
+                description="Get an email the moment a visitor shows buying intent or leaves their contact details. One email per conversation, on every plan."
+              />
+              <Toggle
+                checked={alertsOn}
+                onChange={(leadAlertsEnabled) =>
+                  onUpdate((current) => ({
+                    ...current,
+                    channels: { ...current.channels, leadAlertsEnabled },
+                  }))
+                }
+              />
+            </div>
+            {alertsOn && (
+              <Field
+                label="Send alerts to"
+                hint={alertEmail.trim() ? undefined : "Your account email"}
+                className="mt-6"
+              >
+                <input
+                  type="email"
+                  value={alertEmail}
+                  placeholder={user.email ?? "you@company.com"}
+                  onChange={(event) =>
+                    onUpdate((current) => ({
+                      ...current,
+                      channels: { ...current.channels, leadAlertEmail: event.target.value },
+                    }))
+                  }
+                  className="clean-input"
+                  aria-invalid={alertEmailInvalid}
+                />
+                {alertEmailInvalid && (
+                  <span className="mt-2 block text-xs text-[#b3263f]">
+                    Enter a valid email address.
+                  </span>
+                )}
+              </Field>
+            )}
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#f7f7f5] px-4 py-3">
+              <p className="text-xs leading-5 text-[#6f6e69]">
+                Alert settings take effect the next time you publish.
+              </p>
+              <button
+                type="button"
+                onClick={onPublish}
+                className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[#0b0b0c] px-3.5 text-xs font-medium text-white hover:bg-[#2a2a2e]"
+              >
+                Go to Install <ArrowRight className="h-3.5 w-3.5" />
+              </button>
             </div>
           </Card>
         </div>
@@ -5988,6 +6502,7 @@ function websiteFaviconUrl(value: string) {
 }
 
 function knowledgePagePath(value: string) {
+  if (value.startsWith("manual://")) return "Added in Studio";
   try {
     const url = new URL(value);
     const path = `${url.pathname}${url.search}`;

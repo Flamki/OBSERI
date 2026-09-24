@@ -468,6 +468,12 @@
   --input: #e2e2df;
 }
 
+/* The embedded widget iframe must stay see-through around the chat card. */
+html:has(.obs-widget),
+body:has(.obs-widget) {
+  background: transparent;
+}
+
 .obs-app {
   font-family: "Geist", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   font-feature-settings: "ss01", "cv11";

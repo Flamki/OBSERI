@@ -5,6 +5,13 @@ import { deliverWebhook, type ObseriWebhookEvent } from "@/lib/webhooks";
 import { normalizeAllowedDomains, sha256 } from "@/lib/integration-security";
 import { billingPlanIncludesFeature } from "@/lib/billing-plans";
 import { billingSummary } from "@/lib/billing-store";
+import { isLead } from "@/lib/conversation-insights";
+import {
+  buildLeadAlertEmail,
+  isEmailAddress,
+  leadAlertsConfigured,
+  sendLeadAlert,
+} from "@/lib/lead-alerts";
 
 export type PublishedSoulRecord = {
   soul: Soul;
@@ -51,6 +58,8 @@ export async function publishSoul(input: {
   ownerKey: string;
   widgetToken: string;
   ownerUserId: string;
+  /** The publishing account's email, used for lead alerts when no address is set. */
+  ownerEmail?: string;
 }): Promise<PublishedSoulRecord> {
   if (!isSoul(input.value)) {
     throw new IntegrationStoreError("The published soul payload is invalid.", 422, "invalid_soul");
@@ -76,6 +85,15 @@ export async function publishSoul(input: {
     );
   }
 
+  const customAlertEmail = source.channels.leadAlertEmail?.trim() ?? "";
+  if (customAlertEmail && !isEmailAddress(customAlertEmail)) {
+    throw new IntegrationStoreError("Enter a valid email address for lead alerts.", 422);
+  }
+  const leadAlertEmail =
+    source.channels.leadAlertsEnabled === false
+      ? null
+      : customAlertEmail || (isEmailAddress(input.ownerEmail) ? input.ownerEmail.trim() : null);
+
   const now = new Date().toISOString();
   const publicSoul = createPublicSoul(source, allowedDomains, now);
   const ownerKeyHash = sha256(input.ownerKey);
@@ -99,12 +117,12 @@ export async function publishSoul(input: {
       insert into obseri_published_souls (
         soul_id, workspace_id, owner_user_id, owner_key_hash, widget_token_hash, soul,
         widget_enabled, allowed_domains, webhook_enabled, webhook_url,
-        webhook_secret, published_at, updated_at
+        webhook_secret, lead_alert_email, published_at, updated_at
       ) values (
         ${publicSoul.id}, ${publicSoul.workspaceId}, ${input.ownerUserId}, ${ownerKeyHash}, ${widgetTokenHash},
         ${transaction.json(publicSoul)}, ${publicSoul.channels.widgetEnabled},
         ${transaction.json(allowedDomains)}, ${source.channels.webhookEnabled},
-        ${source.channels.webhookUrl || null}, ${webhookSecret}, ${now}, ${now}
+        ${source.channels.webhookUrl || null}, ${webhookSecret}, ${leadAlertEmail}, ${now}, ${now}
       )
       on conflict (soul_id) do update set
         workspace_id = excluded.workspace_id,
@@ -116,6 +134,7 @@ export async function publishSoul(input: {
         webhook_enabled = excluded.webhook_enabled,
         webhook_url = excluded.webhook_url,
         webhook_secret = excluded.webhook_secret,
+        lead_alert_email = excluded.lead_alert_email,
         updated_at = excluded.updated_at
     `;
   });
@@ -216,9 +235,17 @@ export async function persistConversation(input: {
 }): Promise<string | null> {
   const sql = db();
   const publishedRows = await sql<
-    { owner_user_id: string | null; webhook_enabled: boolean; webhook_url: string | null }[]
+    {
+      owner_user_id: string | null;
+      webhook_enabled: boolean;
+      webhook_url: string | null;
+      lead_alert_email: string | null;
+      site_url: string | null;
+      agent_name: string | null;
+    }[]
   >`
-    select owner_user_id, webhook_enabled, webhook_url
+    select owner_user_id, webhook_enabled, webhook_url, lead_alert_email,
+           soul->>'siteUrl' as site_url, soul->'personality'->>'name' as agent_name
     from obseri_published_souls
     where soul_id = ${input.soulId}
     limit 1
@@ -244,7 +271,10 @@ export async function persistConversation(input: {
     },
   };
 
-  return sql.begin(async (transaction) => {
+  const alertTo = publishedSoul?.lead_alert_email ?? null;
+  const wantsAlert = Boolean(alertTo) && leadAlertsConfigured() && isLead(input.conversation);
+
+  const outcome = await sql.begin(async (transaction) => {
     await transaction`
       insert into obseri_conversations (
         conversation_id, soul_id, origin, channel, visitor_label, lead_intent,
@@ -267,8 +297,18 @@ export async function persistConversation(input: {
           and updated_at < now() - (${retentionDays} * interval '1 day')
       `;
     }
+    // Claim the alert inside the transaction so concurrent events email a lead only once.
+    const alertClaimed = wantsAlert
+      ? (
+          await transaction`
+            update obseri_conversations set lead_notified_at = now()
+            where conversation_id = ${input.conversation.id} and lead_notified_at is null
+            returning conversation_id
+          `
+        ).length > 0
+      : false;
     if (!webhookAllowed || !publishedSoul?.webhook_enabled || !publishedSoul.webhook_url) {
-      return null;
+      return { eventId: null, alertClaimed };
     }
     await transaction`
       insert into obseri_webhook_deliveries (
@@ -277,8 +317,28 @@ export async function persistConversation(input: {
         ${event.id}, ${input.soulId}, ${transaction.json(event as never)}, 'pending', 0, now(), now(), now()
       ) on conflict (event_id) do nothing
     `;
-    return event.id;
+    return { eventId: event.id as string | null, alertClaimed };
   });
+
+  if (outcome.alertClaimed && alertTo) {
+    const delivered = await sendLeadAlert(
+      alertTo,
+      buildLeadAlertEmail({
+        siteUrl: publishedSoul?.site_url || input.origin,
+        agentName: publishedSoul?.agent_name || "Your agent",
+        conversation: input.conversation,
+      }),
+    );
+    if (!delivered) {
+      // Release the claim so the next message in this conversation retries the alert.
+      await sql`
+        update obseri_conversations set lead_notified_at = null
+        where conversation_id = ${input.conversation.id}
+      `.catch(() => undefined);
+    }
+  }
+
+  return outcome.eventId;
 }
 
 export type OwnerConversation = SoulConversation & { origin: string };
@@ -431,6 +491,7 @@ function createPublicSoul(source: Soul, allowedDomains: string[], now: string): 
   soul.channels.webhookSecret = "";
   soul.channels.publishKey = "";
   soul.channels.widgetToken = "";
+  soul.channels.leadAlertEmail = "";
   soul.knowledge.pages = soul.knowledge.pages.slice(0, 50).map((page) => ({
     ...page,
     chunks: page.chunks.slice(0, 500),
