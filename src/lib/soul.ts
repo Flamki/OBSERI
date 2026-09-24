@@ -123,6 +123,8 @@ export type VoiceConfig = {
   speed: number;
   pitch: number;
   cloneConsentRecorded: boolean;
+  /** Let visitors talk over the agent to interrupt it. Defaults to on. */
+  interruptions?: boolean;
 };
 
 export type AppearanceConfig = {
@@ -132,6 +134,10 @@ export type AppearanceConfig = {
   theme: "light" | "dark" | "glass";
   glass: number;
   welcomeLabel: string;
+  /** Colour style of the live voice orb. Defaults to "aurora". */
+  orbStyle?: import("@/lib/voice-appearance").OrbStyle;
+  /** Whether the widget opens on the voice call or the text chat. Defaults to voice. */
+  startMode?: "voice" | "chat";
 };
 
 export type ChannelConfig = {

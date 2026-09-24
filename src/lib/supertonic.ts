@@ -194,7 +194,7 @@ export function fetchSupertonicAudio(
     throw error;
   });
   cloudAudioCache.set(cacheKey, audio);
-  void audio.finally(() => cloudAudioCache.delete(cacheKey));
+  void audio.finally(() => cloudAudioCache.delete(cacheKey)).catch(() => undefined);
   while (cloudAudioCache.size > CLOUD_AUDIO_CACHE_LIMIT) {
     const oldest = cloudAudioCache.keys().next().value;
     if (typeof oldest !== "string") break;
@@ -203,12 +203,20 @@ export function fetchSupertonicAudio(
   return audio;
 }
 
+let audioTap: ((audio: HTMLAudioElement) => void) | null = null;
+
+/** Lets the voice widget observe each neural voice clip, for example to animate with it. */
+export function setSupertonicAudioTap(tap: ((audio: HTMLAudioElement) => void) | null) {
+  audioTap = tap;
+}
+
 export async function playSupertonicAudio(blob: Blob) {
   const generation = ++speechGeneration;
   if (generation !== speechGeneration) throw new DOMException("Speech stopped", "AbortError");
   clearActiveAudio();
   const href = URL.createObjectURL(blob);
   const audio = new Audio(href);
+  audioTap?.(audio);
   activeAudio = audio;
   activeAudioUrl = href;
   await new Promise<void>((resolve, reject) => {
@@ -220,7 +228,14 @@ export async function playSupertonicAudio(blob: Blob) {
       else resolve();
     };
     audio.onended = () => finish();
-    audio.onerror = () => finish(new Error("Neural voice playback failed."));
+    audio.onpause = () => {
+      // stopSupertonic() pauses the clip; treat that as a clean stop, not a failure.
+      if (generation !== speechGeneration) finish();
+    };
+    audio.onerror = () =>
+      finish(
+        generation !== speechGeneration ? undefined : new Error("Neural voice playback failed."),
+      );
     void audio
       .play()
       .catch((cause) =>

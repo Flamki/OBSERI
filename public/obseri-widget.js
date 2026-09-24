@@ -46,12 +46,25 @@
     "margin-top:12px;display:flex;width:max-content;align-items:center;gap:12px;padding:8px 18px 8px 9px;border:1px solid rgba(25,28,23,.1);border-radius:999px;background:#fff;color:#20221f;box-shadow:0 12px 36px rgba(24,29,20,.12);cursor:pointer;font:500 16px/1.1 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;transition:transform 180ms ease,box-shadow 180ms ease;" +
     (position === "left" ? "margin-right:auto;" : "margin-left:auto;");
 
+  function orbBackground(colors) {
+    return (
+      "radial-gradient(circle at 32% 28%," +
+      colors[2] +
+      " 0%,transparent 42%),radial-gradient(circle at 72% 72%," +
+      colors[1] +
+      " 0%,transparent 58%)," +
+      colors[0]
+    );
+  }
+
   var orb = document.createElement("span");
   orb.setAttribute("aria-hidden", "true");
   orb.style.cssText =
-    "display:block;width:42px;height:42px;flex:0 0 42px;border-radius:50%;background:radial-gradient(circle at 28% 24%,rgba(255,229,76,.98),transparent 31%),radial-gradient(circle at 74% 70%,rgba(47,180,255,.98),transparent 35%),radial-gradient(circle at 24% 78%,rgba(75,205,224,.92),transparent 33%),radial-gradient(circle at 75% 20%,rgba(106,211,237,.88),transparent 31%),#88c8d4;box-shadow:inset 0 0 12px rgba(255,255,255,.25),0 5px 14px rgba(56,143,165,.2);";
+    "display:block;width:42px;height:42px;flex:0 0 42px;border-radius:50%;box-shadow:inset 0 0 12px rgba(255,255,255,.3),0 5px 14px rgba(0,0,0,.12);transition:background 300ms ease;";
+  orb.style.background = orbBackground(["#ff6f91", "#a48cff", "#ffd3dc"]);
+  var labelText = script.dataset.label || "Voice chat";
   var label = document.createElement("span");
-  label.textContent = "Voice chat";
+  label.textContent = labelText;
   launcher.appendChild(orb);
   launcher.appendChild(label);
 
@@ -103,7 +116,7 @@
     launcher.style.display = "none";
     launcher.setAttribute("aria-expanded", "true");
     launcher.disabled = false;
-    label.textContent = "Voice chat";
+    label.textContent = labelText;
   });
 
   window.addEventListener("message", function (event) {
@@ -129,6 +142,36 @@
       frame.style.height = "680px";
     }
   }
+
+  // Pick up the style chosen in Soul Studio (orb colours, label, theme) without re-embedding.
+  fetch(
+    origin +
+      "/api/widgets/" +
+      encodeURIComponent(soulId) +
+      "/appearance?token=" +
+      encodeURIComponent(widgetToken),
+    { credentials: "omit" },
+  )
+    .then(function (response) {
+      return response.ok ? response.json() : null;
+    })
+    .then(function (style) {
+      if (!style) return;
+      if (Array.isArray(style.orb) && style.orb.length === 3) {
+        orb.style.background = orbBackground(style.orb);
+      }
+      if (typeof style.label === "string" && style.label && !script.dataset.label) {
+        labelText = style.label;
+        if (!launcher.disabled) label.textContent = labelText;
+        launcher.setAttribute("aria-label", "Open " + labelText);
+      }
+      if (style.theme === "dark") {
+        launcher.style.background = "#0f0f11";
+        launcher.style.color = "#ffffff";
+        launcher.style.borderColor = "rgba(255,255,255,.12)";
+      }
+    })
+    .catch(function () {});
 
   layout();
   mobile.addEventListener("change", layout);

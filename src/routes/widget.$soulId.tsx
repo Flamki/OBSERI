@@ -64,7 +64,7 @@ function EmbeddedSoul() {
           compact
           voiceMode
           sessionToken={context.session}
-          initialPanelMode={mode}
+          initialPanelMode={soul.appearance.startMode ?? mode}
           onClose={() =>
             window.parent.postMessage(
               { type: "obseri:close" },

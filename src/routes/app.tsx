@@ -72,6 +72,7 @@ import {
   type UnansweredQuestion,
 } from "@/lib/conversation-insights";
 import type { OwnerConversation } from "@/lib/integration-store";
+import { ORB_STYLES, orbGradient, orbPalette } from "@/lib/voice-appearance";
 import { streamWebsiteCrawl } from "@/lib/crawl-client";
 import type { CrawlProgressEvent } from "@/lib/knowledge";
 import {
@@ -3802,25 +3803,15 @@ function PlaygroundView({
               </div>
 
               {assistantMode === "closed" && (
-                <button
-                  onClick={() => setAssistantMode("voice")}
-                  className={`absolute bottom-12 z-30 flex items-center gap-3 rounded-full border border-black/10 bg-white py-2 pl-2 pr-5 text-sm font-medium text-[#212120] shadow-[0_12px_36px_rgba(24,29,20,.15)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_42px_rgba(24,29,20,.18)] ${
+                <WidgetLauncher
+                  soul={soul}
+                  onClick={() => setAssistantMode(soul.appearance.startMode ?? "voice")}
+                  className={`absolute bottom-12 z-30 ${
                     soul.appearance.position === "bottom-right"
                       ? "right-4 sm:right-5"
                       : "left-4 sm:left-5"
                   }`}
-                  aria-label="Open voice chat"
-                >
-                  <span
-                    className="h-10 w-10 shrink-0 rounded-full shadow-[inset_0_0_12px_rgba(255,255,255,.25),0_5px_14px_rgba(56,143,165,.2)]"
-                    style={{
-                      background:
-                        "radial-gradient(circle at 28% 24%,rgba(255,229,76,.98),transparent 31%),radial-gradient(circle at 74% 70%,rgba(47,180,255,.98),transparent 35%),radial-gradient(circle at 24% 78%,rgba(75,205,224,.92),transparent 33%),radial-gradient(circle at 75% 20%,rgba(106,211,237,.88),transparent 31%),#88c8d4",
-                    }}
-                    aria-hidden="true"
-                  />
-                  Voice chat
-                </button>
+                />
               )}
 
               <div className="absolute inset-x-0 bottom-0 z-20 flex h-9 items-center justify-between border-t border-black/10 bg-white/95 px-4 text-[11px] text-[#787671] backdrop-blur-xl">
@@ -3953,12 +3944,9 @@ function PlaygroundView({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Launcher">
-              <div className="flex h-11 items-center gap-2 rounded-lg border border-[#dfdedb] bg-[#f7f7f6] px-3 text-sm font-medium text-[#52514e]">
-                <Phone className="h-4 w-4 text-[#0b0b0c]" /> Voice + chat
-              </div>
-            </Field>
+          <WidgetStyleControls soul={soul} onUpdate={onUpdate} />
+
+          <div className="grid grid-cols-1 gap-3">
             <Field label="Position">
               <select
                 value={soul.appearance.position}
@@ -4239,11 +4227,15 @@ function DeployView({
                     className="clean-input"
                   />
                 </Field>
-                <Field label="Launcher">
-                  <div className="flex h-11 items-center gap-2 rounded-lg border border-[#dfdedb] bg-[#f7f7f6] px-3 text-sm font-medium text-[#52514e]">
-                    <Phone className="h-4 w-4 text-[#0b0b0c]" /> Voice + chat
-                  </div>
-                </Field>
+              </div>
+            </Card>
+            <Card>
+              <SectionHeading
+                title="Voice widget style"
+                description="Make the call feel like your brand. The preview updates as you go."
+              />
+              <div className="mt-5 max-w-xl">
+                <WidgetStyleControls soul={soul} onUpdate={onUpdate} />
               </div>
             </Card>
           </div>
@@ -4272,20 +4264,11 @@ function DeployView({
                   )}
                 </div>
                 {previewMode === "closed" && (
-                  <button
-                    onClick={() => setPreviewMode("voice")}
-                    className={`absolute bottom-4 flex items-center gap-2.5 rounded-full border border-black/10 bg-white py-1.5 pl-1.5 pr-4 text-xs font-semibold text-[#212120] shadow-[0_10px_28px_rgba(24,29,20,.14)] transition hover:-translate-y-0.5 ${soul.appearance.position === "bottom-right" ? "right-4" : "left-4"}`}
-                    aria-label="Open voice chat preview"
-                  >
-                    <span
-                      className="h-9 w-9 rounded-full"
-                      style={{
-                        background:
-                          "radial-gradient(circle at 28% 24%,#ffe54c,transparent 31%),radial-gradient(circle at 74% 70%,#2fb4ff,transparent 35%),radial-gradient(circle at 24% 78%,#4bcde0,transparent 33%),#88c8d4",
-                      }}
-                    />
-                    Voice chat
-                  </button>
+                  <WidgetLauncher
+                    soul={soul}
+                    onClick={() => setPreviewMode(soul.appearance.startMode ?? "voice")}
+                    className={`absolute bottom-4 ${soul.appearance.position === "bottom-right" ? "right-4" : "left-4"}`}
+                  />
                 )}
               </div>
             </div>
@@ -4454,6 +4437,132 @@ function DeployView({
         </div>
       )}
     </Page>
+  );
+}
+
+function WidgetLauncher({
+  soul,
+  onClick,
+  className = "",
+}: {
+  soul: Soul;
+  onClick: () => void;
+  className?: string;
+}) {
+  const palette = orbPalette(soul.appearance.orbStyle, soul.appearance.accent);
+  const dark = soul.appearance.theme === "dark";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-3 rounded-full border py-2 pl-2 pr-5 text-sm font-medium shadow-[0_12px_36px_rgba(0,0,0,.15)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_42px_rgba(0,0,0,.2)] ${
+        dark ? "border-white/10 bg-[#0f0f11] text-white" : "border-black/10 bg-white text-[#0b0b0c]"
+      } ${className}`}
+      aria-label={`Open ${soul.appearance.welcomeLabel || "voice chat"}`}
+    >
+      <span
+        aria-hidden="true"
+        className="h-10 w-10 shrink-0 rounded-full shadow-[inset_0_0_12px_rgba(255,255,255,.3)]"
+        style={{ background: orbGradient(palette) }}
+      />
+      {soul.appearance.welcomeLabel || "Voice chat"}
+    </button>
+  );
+}
+
+function WidgetStyleControls({
+  soul,
+  onUpdate,
+}: {
+  soul: Soul;
+  onUpdate: (updater: (soul: Soul) => Soul) => void;
+}) {
+  const updateAppearance = (patch: Partial<Soul["appearance"]>) =>
+    onUpdate((current) => ({ ...current, appearance: { ...current.appearance, ...patch } }));
+  const selectedOrb = soul.appearance.orbStyle ?? "aurora";
+  const startMode = soul.appearance.startMode ?? "voice";
+  return (
+    <div className="space-y-5">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[.12em] text-[#928f86]">Orb</p>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {ORB_STYLES.map((style) => {
+            const selected = selectedOrb === style.id;
+            return (
+              <button
+                key={style.id}
+                type="button"
+                onClick={() => updateAppearance({ orbStyle: style.id })}
+                aria-pressed={selected}
+                className={`flex flex-col items-center gap-2 rounded-xl border p-3 text-xs font-medium transition ${
+                  selected
+                    ? "border-[#0b0b0c] bg-white shadow-[0_0_0_3px_rgba(11,11,12,.06)]"
+                    : "border-[#e5e4e2] hover:border-[#d1d0cc] hover:bg-[#fafaf9]"
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className="h-9 w-9 rounded-full shadow-[inset_0_0_10px_rgba(255,255,255,.35)]"
+                  style={{
+                    background: orbGradient(orbPalette(style.id, soul.appearance.accent)),
+                  }}
+                />
+                {style.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[.12em] text-[#928f86]">Opens on</p>
+        <div className="mt-3 grid grid-cols-2 gap-1 rounded-full border border-[#e5e4e2] bg-[#f7f7f5] p-1">
+          {(
+            [
+              ["voice", "Voice call"],
+              ["chat", "Text chat"],
+            ] as const
+          ).map(([mode, label]) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => updateAppearance({ startMode: mode })}
+              aria-pressed={startMode === mode}
+              className={`h-9 rounded-full text-sm font-medium transition ${
+                startMode === mode
+                  ? "bg-white text-[#0b0b0c] shadow-[0_1px_3px_rgba(0,0,0,.1)]"
+                  : "text-[#6f6e69] hover:text-[#0b0b0c]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <Field label="Launcher text" hint={`${(soul.appearance.welcomeLabel ?? "").length}/28`}>
+        <input
+          value={soul.appearance.welcomeLabel}
+          maxLength={28}
+          placeholder="Voice chat"
+          onChange={(event) => updateAppearance({ welcomeLabel: event.target.value })}
+          className="clean-input"
+        />
+      </Field>
+      <div className="flex items-center justify-between gap-4 rounded-xl border border-[#e3e2e0] p-4">
+        <div>
+          <p className="text-sm font-semibold">Let visitors interrupt</p>
+          <p className="mt-1 text-xs leading-5 text-[#7c7a74]">
+            Talking over {soul.personality.name || "the agent"} stops it mid-sentence, like a real
+            call.
+          </p>
+        </div>
+        <Toggle
+          checked={soul.voice.interruptions !== false}
+          onChange={(interruptions) =>
+            onUpdate((current) => ({ ...current, voice: { ...current.voice, interruptions } }))
+          }
+        />
+      </div>
+    </div>
   );
 }
 

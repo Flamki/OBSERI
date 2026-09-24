@@ -38,6 +38,7 @@ import { Route as ApiBillingCheckoutRouteImport } from './routes/api.billing.che
 import { Route as ApiBillingChangeRouteImport } from './routes/api.billing.change'
 import { Route as ApiBillingCancelRouteImport } from './routes/api.billing.cancel'
 import { Route as ApiWidgetsSoulIdSessionRouteImport } from './routes/api.widgets.$soulId.session'
+import { Route as ApiWidgetsSoulIdAppearanceRouteImport } from './routes/api.widgets.$soulId.appearance'
 import { Route as ApiSoulsSoulIdEventsRouteImport } from './routes/api.souls.$soulId.events'
 import { Route as ApiSoulsSoulIdConversationsRouteImport } from './routes/api.souls.$soulId.conversations'
 import { Route as ApiInternalWebhooksDrainRouteImport } from './routes/api.internal.webhooks.drain'
@@ -188,6 +189,12 @@ const ApiWidgetsSoulIdSessionRoute = ApiWidgetsSoulIdSessionRouteImport.update({
   path: '/api/widgets/$soulId/session',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWidgetsSoulIdAppearanceRoute =
+  ApiWidgetsSoulIdAppearanceRouteImport.update({
+    id: '/api/widgets/$soulId/appearance',
+    path: '/api/widgets/$soulId/appearance',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiSoulsSoulIdEventsRoute = ApiSoulsSoulIdEventsRouteImport.update({
   id: '/events',
   path: '/events',
@@ -238,6 +245,7 @@ export interface FileRoutesByFullPath {
   '/api/internal/webhooks/drain': typeof ApiInternalWebhooksDrainRoute
   '/api/souls/$soulId/conversations': typeof ApiSoulsSoulIdConversationsRoute
   '/api/souls/$soulId/events': typeof ApiSoulsSoulIdEventsRoute
+  '/api/widgets/$soulId/appearance': typeof ApiWidgetsSoulIdAppearanceRoute
   '/api/widgets/$soulId/session': typeof ApiWidgetsSoulIdSessionRoute
 }
 export interface FileRoutesByTo {
@@ -272,6 +280,7 @@ export interface FileRoutesByTo {
   '/api/internal/webhooks/drain': typeof ApiInternalWebhooksDrainRoute
   '/api/souls/$soulId/conversations': typeof ApiSoulsSoulIdConversationsRoute
   '/api/souls/$soulId/events': typeof ApiSoulsSoulIdEventsRoute
+  '/api/widgets/$soulId/appearance': typeof ApiWidgetsSoulIdAppearanceRoute
   '/api/widgets/$soulId/session': typeof ApiWidgetsSoulIdSessionRoute
 }
 export interface FileRoutesById {
@@ -307,6 +316,7 @@ export interface FileRoutesById {
   '/api/internal/webhooks/drain': typeof ApiInternalWebhooksDrainRoute
   '/api/souls/$soulId/conversations': typeof ApiSoulsSoulIdConversationsRoute
   '/api/souls/$soulId/events': typeof ApiSoulsSoulIdEventsRoute
+  '/api/widgets/$soulId/appearance': typeof ApiWidgetsSoulIdAppearanceRoute
   '/api/widgets/$soulId/session': typeof ApiWidgetsSoulIdSessionRoute
 }
 export interface FileRouteTypes {
@@ -343,6 +353,7 @@ export interface FileRouteTypes {
     | '/api/internal/webhooks/drain'
     | '/api/souls/$soulId/conversations'
     | '/api/souls/$soulId/events'
+    | '/api/widgets/$soulId/appearance'
     | '/api/widgets/$soulId/session'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -377,6 +388,7 @@ export interface FileRouteTypes {
     | '/api/internal/webhooks/drain'
     | '/api/souls/$soulId/conversations'
     | '/api/souls/$soulId/events'
+    | '/api/widgets/$soulId/appearance'
     | '/api/widgets/$soulId/session'
   id:
     | '__root__'
@@ -411,6 +423,7 @@ export interface FileRouteTypes {
     | '/api/internal/webhooks/drain'
     | '/api/souls/$soulId/conversations'
     | '/api/souls/$soulId/events'
+    | '/api/widgets/$soulId/appearance'
     | '/api/widgets/$soulId/session'
   fileRoutesById: FileRoutesById
 }
@@ -442,6 +455,7 @@ export interface RootRouteChildren {
   ApiVoiceSpeakRoute: typeof ApiVoiceSpeakRoute
   ApiWebhooksTestRoute: typeof ApiWebhooksTestRoute
   ApiInternalWebhooksDrainRoute: typeof ApiInternalWebhooksDrainRoute
+  ApiWidgetsSoulIdAppearanceRoute: typeof ApiWidgetsSoulIdAppearanceRoute
   ApiWidgetsSoulIdSessionRoute: typeof ApiWidgetsSoulIdSessionRoute
 }
 
@@ -650,6 +664,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWidgetsSoulIdSessionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/widgets/$soulId/appearance': {
+      id: '/api/widgets/$soulId/appearance'
+      path: '/api/widgets/$soulId/appearance'
+      fullPath: '/api/widgets/$soulId/appearance'
+      preLoaderRoute: typeof ApiWidgetsSoulIdAppearanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/souls/$soulId/events': {
       id: '/api/souls/$soulId/events'
       path: '/events'
@@ -739,6 +760,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiVoiceSpeakRoute: ApiVoiceSpeakRoute,
   ApiWebhooksTestRoute: ApiWebhooksTestRoute,
   ApiInternalWebhooksDrainRoute: ApiInternalWebhooksDrainRoute,
+  ApiWidgetsSoulIdAppearanceRoute: ApiWidgetsSoulIdAppearanceRoute,
   ApiWidgetsSoulIdSessionRoute: ApiWidgetsSoulIdSessionRoute,
 }
 export const routeTree = rootRouteImport

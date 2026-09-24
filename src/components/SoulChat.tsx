@@ -22,11 +22,26 @@ import type { KnowledgeChunk, Soul, SoulMessage } from "@/lib/soul";
 import {
   fetchSupertonicAudio,
   playSupertonicAudio,
+  setSupertonicAudioTap,
   speakSupertonic,
   stopSupertonic,
   type SupertonicVoiceId,
 } from "@/lib/supertonic";
 import { authFetch } from "@/lib/auth-client";
+import VoiceOrb from "@/components/voice/VoiceOrb";
+import { cleanForSpeech, contrastText, orbPalette } from "@/lib/voice-appearance";
+import {
+  inputLevel,
+  micMeterActive,
+  outputLevel,
+  playCue,
+  resumeAudio,
+  startMicMeter,
+  stopMicMeter,
+  tapOutput,
+} from "@/lib/voice-meter";
+
+type VoiceStatus = "idle" | "connecting" | "listening" | "thinking" | "speaking";
 
 const VOICE_LANGUAGES = [
   { code: "en-US", name: "English", flag: "US" },
@@ -74,9 +89,20 @@ export default function SoulChat({
   const [listening, setListening] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(soul.voice.enabled);
   const [voiceCallActive, setVoiceCallActive] = useState(false);
-  const [voiceStatus, setVoiceStatus] = useState<"idle" | "listening" | "thinking" | "speaking">(
-    "idle",
-  );
+  const [voiceStatus, setVoiceStatusState] = useState<VoiceStatus>("idle");
+  const voiceStatusRef = useRef<VoiceStatus>("idle");
+  const setVoiceStatus = (next: VoiceStatus) => {
+    voiceStatusRef.current = next;
+    setVoiceStatusState(next);
+  };
+  const [visitorCaption, setVisitorCaption] = useState("");
+  const [micMuted, setMicMuted] = useState(false);
+  const micMutedRef = useRef(false);
+  const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
+  const [, setClockTick] = useState(0);
+  // Every visitor turn and every interruption gets a new id, so late callbacks from an
+  // abandoned reply can never restart listening or end the call.
+  const turnRef = useRef(0);
   const [voicePanelView, setVoicePanelView] = useState<"voice" | "chat">(initialPanelMode);
   const [languageOpen, setLanguageOpen] = useState(false);
   const [callLanguage, setCallLanguage] = useState(soul.voice.language || "en-US");
@@ -112,6 +138,8 @@ export default function SoulChat({
     setCallLanguage(soul.voice.language || "en-US");
     setVoicePanelView(initialPanelMode);
     stopVoiceCall();
+    // Reset only when the identity or voice settings change; stopVoiceCall reads refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     soul.id,
     soul.personality.greeting,
@@ -122,6 +150,7 @@ export default function SoulChat({
 
   useEffect(() => {
     if (!voiceMode) stopVoiceCall();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voiceMode]);
 
   useEffect(() => {
@@ -130,17 +159,63 @@ export default function SoulChat({
     return () => document.removeEventListener("fullscreenchange", syncFullscreen);
   }, []);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    setSupertonicAudioTap((audio) => void tapOutput(audio));
+    return () => {
+      setSupertonicAudioTap(null);
       voiceCallActiveRef.current = false;
       voiceRequestRef.current?.abort();
       recognitionRef.current?.abort();
       audioRef.current?.pause();
       window.speechSynthesis?.cancel();
       stopSupertonic();
-    },
-    [],
-  );
+      stopMicMeter();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!callStartedAt) return;
+    const timer = window.setInterval(() => setClockTick((tick) => tick + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [callStartedAt]);
+
+  // Talk-over detection: sustained speech well above the room's noise floor while the agent
+  // is talking interrupts it, like a real conversation. Echo-cancelled mic input only.
+  useEffect(() => {
+    if (!voiceCallActive || soul.voice.interruptions === false) return;
+    let frame = 0;
+    let floor = 0.03;
+    let loudSince = 0;
+    const loop = (now: number) => {
+      frame = window.requestAnimationFrame(loop);
+      if (!micMeterActive() || micMutedRef.current) return;
+      const level = inputLevel();
+      const status = voiceStatusRef.current;
+      if (status === "listening") {
+        floor = floor * 0.98 + Math.min(level, 0.2) * 0.02;
+        loudSince = 0;
+        return;
+      }
+      if (status !== "speaking") {
+        loudSince = 0;
+        return;
+      }
+      const threshold = Math.max(0.22, floor * 4);
+      if (level > threshold) {
+        loudSince ||= now;
+        if (now - loudSince > 320) {
+          loudSince = 0;
+          interruptAgent();
+        }
+      } else {
+        loudSince = 0;
+      }
+    };
+    frame = window.requestAnimationFrame(loop);
+    return () => window.cancelAnimationFrame(frame);
+    // interruptAgent only reads refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceCallActive, soul.voice.interruptions]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -171,6 +246,7 @@ export default function SoulChat({
   async function sendMessage(text = value, continueVoiceCall = false) {
     const question = text.trim();
     if (!question || sendingRef.current) return;
+    const turn = continueVoiceCall ? ++turnRef.current : turnRef.current;
     const visitor: SoulMessage = {
       id: crypto.randomUUID(),
       role: "visitor",
@@ -188,7 +264,7 @@ export default function SoulChat({
 
     try {
       if (continueVoiceCall) {
-        await streamVoiceMessage(nextMessages);
+        await streamVoiceMessage(nextMessages, turn);
         return;
       }
       const response = await authFetch("/api/chat", {
@@ -234,7 +310,10 @@ export default function SoulChat({
         }
       }
     } catch (cause) {
-      if (!(cause instanceof DOMException && cause.name === "AbortError")) {
+      const aborted = cause instanceof DOMException && cause.name === "AbortError";
+      // An interrupted reply is expected; the call carries on listening.
+      if (continueVoiceCall && (aborted || turn !== turnRef.current)) return;
+      if (!aborted) {
         setError(cause instanceof Error ? cause.message : "The conversation was interrupted.");
       }
       if (continueVoiceCall) stopVoiceCall();
@@ -245,7 +324,7 @@ export default function SoulChat({
     }
   }
 
-  async function streamVoiceMessage(nextMessages: SoulMessage[]) {
+  async function streamVoiceMessage(nextMessages: SoulMessage[], turn: number) {
     const requestController = new AbortController();
     voiceRequestRef.current?.abort();
     voiceRequestRef.current = requestController;
@@ -274,7 +353,7 @@ export default function SoulChat({
     }
 
     const assistantId = crypto.randomUUID();
-    const speaker = createStreamingSpeaker();
+    const speaker = createStreamingSpeaker(turn);
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -309,6 +388,7 @@ export default function SoulChat({
             citations = event.citations;
             leadIntent = event.leadIntent;
           } else if (event.type === "delta" && event.text) {
+            if (turn !== turnRef.current) break;
             if (!answer) setVoiceStatus("speaking");
             answer += event.text;
             speaker.push(event.text);
@@ -324,13 +404,17 @@ export default function SoulChat({
       const completed = updateDraft();
       onMessagesChange?.(completed, leadIntent);
       await speaker.finish();
-      if (voiceCallActiveRef.current) window.setTimeout(() => startListening(true), 60);
+      if (voiceCallActiveRef.current && turn === turnRef.current) {
+        window.setTimeout(() => startListening(true), 60);
+      }
     } finally {
       reader.releaseLock();
     }
   }
 
-  async function speak(text: string) {
+  async function speak(raw: string) {
+    const text = cleanForSpeech(raw);
+    if (!text) return;
     if (soul.voice.provider === "voicebox" && soul.voice.profileId) {
       await playAudioBlob(await fetchVoiceboxAudio(text));
       return;
@@ -352,7 +436,8 @@ export default function SoulChat({
     }
   }
 
-  function createStreamingSpeaker() {
+  function createStreamingSpeaker(turn: number) {
+    const live = () => voiceCallActiveRef.current && turn === turnRef.current;
     let pendingText = "";
     let synthesis = Promise.resolve();
     let playback = Promise.resolve();
@@ -360,12 +445,12 @@ export default function SoulChat({
     audioRef.current?.pause();
 
     const queue = (text: string) => {
-      const segment = text.trim();
-      if (!segment) return;
+      const segment = cleanForSpeech(text);
+      if (!segment || !live()) return;
       if (soul.voice.provider === "voicebox" && soul.voice.profileId) {
         const audio = fetchVoiceboxAudio(segment, voiceRequestRef.current?.signal);
         playback = playback.then(async () => {
-          if (!voiceCallActiveRef.current) return;
+          if (!live()) return;
           await playAudioBlob(await audio);
         });
       } else if (soul.voice.provider === "supertonic") {
@@ -386,13 +471,11 @@ export default function SoulChat({
           () => undefined,
         );
         playback = playback.then(async () => {
-          if (!voiceCallActiveRef.current) return;
+          if (!live()) return;
           await playSupertonicAudio(await audio);
         });
       } else {
-        playback = playback.then(() =>
-          voiceCallActiveRef.current ? speakBrowserSegment(segment) : Promise.resolve(),
-        );
+        playback = playback.then(() => (live() ? speakBrowserSegment(segment) : Promise.resolve()));
       }
     };
 
@@ -433,6 +516,7 @@ export default function SoulChat({
   async function playAudioBlob(blob: Blob) {
     const href = URL.createObjectURL(blob);
     const audio = new Audio(href);
+    tapOutput(audio);
     audioRef.current = audio;
     await new Promise<void>((resolve, reject) => {
       let settled = false;
@@ -486,10 +570,12 @@ export default function SoulChat({
         }
       ).webkitSpeechRecognition;
     if (!constructor) {
-      setError("Voice input is not supported in this browser.");
+      setError("Voice input is not supported in this browser. You can still type below.");
       if (autoSend) stopVoiceCall();
       return;
     }
+    if (autoSend && (micMutedRef.current || !voiceCallActiveRef.current)) return;
+    if (recognitionRef.current) return;
     const recognition = new constructor();
     recognitionRef.current = recognition;
     recognition.lang = callLanguage;
@@ -519,17 +605,28 @@ export default function SoulChat({
       }
       transcript = nextTranscript.trim();
       if (!transcript) return;
+      if (autoSend) setVisitorCaption(transcript);
       if (!autoSend || hasFinalResult) {
         submitTranscript();
         return;
       }
+      // Give short fragments ("um, so…") more time; end longer sentences quickly.
+      const words = transcript.split(/\s+/).length;
       if (endpointTimer) window.clearTimeout(endpointTimer);
-      endpointTimer = window.setTimeout(() => recognition.stop(), 320);
+      endpointTimer = window.setTimeout(() => recognition.stop(), words <= 2 ? 750 : 450);
     };
     recognition.onerror = (event) => {
       if (endpointTimer) window.clearTimeout(endpointTimer);
       setListening(false);
-      recognitionRef.current = null;
+      if (recognitionRef.current === recognition) recognitionRef.current = null;
+      // Aborted by us (mute, end call): nothing to report.
+      if (event.error === "aborted") return;
+      // Some phones cannot share the microphone with the level meter; give it up and retry.
+      if (autoSend && event.error === "audio-capture" && micMeterActive()) {
+        stopMicMeter();
+        window.setTimeout(() => startListening(true), 160);
+        return;
+      }
       if (autoSend && event.error === "no-speech" && voiceCallActiveRef.current) {
         window.setTimeout(() => startListening(true), 160);
         return;
@@ -544,7 +641,7 @@ export default function SoulChat({
     recognition.onend = () => {
       if (endpointTimer) window.clearTimeout(endpointTimer);
       setListening(false);
-      recognitionRef.current = null;
+      if (recognitionRef.current === recognition) recognitionRef.current = null;
       if (!submitted && transcript) {
         submitTranscript();
         return;
@@ -556,7 +653,10 @@ export default function SoulChat({
     try {
       recognition.start();
       setListening(true);
-      if (autoSend) setVoiceStatus("listening");
+      if (autoSend) {
+        setVisitorCaption("");
+        setVoiceStatus("listening");
+      }
     } catch {
       setError("The microphone is already in use. Please try again.");
       if (autoSend) stopVoiceCall();
@@ -574,34 +674,50 @@ export default function SoulChat({
   }
 
   function startVoiceCall() {
+    // Resume audio synchronously inside the click so browsers allow playback.
+    void resumeAudio();
     setError("");
     setSoundEnabled(true);
     voiceCallActiveRef.current = true;
     setVoiceCallActive(true);
+    micMutedRef.current = false;
+    setMicMuted(false);
+    setVisitorCaption("");
+    setCallStartedAt(Date.now());
+    setVoiceStatus("connecting");
+    const turn = ++turnRef.current;
+    void startMicMeter();
+    window.setTimeout(() => playCue("connect"), 60);
     const greeting = soul.personality.greeting.trim();
-    setVoiceStatus("speaking");
     const opening =
       soul.voice.provider === "supertonic"
-        ? fetchSupertonicAudio(greeting, {
+        ? fetchSupertonicAudio(cleanForSpeech(greeting), {
             voice: (soul.voice.profileId || "F1") as SupertonicVoiceId,
             language: callLanguage,
             speed: soul.voice.speed,
             qualitySteps: 4,
             soulId: soul.id,
-          }).then(playSupertonicAudio)
-        : speak(greeting);
+          }).then((blob) => {
+            if (!voiceCallActiveRef.current || turn !== turnRef.current) return;
+            setVoiceStatus("speaking");
+            return playSupertonicAudio(blob);
+          })
+        : (setVoiceStatus("speaking"), speak(greeting));
     void opening
       .then(() => {
-        if (voiceCallActiveRef.current) startListening(true);
+        if (voiceCallActiveRef.current && turn === turnRef.current) startListening(true);
       })
       .catch(() => {
+        if (turn !== turnRef.current) return;
         setError("The selected voice is temporarily unavailable. Please try again shortly.");
         stopVoiceCall();
       });
   }
 
   function stopVoiceCall() {
+    const wasActive = voiceCallActiveRef.current;
     voiceCallActiveRef.current = false;
+    turnRef.current += 1;
     voiceRequestRef.current?.abort();
     voiceRequestRef.current = null;
     recognitionRef.current?.abort();
@@ -610,9 +726,48 @@ export default function SoulChat({
     audioRef.current = null;
     window.speechSynthesis?.cancel();
     stopSupertonic();
+    if (wasActive) playCue("disconnect");
+    stopMicMeter();
     setListening(false);
     setVoiceCallActive(false);
+    setCallStartedAt(null);
+    setVisitorCaption("");
     setVoiceStatus("idle");
+  }
+
+  /** Stop the agent mid-reply and hand the floor back to the visitor. */
+  function interruptAgent() {
+    if (!voiceCallActiveRef.current) return;
+    const status = voiceStatusRef.current;
+    if (status !== "speaking" && status !== "thinking") return;
+    turnRef.current += 1;
+    voiceRequestRef.current?.abort();
+    voiceRequestRef.current = null;
+    audioRef.current?.pause();
+    window.speechSynthesis?.cancel();
+    stopSupertonic();
+    sendingRef.current = false;
+    setSending(false);
+    if (micMutedRef.current) {
+      setVoiceStatus("listening");
+      return;
+    }
+    startListening(true);
+  }
+
+  function toggleMute() {
+    const next = !micMutedRef.current;
+    micMutedRef.current = next;
+    setMicMuted(next);
+    if (next) {
+      recognitionRef.current?.abort();
+      recognitionRef.current = null;
+      setListening(false);
+      return;
+    }
+    if (voiceCallActiveRef.current && voiceStatusRef.current === "listening") {
+      startListening(true);
+    }
   }
 
   function restart() {
@@ -645,65 +800,125 @@ export default function SoulChat({
   if (voiceMode) {
     const selectedLanguage =
       VOICE_LANGUAGES.find((language) => language.code === callLanguage) ?? VOICE_LANGUAGES[0];
-    const statusLabel =
-      voiceStatus === "listening"
-        ? "Listening..."
-        : voiceStatus === "thinking"
-          ? "Thinking..."
-          : voiceStatus === "speaking"
-            ? `${soul.personality.name} is speaking...`
-            : `Talk with ${soul.personality.name}`;
+    const agentName = soul.personality.name || "Assistant";
+    const accent = /^#[0-9a-f]{3,8}$/i.test(soul.appearance.accent)
+      ? soul.appearance.accent
+      : "#0b0b0c";
+    const accentText = contrastText(accent);
+    const palette = orbPalette(soul.appearance.orbStyle, accent);
+    const isDarkPanel = theme === "dark";
+    const orbState =
+      voiceCallActive && !(micMuted && voiceStatus === "listening") ? voiceStatus : "idle";
+    const statusLabel = !voiceCallActive
+      ? `Talk to ${agentName}`
+      : voiceStatus === "connecting"
+        ? "Connecting…"
+        : voiceStatus === "listening"
+          ? micMuted
+            ? "You’re muted"
+            : "Listening…"
+          : voiceStatus === "thinking"
+            ? "Thinking…"
+            : voiceStatus === "speaking"
+              ? `${agentName} is speaking`
+              : "Your turn";
+    const statusHint = !voiceCallActive
+      ? soul.appearance.welcomeLabel || "Ask anything about this website, out loud."
+      : voiceStatus === "speaking"
+        ? soul.voice.interruptions === false
+          ? "Tap the orb to interrupt."
+          : "Just start talking to interrupt."
+        : voiceStatus === "listening"
+          ? micMuted
+            ? "Unmute to keep talking."
+            : "Go ahead, I’m listening."
+          : voiceStatus === "thinking"
+            ? "Finding the answer on this website."
+            : "";
+    const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant");
+    const suggestions = soul.knowledge.pages
+      .slice(1)
+      .map((page) => page.title.split(/[|–—]/)[0]?.trim())
+      .filter((title): title is string => Boolean(title) && title.length <= 40)
+      .slice(0, 3);
+    const prompts: Array<{ label: string; text: string }> = suggestions.length
+      ? suggestions.map((title) => ({ label: title, text: `Tell me about ${title.toLowerCase()}` }))
+      : ["What do you offer?", "How does it work?", "How much does it cost?"].map((text) => ({
+          label: text,
+          text,
+        }));
+    const elapsed = callStartedAt
+      ? Math.max(0, Math.floor((Date.now() - callStartedAt) / 1000))
+      : 0;
+    const clock = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`;
+
+    const panelTone = isDarkPanel
+      ? "border-white/10 bg-[#0f0f11] text-white"
+      : isGlass
+        ? "border-white/60 bg-white/85 text-[#0b0b0c] backdrop-blur-2xl"
+        : "border-[#ebebe8] bg-white text-[#0b0b0c]";
+    const surface = isDarkPanel ? "bg-white/[0.07]" : "bg-[#f4f4f2]";
+    const muted = isDarkPanel ? "text-white/55" : "text-[#6f6e69]";
+    const iconButton = `flex h-10 w-10 items-center justify-center rounded-full transition ${
+      isDarkPanel
+        ? "text-white/70 hover:bg-white/10 hover:text-white"
+        : "text-[#5f5e5a] hover:bg-[#f1f1ef] hover:text-[#0b0b0c]"
+    }`;
+    const chip = `shrink-0 rounded-full border px-3.5 py-2 text-[13px] transition ${
+      isDarkPanel
+        ? "border-white/12 text-white/75 hover:bg-white/10"
+        : "border-[#e7e7e4] bg-white text-[#3d3d3a] hover:border-[#d6d6d2] hover:bg-[#fafaf9]"
+    }`;
+
+    const sendText = (text: string) => {
+      if (voicePanelView === "voice") showPanelView("chat");
+      void sendMessage(text);
+    };
 
     return (
       <div
         ref={panelRef}
-        className={`relative flex flex-col overflow-hidden border bg-white text-[#20201f] shadow-[0_24px_80px_rgba(20,24,18,.16)] ${
+        className={`relative flex flex-col overflow-hidden border shadow-[0_24px_80px_-12px_rgba(0,0,0,.28)] ${panelTone} ${
           isFullscreen
             ? "h-screen rounded-none"
-            : `rounded-[30px] ${fill ? "h-full min-h-[440px]" : compact ? "h-[620px]" : "h-[680px]"}`
+            : `rounded-[28px] ${fill ? "h-full min-h-[440px]" : compact ? "h-[620px]" : "h-[680px]"}`
         }`}
       >
-        <div className="relative z-20 flex h-[72px] shrink-0 items-center justify-between px-4">
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => showPanelView(voicePanelView === "voice" ? "chat" : "voice")}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f4f3f0] text-[#5d5b57] transition hover:bg-[#ebeae6] hover:text-[#212120]"
-              aria-label={voicePanelView === "voice" ? "Open text chat" : "Open voice chat"}
-            >
-              {voicePanelView === "voice" ? (
-                <MessageCircle className="h-[19px] w-[19px]" />
-              ) : (
-                <Phone className="h-[18px] w-[18px]" />
-              )}
-            </button>
-            {onClose && (
-              <button
-                onClick={() => {
-                  stopVoiceCall();
-                  onClose();
-                }}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-[#9d9b93] transition hover:bg-[#f4f3f0] hover:text-[#212120]"
-                aria-label="Close conversation"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
+        <header className="relative z-20 flex h-16 shrink-0 items-center gap-2 px-3">
+          <span
+            aria-hidden="true"
+            className="ml-1 h-8 w-8 shrink-0 rounded-full"
+            style={{
+              background: `radial-gradient(circle at 32% 28%, ${palette[2]} 0%, transparent 45%), radial-gradient(circle at 72% 72%, ${palette[1]} 0%, transparent 60%), ${palette[0]}`,
+            }}
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold leading-5">{agentName}</p>
+            <p className={`flex items-center gap-1.5 truncate text-xs ${muted}`}>
+              <span
+                className={`h-1.5 w-1.5 shrink-0 rounded-full ${voiceCallActive ? "animate-pulse bg-[#22c55e]" : "bg-[#22c55e]"}`}
+              />
+              {voiceCallActive ? `On a call · ${clock}` : soul.personality.role || "Online"}
+            </p>
           </div>
-
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <div className="relative">
             <button
               onClick={() => setLanguageOpen((current) => !current)}
-              className="flex h-11 items-center gap-2 rounded-full border border-[#e6e5e1] bg-white px-4 text-sm font-medium shadow-sm transition hover:bg-[#f9f9f9]"
+              className={`${iconButton} w-auto gap-1 px-2.5 text-xs font-medium`}
               aria-expanded={languageOpen}
+              aria-label={`Language: ${selectedLanguage.name}`}
             >
               <span className="text-base" aria-hidden="true">
                 {countryFlag(selectedLanguage.flag)}
               </span>
-              <span>{selectedLanguage.name}</span>
-              <ChevronDown className="h-4 w-4 text-[#8b887e]" />
+              <ChevronDown className="h-3.5 w-3.5" />
             </button>
             {languageOpen && (
-              <div className="absolute left-1/2 top-[50px] z-30 max-h-64 w-52 -translate-x-1/2 overflow-y-auto rounded-2xl border border-[#e3e2de] bg-white p-2 shadow-[0_18px_50px_rgba(25,28,22,.16)]">
+              <div
+                className={`absolute right-0 top-11 z-30 max-h-64 w-48 overflow-y-auto rounded-2xl border p-1.5 shadow-[0_18px_50px_rgba(0,0,0,.18)] ${
+                  isDarkPanel ? "border-white/10 bg-[#18181b]" : "border-[#ebebe8] bg-white"
+                }`}
+              >
                 {VOICE_LANGUAGES.map((language) => (
                   <button
                     key={language.code}
@@ -712,8 +927,14 @@ export default function SoulChat({
                       setCallLanguage(language.code);
                       setLanguageOpen(false);
                     }}
-                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition hover:bg-[#f4f3f0] ${
-                      language.code === callLanguage ? "bg-[#f4f3f0] font-semibold" : ""
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition ${
+                      language.code === callLanguage
+                        ? isDarkPanel
+                          ? "bg-white/10 font-semibold"
+                          : "bg-[#f4f4f2] font-semibold"
+                        : isDarkPanel
+                          ? "hover:bg-white/5"
+                          : "hover:bg-[#fafaf9]"
                     }`}
                   >
                     <span className="text-base">{countryFlag(language.flag)}</span>
@@ -723,96 +944,190 @@ export default function SoulChat({
               </div>
             )}
           </div>
-
           <button
             onClick={() => void toggleFullscreen()}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f4f3f0] text-[#5d5b57] transition hover:bg-[#ebeae6] hover:text-[#212120]"
+            className={iconButton}
             aria-label={isFullscreen ? "Exit fullscreen" : "Open fullscreen"}
           >
             {isFullscreen ? (
-              <Minimize2 className="h-[18px] w-[18px]" />
+              <Minimize2 className="h-[17px] w-[17px]" />
             ) : (
-              <Maximize2 className="h-[18px] w-[18px]" />
+              <Maximize2 className="h-[17px] w-[17px]" />
             )}
           </button>
+          {onClose && (
+            <button
+              onClick={() => {
+                stopVoiceCall();
+                onClose();
+              }}
+              className={iconButton}
+              aria-label="Close conversation"
+            >
+              <X className="h-[18px] w-[18px]" />
+            </button>
+          )}
+        </header>
+
+        <div className="relative z-10 flex shrink-0 justify-center pb-1">
+          <div className={`flex rounded-full p-1 ${surface}`} role="tablist">
+            {(["voice", "chat"] as const).map((view) => (
+              <button
+                key={view}
+                role="tab"
+                aria-selected={voicePanelView === view}
+                onClick={() => showPanelView(view)}
+                className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold transition ${
+                  voicePanelView === view
+                    ? isDarkPanel
+                      ? "bg-white text-[#0b0b0c]"
+                      : "bg-white text-[#0b0b0c] shadow-[0_1px_3px_rgba(0,0,0,.1)]"
+                    : muted
+                }`}
+              >
+                {view === "voice" ? (
+                  <Phone className="h-3.5 w-3.5" />
+                ) : (
+                  <MessageCircle className="h-3.5 w-3.5" />
+                )}
+                {view === "voice" ? "Call" : "Chat"}
+              </button>
+            ))}
+          </div>
         </div>
 
         {voicePanelView === "voice" ? (
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-7 pb-4 pt-2 text-center">
-            <div className="relative flex h-[190px] w-[190px] shrink-0 items-center justify-center">
-              <div
-                className={`absolute inset-0 rounded-full ${voiceCallActive ? "animate-[spin_10s_linear_infinite]" : ""}`}
-                style={{
-                  background:
-                    "radial-gradient(circle at 28% 24%,rgba(255,229,76,.95),transparent 31%),radial-gradient(circle at 74% 70%,rgba(47,180,255,.95),transparent 35%),radial-gradient(circle at 24% 78%,rgba(75,205,224,.9),transparent 33%),radial-gradient(circle at 75% 20%,rgba(106,211,237,.85),transparent 31%),#88c8d4",
-                  filter: "saturate(.9)",
-                  boxShadow:
-                    "inset 0 0 30px rgba(255,255,255,.28),0 20px 48px rgba(61,143,164,.22)",
-                }}
-              />
-              <div
-                className="pointer-events-none absolute inset-0 rounded-full opacity-35 mix-blend-overlay"
-                style={{
-                  backgroundImage:
-                    "repeating-radial-gradient(circle at 40% 45%,rgba(255,255,255,.65) 0 1px,transparent 1px 3px)",
-                }}
-              />
-              {voiceCallActive && (
-                <span className="absolute -inset-3 animate-pulse rounded-full border border-[#66c5d5]/35" />
-              )}
+          <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 text-center">
+            <div className="flex min-h-[250px] flex-1 flex-col items-center justify-center">
               <button
-                onClick={voiceCallActive ? stopVoiceCall : startVoiceCall}
-                className={`relative z-10 flex h-14 w-14 items-center justify-center rounded-full bg-white text-[#121110] shadow-[0_8px_28px_rgba(25,35,28,.2)] transition hover:scale-105 ${
-                  voiceCallActive ? "text-[#b34b43]" : ""
-                }`}
-                aria-label={voiceCallActive ? "End voice call" : "Start voice call"}
+                type="button"
+                onClick={() => {
+                  if (!voiceCallActive) startVoiceCall();
+                  else if (voiceStatus === "speaking" || voiceStatus === "thinking")
+                    interruptAgent();
+                }}
+                className="relative rounded-full outline-none transition-transform duration-500 focus-visible:ring-4 focus-visible:ring-black/10 active:scale-[0.97]"
+                aria-label={
+                  voiceCallActive
+                    ? voiceStatus === "speaking"
+                      ? "Interrupt"
+                      : statusLabel
+                    : `Start a voice call with ${agentName}`
+                }
               >
-                {voiceCallActive ? (
-                  <PhoneOff className="h-5 w-5" />
-                ) : (
-                  <Phone className="h-5 w-5 fill-current" />
+                <VoiceOrb
+                  palette={palette}
+                  state={orbState}
+                  size={isFullscreen ? 280 : 220}
+                  getLevel={() =>
+                    voiceStatusRef.current === "listening"
+                      ? micMutedRef.current
+                        ? 0
+                        : inputLevel()
+                      : voiceStatusRef.current === "speaking"
+                        ? outputLevel()
+                        : 0
+                  }
+                />
+                {!voiceCallActive && (
+                  <span className="absolute left-1/2 top-1/2 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#0b0b0c] shadow-[0_10px_30px_rgba(0,0,0,.18)] backdrop-blur transition hover:scale-105">
+                    <Phone className="h-5 w-5 fill-current" />
+                  </span>
                 )}
               </button>
+              <h3
+                key={statusLabel}
+                className="mt-2 animate-in fade-in text-[17px] font-semibold tracking-[-0.01em] duration-300"
+              >
+                {statusLabel}
+              </h3>
+              {statusHint && (
+                <p className={`mt-1 max-w-[280px] text-[13px] leading-5 ${muted}`}>{statusHint}</p>
+              )}
             </div>
-            <h3 className="mt-6 text-[17px] font-semibold">{statusLabel}</h3>
-            <p className="mt-2 max-w-[300px] text-sm leading-5 text-[#7b7973]">
-              {voiceCallActive
-                ? "Speak naturally. The conversation keeps listening after every reply."
-                : "Ask about this website by voice or message."}
-            </p>
-            {error && (
-              <div className="mt-4 w-full max-w-sm rounded-xl border border-[#eed5ce] bg-[#fff6f2] px-4 py-3 text-sm text-[#934b3a]">
-                {error}
+
+            {voiceCallActive ? (
+              <div className="mb-3 w-full max-w-[340px] space-y-2 text-left" aria-live="polite">
+                {visitorCaption && (
+                  <p
+                    className={`animate-in fade-in line-clamp-2 text-[13px] leading-5 duration-200 ${muted}`}
+                  >
+                    <span className="font-semibold">You · </span>
+                    {visitorCaption}
+                  </p>
+                )}
+                {lastAssistant && voiceStatus !== "listening" && (
+                  <p
+                    key={lastAssistant.id}
+                    className={`animate-in fade-in slide-in-from-bottom-1 line-clamp-3 rounded-2xl px-4 py-3 text-[14px] leading-6 duration-300 ${surface}`}
+                  >
+                    {lastAssistant.content || "…"}
+                  </p>
+                )}
+                {error && (
+                  <p className="rounded-xl bg-[#fff1f4] px-3 py-2 text-xs text-[#b3263f]">
+                    {error}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="mb-3 w-full">
+                {error && (
+                  <p className="mb-3 rounded-xl bg-[#fff1f4] px-3 py-2 text-xs text-[#b3263f]">
+                    {error}
+                  </p>
+                )}
+                <div className="flex flex-wrap justify-center gap-2 px-1">
+                  {prompts.map((prompt) => (
+                    <button
+                      key={prompt.label}
+                      type="button"
+                      onClick={() => sendText(prompt.text)}
+                      className={chip}
+                    >
+                      {prompt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
         ) : (
-          <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+          <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={`flex ${message.role === "visitor" ? "justify-end" : "justify-start"}`}
+                className={`flex animate-in fade-in slide-in-from-bottom-1 duration-300 ${message.role === "visitor" ? "justify-end" : "justify-start"}`}
               >
-                <div
-                  className={`max-w-[88%] rounded-[22px] px-4 py-3 text-sm leading-6 ${
-                    message.role === "visitor"
-                      ? "rounded-br-md border border-[#e1e0dc] bg-white text-[#232220] shadow-sm"
-                      : "rounded-bl-md bg-[#f2f1ee] text-[#32312f]"
-                  }`}
-                >
-                  <p className="whitespace-pre-wrap">{message.content}</p>
+                <div className="max-w-[86%]">
+                  <div
+                    className={`rounded-[20px] px-4 py-2.5 text-[14px] leading-6 ${
+                      message.role === "visitor" ? "rounded-br-md" : `rounded-bl-md ${surface}`
+                    }`}
+                    style={
+                      message.role === "visitor"
+                        ? { background: accent, color: accentText }
+                        : undefined
+                    }
+                  >
+                    <p className="whitespace-pre-wrap">{message.content}</p>
+                  </div>
                   {!!message.citations?.length && (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {message.citations.map((citation, index) => (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {message.citations.slice(0, 3).map((citation, index) => (
                         <a
                           key={`${citation.chunkId}-${index}`}
                           href={citation.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 rounded-full border border-[#dddcd9] bg-white px-2.5 py-1 text-[11px] text-[#64635f]"
+                          className={`inline-flex max-w-[220px] items-center gap-1 truncate rounded-full border px-2.5 py-1 text-[11px] transition ${
+                            isDarkPanel
+                              ? "border-white/12 text-white/60 hover:text-white"
+                              : "border-[#e7e7e4] bg-white text-[#6f6e69] hover:text-[#0b0b0c]"
+                          }`}
                         >
-                          {citation.title.slice(0, 26)}
-                          <ExternalLink className="h-3 w-3" />
+                          <BookOpen className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{citation.title}</span>
                         </a>
                       ))}
                     </div>
@@ -821,49 +1136,147 @@ export default function SoulChat({
               </div>
             ))}
             {sending && (
-              <div className="flex items-center gap-2 text-sm text-[#7b7973]">
-                <LoaderCircle className="h-4 w-4 animate-spin" /> {soul.personality.name} is
-                thinking...
+              <div className="flex animate-in fade-in justify-start duration-200">
+                <div
+                  className={`flex items-center gap-1 rounded-[20px] rounded-bl-md px-4 py-3.5 ${surface}`}
+                  aria-label={`${agentName} is typing`}
+                >
+                  {[0, 1, 2].map((dot) => (
+                    <span
+                      key={dot}
+                      className={`h-1.5 w-1.5 animate-bounce rounded-full ${isDarkPanel ? "bg-white/60" : "bg-[#8a8a8f]"}`}
+                      style={{ animationDelay: `${dot * 140}ms` }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            {messages.length === 1 && !sending && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {prompts.map((prompt) => (
+                  <button
+                    key={prompt.label}
+                    type="button"
+                    onClick={() => sendText(prompt.text)}
+                    className={chip}
+                  >
+                    {prompt.label}
+                  </button>
+                ))}
               </div>
             )}
             {error && (
-              <div className="rounded-xl border border-[#eed5ce] bg-[#fff6f2] px-4 py-3 text-sm text-[#934b3a]">
-                {error}
-              </div>
+              <p className="rounded-xl bg-[#fff1f4] px-3 py-2 text-xs text-[#b3263f]">{error}</p>
             )}
           </div>
         )}
 
         <div className="shrink-0 px-4 pb-4 pt-2">
-          <div className="flex items-end gap-2 rounded-full border border-[#deddda] bg-white p-1.5 pl-5 shadow-[0_4px_16px_rgba(25,29,22,.06)] focus-within:border-[#bcbab5]">
-            <textarea
-              value={value}
-              onChange={(event) => setValue(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  void sendMessage();
-                  if (voicePanelView === "voice") showPanelView("chat");
-                }
-              }}
-              rows={1}
-              placeholder="Ask this website..."
-              className="max-h-24 min-h-10 flex-1 resize-none bg-transparent py-2.5 text-sm outline-none placeholder:text-[#a7a49d]"
-            />
-            <button
-              onClick={() => {
-                void sendMessage();
-                if (voicePanelView === "voice") showPanelView("chat");
-              }}
-              disabled={!value.trim() || sending}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#232220] text-white transition hover:bg-black disabled:bg-[#eeede9] disabled:text-[#adaba5]"
-              aria-label="Send message"
-            >
-              <ArrowUp className="h-4 w-4" />
-            </button>
-          </div>
-          <p className="mt-2 text-center text-[10px] text-[#a4a19a]">
-            Voice uses your microphone only while the call is active
+          {voiceCallActive && voicePanelView === "voice" ? (
+            <div className="flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={toggleMute}
+                aria-pressed={micMuted}
+                aria-label={micMuted ? "Unmute microphone" : "Mute microphone"}
+                className={`flex h-12 w-12 items-center justify-center rounded-full transition ${
+                  micMuted
+                    ? "bg-[#0b0b0c] text-white"
+                    : isDarkPanel
+                      ? "bg-white/10 text-white hover:bg-white/15"
+                      : "bg-[#f1f1ef] text-[#0b0b0c] hover:bg-[#e9e9e6]"
+                }`}
+              >
+                {micMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+              </button>
+              <button
+                type="button"
+                onClick={stopVoiceCall}
+                className="inline-flex h-12 min-w-[132px] items-center justify-center gap-2 rounded-full bg-[#e5484d] px-6 text-sm font-semibold text-white shadow-[0_10px_24px_-8px_rgba(229,72,77,.6)] transition hover:bg-[#d93d42]"
+              >
+                <PhoneOff className="h-4 w-4" /> End call
+              </button>
+              <button
+                type="button"
+                onClick={() => showPanelView("chat")}
+                aria-label="Switch to text chat"
+                className={`flex h-12 w-12 items-center justify-center rounded-full transition ${
+                  isDarkPanel
+                    ? "bg-white/10 text-white hover:bg-white/15"
+                    : "bg-[#f1f1ef] text-[#0b0b0c] hover:bg-[#e9e9e6]"
+                }`}
+              >
+                <MessageCircle className="h-5 w-5" />
+              </button>
+            </div>
+          ) : (
+            <>
+              {voicePanelView === "voice" && (
+                <button
+                  type="button"
+                  onClick={startVoiceCall}
+                  className="mb-2.5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold shadow-[0_10px_24px_-10px_rgba(0,0,0,.35)] transition hover:brightness-105 active:scale-[0.99]"
+                  style={{ background: accent, color: accentText }}
+                >
+                  <Phone className="h-4 w-4 fill-current" /> Start voice call
+                </button>
+              )}
+              <div
+                className={`flex items-end gap-1.5 rounded-[22px] border p-1.5 pl-4 transition focus-within:ring-4 ${
+                  isDarkPanel
+                    ? "border-white/12 bg-white/[0.04] focus-within:ring-white/5"
+                    : "border-[#e2e2df] bg-white focus-within:border-[#cfcfcb] focus-within:ring-black/[0.04]"
+                }`}
+              >
+                <textarea
+                  value={value}
+                  onChange={(event) => setValue(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      if (value.trim()) sendText(value);
+                    }
+                  }}
+                  rows={1}
+                  placeholder={`Message ${agentName}…`}
+                  className={`max-h-24 min-h-10 flex-1 resize-none bg-transparent py-2.5 text-sm outline-none ${
+                    isDarkPanel ? "placeholder:text-white/35" : "placeholder:text-[#9a9a9e]"
+                  }`}
+                />
+                {voicePanelView === "chat" && (
+                  <button
+                    type="button"
+                    onClick={toggleListening}
+                    aria-label={listening ? "Stop dictation" : "Dictate a message"}
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition ${
+                      listening
+                        ? "animate-pulse bg-[#e5484d] text-white"
+                        : isDarkPanel
+                          ? "text-white/60 hover:bg-white/10"
+                          : "text-[#6f6e69] hover:bg-[#f1f1ef]"
+                    }`}
+                  >
+                    {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                  </button>
+                )}
+                <button
+                  onClick={() => value.trim() && sendText(value)}
+                  disabled={!value.trim() || sending}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition disabled:opacity-30"
+                  style={{ background: accent, color: accentText }}
+                  aria-label="Send message"
+                >
+                  <ArrowUp className="h-4 w-4" />
+                </button>
+              </div>
+            </>
+          )}
+          <p
+            className={`mt-2 text-center text-[10px] ${isDarkPanel ? "text-white/35" : "text-[#a3a29d]"}`}
+          >
+            {voiceCallActive
+              ? "Your microphone is only used during the call"
+              : "Answers come from this website’s own pages"}
           </p>
         </div>
       </div>
