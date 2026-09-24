@@ -228,7 +228,7 @@ export function createSoul(siteUrl: string, name?: string): Soul {
       cloneConsentRecorded: false,
     },
     appearance: {
-      accent: "#b6ff60",
+      accent: "#ff5c7a",
       position: "bottom-right",
       launcher: "orb",
       theme: "light",

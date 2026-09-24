@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useMemo, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import {
   ArrowRight,
   BookOpen,
@@ -173,19 +173,28 @@ export default function OnboardingFlow({
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#f7f5f2] font-sans text-[#19181a]">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[32rem] bg-[radial-gradient(ellipse_70%_65%_at_50%_-5%,rgba(255,92,122,.2),rgba(255,178,157,.12)_42%,transparent_75%)]" />
-      <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-col px-5 pb-12 pt-7 sm:px-8 sm:pt-9">
+    <div className="obs-app relative min-h-screen overflow-hidden bg-[#fafaf9] text-[#0b0b0c]">
+      <div className="obs-hero-glow pointer-events-none absolute inset-x-0 top-0 h-[34rem] opacity-70" />
+      <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-col px-5 pb-12 pt-6 sm:px-8 sm:pt-8">
+        <div className="mb-7 flex items-center justify-between">
+          <img src="/obseri-logo-dark.svg" alt="Obseri" className="h-7 w-auto" />
+          <a
+            href="mailto:flamki@obseri.com?subject=Obseri%20setup%20help"
+            className="text-sm text-[#6f6e69] transition hover:text-[#0b0b0c]"
+          >
+            Need help?
+          </a>
+        </div>
         <SetupProgress current={step} />
 
-        <section className="mt-8 min-h-[590px] overflow-hidden rounded-[32px] border border-black/[0.08] bg-white/80 shadow-[0_28px_90px_rgba(57,39,43,.09)] backdrop-blur-xl">
+        <section className="mt-8 min-h-[590px] overflow-hidden rounded-[28px] border border-[#e7e7e4] bg-white shadow-[0_1px_2px_rgba(0,0,0,.04),0_24px_80px_-24px_rgba(40,20,60,.18)]">
           {step === "website" ? (
             <div className="grid min-h-[590px] lg:grid-cols-[1.08fr_.92fr]">
               <div className="flex flex-col justify-center px-7 py-12 sm:px-14 lg:px-16">
-                <span className="mb-5 text-xs font-semibold uppercase tracking-[0.2em] text-[#b63c56]">
+                <span className="mb-5 obs-mono text-xs font-medium uppercase tracking-[0.14em] text-[#8a8a8f]">
                   Start with one URL
                 </span>
-                <h1 className="max-w-xl font-serif text-5xl leading-[.98] tracking-[-0.045em] sm:text-6xl">
+                <h1 className="max-w-xl text-[clamp(2.4rem,5vw,3.5rem)] font-semibold leading-[1] tracking-[-0.05em]">
                   Let’s wake up your website.
                 </h1>
                 <p className="mt-6 max-w-lg text-base leading-7 text-[#716d6c] sm:text-lg">
@@ -193,11 +202,11 @@ export default function OnboardingFlow({
                   you can shape before it meets a visitor.
                 </p>
                 <form onSubmit={beginLearning} className="mt-9">
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.15em] text-[#898381]">
+                  <label className="obs-mono mb-2 block text-xs font-medium uppercase tracking-[0.14em] text-[#8a8a8f]">
                     Your website
                   </label>
-                  <div className="flex items-center rounded-2xl border border-black/10 bg-white p-2 shadow-sm transition focus-within:border-[#ff5c7a]/60 focus-within:shadow-[0_0_0_4px_rgba(255,92,122,.1)]">
-                    <Globe2 className="ml-3 h-5 w-5 shrink-0 text-[#a19c99]" />
+                  <div className="flex flex-col gap-2 rounded-[22px] border border-[#e2e2df] bg-white p-1.5 shadow-[0_1px_2px_rgba(0,0,0,.04)] transition focus-within:border-[#cfcfcb] focus-within:ring-4 focus-within:ring-black/[0.04] sm:flex-row sm:items-center sm:rounded-full">
+                    <Globe2 className="ml-3 hidden h-5 w-5 shrink-0 text-[#a19c99] sm:block" />
                     <input
                       autoFocus
                       value={url}
@@ -205,7 +214,7 @@ export default function OnboardingFlow({
                       placeholder="yourwebsite.com"
                       className="min-w-0 flex-1 bg-transparent px-3 py-3 text-base outline-none placeholder:text-[#b5b0ad]"
                     />
-                    <button className="flex shrink-0 items-center gap-2 rounded-xl bg-[#1c1b1d] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#b63c56]">
+                    <button className="flex shrink-0 items-center justify-center gap-2 rounded-full bg-[#0b0b0c] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#2a2a2e]">
                       Build its soul <ArrowRight className="h-4 w-4" />
                     </button>
                   </div>
@@ -220,10 +229,10 @@ export default function OnboardingFlow({
           ) : step === "knowledge" ? (
             <div className="grid min-h-[590px] lg:grid-cols-[.9fr_1.1fr]">
               <div className="flex flex-col justify-center border-b border-black/[0.07] px-7 py-10 sm:px-14 lg:border-b-0 lg:border-r">
-                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#b63c56]">
+                <span className="obs-mono text-xs font-medium uppercase tracking-[0.14em] text-[#8a8a8f]">
                   Live website learning
                 </span>
-                <h1 className="mt-5 font-serif text-5xl leading-none tracking-[-0.04em]">
+                <h1 className="mt-5 text-[clamp(2.2rem,4.4vw,3.2rem)] font-semibold leading-[1] tracking-[-0.05em]">
                   {draftSoul?.knowledge.status === "ready"
                     ? "Knowledge ready."
                     : "Reading your website."}
@@ -261,7 +270,7 @@ export default function OnboardingFlow({
                         !error ? (
                           <LoaderCircle className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-[#ff5c7a]" />
                         ) : (
-                          <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#6d9d4f]" />
+                          <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#0b0b0c]" />
                         )}
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-[#3e3a39]">{event.message}</p>
@@ -278,7 +287,7 @@ export default function OnboardingFlow({
                     <ErrorMessage message={error} />
                     <button
                       onClick={() => setStep("website")}
-                      className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#b63c56]"
+                      className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#0b0b0c] underline underline-offset-4"
                     >
                       <RefreshCw className="h-4 w-4" /> Try another URL
                     </button>
@@ -289,7 +298,7 @@ export default function OnboardingFlow({
                       applyPreset("guide");
                       setStep("personality");
                     }}
-                    className="mt-7 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#1c1b1d] px-5 py-4 text-sm font-semibold text-white transition hover:bg-[#b63c56]"
+                    className="mt-7 flex w-full items-center justify-center gap-2 rounded-full bg-[#0b0b0c] px-5 py-4 text-sm font-semibold text-white transition hover:bg-[#2a2a2e]"
                   >
                     Shape its presence <ArrowRight className="h-4 w-4" />
                   </button>
@@ -299,10 +308,10 @@ export default function OnboardingFlow({
           ) : step === "personality" ? (
             <div className="grid min-h-[590px] lg:grid-cols-[1fr_.78fr]">
               <div className="flex flex-col justify-center px-7 py-10 sm:px-14 lg:px-16">
-                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#b63c56]">
+                <span className="obs-mono text-xs font-medium uppercase tracking-[0.14em] text-[#8a8a8f]">
                   Make it feel like you
                 </span>
-                <h1 className="mt-5 font-serif text-5xl leading-none tracking-[-0.04em]">
+                <h1 className="mt-5 text-[clamp(2.2rem,4.4vw,3.2rem)] font-semibold leading-[1] tracking-[-0.05em]">
                   How should it show up?
                 </h1>
                 <p className="mt-5 max-w-xl leading-7 text-[#716d6c]">
@@ -316,7 +325,7 @@ export default function OnboardingFlow({
                       onClick={() => applyPreset(item.id)}
                       className={`flex items-center justify-between rounded-2xl border p-5 text-left transition ${
                         preset === item.id
-                          ? "border-[#ff5c7a]/50 bg-[#fff4f4] shadow-[0_0_0_3px_rgba(255,92,122,.08)]"
+                          ? "border-[#0b0b0c] bg-white shadow-[0_0_0_3px_rgba(11,11,12,.06)]"
                           : "border-black/[0.08] bg-white hover:border-black/20"
                       }`}
                     >
@@ -327,7 +336,7 @@ export default function OnboardingFlow({
                       <span
                         className={`flex h-6 w-6 items-center justify-center rounded-full border ${
                           preset === item.id
-                            ? "border-[#ff5c7a] bg-[#ff5c7a] text-white"
+                            ? "border-[#0b0b0c] bg-[#0b0b0c] text-white"
                             : "border-black/15 text-transparent"
                         }`}
                       >
@@ -340,7 +349,7 @@ export default function OnboardingFlow({
                 <button
                   onClick={() => void finishSetup()}
                   disabled={saving}
-                  className="mt-7 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#1c1b1d] px-5 py-4 text-sm font-semibold text-white transition hover:bg-[#b63c56] disabled:cursor-wait disabled:opacity-60"
+                  className="mt-7 flex w-full items-center justify-center gap-2 rounded-full bg-[#0b0b0c] px-5 py-4 text-sm font-semibold text-white transition hover:bg-[#2a2a2e] disabled:cursor-wait disabled:opacity-60"
                 >
                   {saving ? (
                     <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -350,20 +359,18 @@ export default function OnboardingFlow({
                   {saving ? "Saving your agent…" : "Finish setup"}
                 </button>
               </div>
-              <div className="flex items-center justify-center border-t border-black/[0.07] bg-[#19181a] px-7 py-12 text-white lg:border-l lg:border-t-0">
+              <div className="flex items-center justify-center border-t border-[#efefec] bg-[#f5f5f3] px-7 py-12 lg:border-l lg:border-t-0">
                 <div className="w-full max-w-sm">
-                  <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full border border-white/10 bg-[radial-gradient(circle_at_35%_30%,#ffb19f,#ff5c7a_48%,#712b4c)] shadow-[0_25px_70px_rgba(255,92,122,.3)]">
-                    <Volume2 className="h-8 w-8" />
-                  </div>
-                  <div className="mt-9 rounded-3xl border border-white/10 bg-white/[0.06] p-6">
-                    <div className="flex items-center gap-2 text-xs uppercase tracking-[0.15em] text-white/45">
+                  <OnboardingOrb size={112} />
+                  <div className="mt-9 rounded-3xl bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,.05),0_18px_40px_-20px_rgba(0,0,0,.2)]">
+                    <div className="obs-mono flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-[#8a8a8f]">
                       <MessageCircle className="h-4 w-4" /> First greeting
                     </div>
-                    <p className="mt-4 text-lg leading-7 text-white/90">
+                    <p className="mt-4 text-lg leading-7 text-[#1f1f23]">
                       Hi — I’m {draftSoul?.name}. What can I help you find?
                     </p>
                   </div>
-                  <div className="mt-4 flex items-center justify-center gap-2 text-xs text-white/45">
+                  <div className="mt-4 flex items-center justify-center gap-2 text-xs text-[#8a8a8f]">
                     <Volume2 className="h-4 w-4" /> Natural voice is ready by default
                   </div>
                 </div>
@@ -371,14 +378,16 @@ export default function OnboardingFlow({
             </div>
           ) : (
             <div className="flex min-h-[590px] flex-col items-center justify-center px-6 py-12 text-center">
-              <div className="relative flex h-28 w-28 items-center justify-center rounded-full bg-[#fff0f1]">
-                <div className="absolute inset-3 rounded-full border border-[#ff5c7a]/25" />
-                <Check className="h-10 w-10 text-[#c9425e]" />
+              <div className="relative">
+                <OnboardingOrb size={112} live />
+                <span className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full border-4 border-white bg-[#0b0b0c] text-white">
+                  <Check className="h-4 w-4" />
+                </span>
               </div>
-              <span className="mt-8 text-xs font-semibold uppercase tracking-[0.2em] text-[#b63c56]">
+              <span className="mt-8 obs-mono text-xs font-medium uppercase tracking-[0.14em] text-[#8a8a8f]">
                 Your first agent is ready
               </span>
-              <h1 className="mt-4 font-serif text-5xl tracking-[-0.04em] sm:text-6xl">
+              <h1 className="mt-4 text-[clamp(2.4rem,5vw,3.6rem)] font-semibold leading-[1] tracking-[-0.05em]">
                 Meet {draftSoul?.name}.
               </h1>
               <p className="mt-5 max-w-xl text-base leading-7 text-[#716d6c]">
@@ -393,13 +402,18 @@ export default function OnboardingFlow({
                 />
                 <ReadyPill icon={<Volume2 className="h-4 w-4" />} label="Voice ready" />
               </div>
-              <button
-                onClick={onEnterStudio}
-                disabled={!savedWorkspace}
-                className="mt-10 flex items-center gap-2 rounded-2xl bg-[#1c1b1d] px-8 py-4 text-sm font-semibold text-white transition hover:bg-[#b63c56] disabled:opacity-50"
-              >
-                Meet your agent <ArrowRight className="h-4 w-4" />
-              </button>
+              <div className="mt-10 flex flex-wrap justify-center gap-3">
+                <button
+                  onClick={onEnterStudio}
+                  disabled={!savedWorkspace}
+                  className="flex items-center gap-2 rounded-full bg-[#0b0b0c] px-7 py-4 text-sm font-semibold text-white transition hover:bg-[#2a2a2e] disabled:opacity-50"
+                >
+                  Talk to your agent <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+              <p className="mt-4 text-sm text-[#8a8a8f]">
+                Next: preview it, then install it on your website with one snippet.
+              </p>
             </div>
           )}
         </section>
@@ -421,9 +435,9 @@ function SetupProgress({ current }: { current: SetupStep }) {
               <span
                 className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${
                   complete
-                    ? "border-[#ff5c7a] bg-[#ff5c7a] text-white"
+                    ? "border-[#0b0b0c] bg-[#0b0b0c] text-white"
                     : active
-                      ? "border-[#c9425e] bg-white text-[#b63c56]"
+                      ? "border-[#0b0b0c] bg-white text-[#0b0b0c]"
                       : "border-black/10 bg-white/60 text-[#aaa4a1]"
                 }`}
               >
@@ -437,7 +451,7 @@ function SetupProgress({ current }: { current: SetupStep }) {
             </div>
             {index < STEPS.length - 1 && (
               <div
-                className={`mx-3 h-px flex-1 ${index < currentIndex ? "bg-[#ff5c7a]" : "bg-black/10"}`}
+                className={`mx-3 h-px flex-1 ${index < currentIndex ? "bg-[#0b0b0c]" : "bg-black/10"}`}
               />
             )}
           </div>
@@ -447,25 +461,44 @@ function SetupProgress({ current }: { current: SetupStep }) {
   );
 }
 
+function OnboardingOrb({ size, live = false }: { size: number; live?: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      data-live={live}
+      className="obs-orb mx-auto block"
+      style={
+        {
+          width: size,
+          height: size,
+          "--obs-orb-a": "#ff6f91",
+          "--obs-orb-b": "#b39cff",
+          "--obs-orb-c": "#ffd3dc",
+        } as CSSProperties
+      }
+    />
+  );
+}
+
 function OnboardingVisual() {
   return (
-    <div className="relative flex min-h-[420px] items-center justify-center overflow-hidden border-t border-black/[0.07] bg-[#19181a] lg:min-h-0 lg:border-l lg:border-t-0">
-      <div className="absolute h-[34rem] w-[34rem] rounded-full border border-[#ff5c7a]/10" />
-      <div className="absolute h-[25rem] w-[25rem] rounded-full border border-[#ff5c7a]/15" />
-      <div className="absolute h-[17rem] w-[17rem] rounded-full bg-[radial-gradient(circle_at_35%_32%,#ffc3ae,#ff6a7f_38%,#763052_70%,#17171a_100%)] shadow-[0_0_90px_rgba(255,92,122,.3)]" />
-      <img src="/obseri-pulse-mark.svg" alt="" className="relative h-20 w-20 brightness-0 invert" />
+    <div className="relative flex min-h-[420px] items-center justify-center overflow-hidden border-t border-[#efefec] bg-[#f5f5f3] lg:min-h-0 lg:border-l lg:border-t-0">
+      <div className="obs-hero-glow absolute inset-0 opacity-60" />
+      <div className="absolute h-[26rem] w-[26rem] rounded-full border border-black/[0.05]" />
+      <div className="absolute h-[18rem] w-[18rem] rounded-full border border-black/[0.06]" />
+      <OnboardingOrb size={180} />
       <VisualNode
-        className="left-[12%] top-[22%]"
+        className="left-[10%] top-[22%]"
         icon={<Globe2 className="h-4 w-4" />}
         label="Discover"
       />
       <VisualNode
-        className="right-[10%] top-[38%]"
+        className="right-[8%] top-[40%]"
         icon={<BookOpen className="h-4 w-4" />}
         label="Understand"
       />
       <VisualNode
-        className="bottom-[18%] left-[18%]"
+        className="bottom-[18%] left-[16%]"
         icon={<MessageCircle className="h-4 w-4" />}
         label="Answer"
       />
@@ -484,7 +517,7 @@ function VisualNode({
 }) {
   return (
     <div
-      className={`absolute flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-xs text-white/75 backdrop-blur ${className}`}
+      className={`absolute flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-medium text-[#3d3d42] shadow-[0_1px_2px_rgba(0,0,0,.05),0_10px_24px_-12px_rgba(0,0,0,.2)] ${className}`}
     >
       {icon} {label}
     </div>
@@ -503,7 +536,7 @@ function Metric({ value, label }: { value: number; label: string }) {
 function ReadyPill({ icon, label }: { icon: ReactNode; label: string }) {
   return (
     <span className="flex items-center gap-2 rounded-full border border-black/[0.08] bg-white px-4 py-2 text-sm text-[#615c5a]">
-      <span className="text-[#c9425e]">{icon}</span> {label}
+      <span className="text-[#0b0b0c]">{icon}</span> {label}
     </span>
   );
 }

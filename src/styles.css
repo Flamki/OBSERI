@@ -449,14 +449,29 @@
 
 /*
  * @neondatabase/auth-ui sets `* { border-color }` in a cascade layer that sits above Tailwind's
- * utilities. Revert it on the landing page so border utilities apply as written.
+ * utilities. Revert it on the landing page and in Studio so border utilities apply as written.
  */
 @layer neon-auth {
   .obs-landing,
-  .obs-landing * {
+  .obs-landing *,
+  .obs-app,
+  .obs-app * {
     border-color: revert-layer;
     outline-color: revert-layer;
   }
+}
+
+.obs-app,
+.obs-landing {
+  --border: #e7e7e4;
+  --color-border: #e7e7e4;
+  --input: #e2e2df;
+}
+
+.obs-app {
+  font-family: "Geist", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
 }
 
 .obs-landing ::selection {
