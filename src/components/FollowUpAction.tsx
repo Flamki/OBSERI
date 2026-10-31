@@ -26,7 +26,7 @@ export default function FollowUpAction({
         href={bookingUrl(config.url, config.provider)!}
         target="_blank"
         rel="noopener noreferrer"
-        className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#f3f0fb] px-3 py-2 text-xs font-medium text-[#6751a8] hover:bg-[#ebe4fb]"
+        className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--chat-accent,#f3f0fb)] px-3 py-2 text-xs font-medium text-[var(--chat-on-accent,#6751a8)] hover:brightness-95"
       >
         {followUpLabel(config)}
         <ArrowUpRight aria-hidden="true" className="h-3.5 w-3.5" />

@@ -2762,7 +2762,10 @@ function PlaygroundView({
 
           <div>
             <p className="text-xs font-semibold uppercase tracking-[.12em] text-[#928f86]">
-              Accent
+              Brand color
+            </p>
+            <p className="mt-1 text-xs text-[#8a8880]">
+              Colors your message bubbles and action buttons.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {accents.map((accent) => (

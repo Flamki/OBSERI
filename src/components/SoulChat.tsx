@@ -1,17 +1,15 @@
+import { chatAppearance } from "@/lib/chat-appearance";
 import { findSpeechBoundary } from "@/lib/speech-segments";
 import { NEURAL_QUALITY_STEPS, neuralVoice } from "@/lib/voice-catalog";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowUp,
   BookOpen,
-  ChevronDown,
   ExternalLink,
   LoaderCircle,
-  Maximize2,
   MessageCircle,
   Mic,
   MicOff,
-  Minimize2,
   Phone,
   PhoneOff,
   RotateCcw,
@@ -29,25 +27,6 @@ import {
   stopSupertonic,
 } from "@/lib/supertonic";
 import { authFetch } from "@/lib/auth-client";
-
-const VOICE_LANGUAGES = [
-  { code: "en-US", name: "English", flag: "US" },
-  { code: "hi-IN", name: "Hindi", flag: "IN" },
-  { code: "es-ES", name: "Spanish", flag: "ES" },
-  { code: "fr-FR", name: "French", flag: "FR" },
-  { code: "de-DE", name: "German", flag: "DE" },
-  { code: "pt-BR", name: "Portuguese", flag: "BR" },
-  { code: "ar-SA", name: "Arabic", flag: "SA" },
-] as const;
-
-function countryFlag(countryCode: string) {
-  return String.fromCodePoint(
-    ...countryCode
-      .toUpperCase()
-      .split("")
-      .map((character) => 127397 + character.charCodeAt(0)),
-  );
-}
 
 export default function SoulChat({
   soul,
@@ -84,18 +63,17 @@ export default function SoulChat({
     "idle",
   );
   const [voicePanelView, setVoicePanelView] = useState<"voice" | "chat">(initialPanelMode);
-  const [languageOpen, setLanguageOpen] = useState(false);
-  const [callLanguage, setCallLanguage] = useState(soul.voice.language || "en-US");
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const callLanguage = soul.voice.language || "en-US";
   const [error, setError] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const voiceCallActiveRef = useRef(false);
   const messagesRef = useRef(messages);
   const sendingRef = useRef(false);
   const voiceRequestRef = useRef<AbortController | null>(null);
   const greetingAudioRef = useRef<Promise<Blob> | null>(null);
+  const appearanceStyle = chatAppearance(soul.appearance);
+  const brandStyle = { backgroundColor: "var(--chat-accent)", color: "var(--chat-on-accent)" };
   const theme = soul.appearance.theme ?? "light";
   const isDark = theme === "dark";
   const isGlass = theme === "glass";
@@ -115,7 +93,6 @@ export default function SoulChat({
     messagesRef.current = greeting;
     setMessages(greeting);
     setSoundEnabled(soul.voice.enabled && initialPanelMode === "voice");
-    setCallLanguage(soul.voice.language || "en-US");
     setVoicePanelView(initialPanelMode);
     stopVoiceCall();
   }, [
@@ -129,12 +106,6 @@ export default function SoulChat({
   useEffect(() => {
     if (!voiceMode) stopVoiceCall();
   }, [voiceMode]);
-
-  useEffect(() => {
-    const syncFullscreen = () => setIsFullscreen(document.fullscreenElement === panelRef.current);
-    document.addEventListener("fullscreenchange", syncFullscreen);
-    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
-  }, []);
 
   useEffect(
     () => () => {
@@ -612,27 +583,12 @@ export default function SoulChat({
     stopSupertonic();
   }
 
-  async function toggleFullscreen() {
-    try {
-      if (document.fullscreenElement === panelRef.current) {
-        await document.exitFullscreen();
-      } else {
-        await panelRef.current?.requestFullscreen();
-      }
-    } catch {
-      setError("Fullscreen is not available in this browser.");
-    }
-  }
-
   function showPanelView(view: "voice" | "chat") {
     setVoicePanelView(view);
-    setLanguageOpen(false);
     if (view === "chat") stopVoiceCall();
   }
 
   if (voiceMode) {
-    const selectedLanguage =
-      VOICE_LANGUAGES.find((language) => language.code === callLanguage) ?? VOICE_LANGUAGES[0];
     const statusLabel =
       voiceStatus === "listening"
         ? "Listening..."
@@ -644,18 +600,23 @@ export default function SoulChat({
 
     return (
       <div
-        ref={panelRef}
-        className={`relative flex flex-col overflow-hidden border bg-white text-[#20201f] shadow-[0_24px_80px_rgba(20,24,18,.16)] ${
-          isFullscreen
-            ? "h-screen rounded-none"
-            : `rounded-[30px] ${fill ? "h-full min-h-[440px]" : compact ? "h-[620px]" : "h-[680px]"}`
-        }`}
+        data-chat-theme={theme}
+        style={appearanceStyle}
+        className={`relative flex flex-col overflow-hidden rounded-[30px] border ${shellTone} ${fill ? "h-full min-h-0" : compact ? "h-[620px]" : "h-[680px]"}`}
       >
-        <div className="relative z-20 flex h-[72px] shrink-0 items-center justify-between px-4">
-          <div className="flex items-center gap-1.5">
+        <div
+          className={`relative z-20 flex h-[64px] shrink-0 items-center justify-between gap-3 border-b px-4 ${dividerTone}`}
+        >
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold">{soul.personality.name}</p>
+            <p className={`text-xs ${mutedTone}`}>
+              {voicePanelView === "voice" ? "Voice conversation" : "Chat with us"}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
             <button
               onClick={() => showPanelView(voicePanelView === "voice" ? "chat" : "voice")}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f4f3f0] text-[#5d5b57] transition hover:bg-[#ebeae6] hover:text-[#212120]"
+              className={`flex h-10 w-10 items-center justify-center rounded-full transition ${quietButtonTone}`}
               aria-label={voicePanelView === "voice" ? "Open text chat" : "Open voice chat"}
             >
               {voicePanelView === "voice" ? (
@@ -670,59 +631,13 @@ export default function SoulChat({
                   stopVoiceCall();
                   onClose();
                 }}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-[#9d9b93] transition hover:bg-[#f4f3f0] hover:text-[#212120]"
+                className={`flex h-10 w-10 items-center justify-center rounded-full transition ${quietButtonTone}`}
                 aria-label="Close conversation"
               >
                 <X className="h-4 w-4" />
               </button>
             )}
           </div>
-
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-            <button
-              onClick={() => setLanguageOpen((current) => !current)}
-              className="flex h-11 items-center gap-2 rounded-full border border-[#e6e5e1] bg-white px-4 text-sm font-medium shadow-sm transition hover:bg-[#f9f9f9]"
-              aria-expanded={languageOpen}
-            >
-              <span className="text-base" aria-hidden="true">
-                {countryFlag(selectedLanguage.flag)}
-              </span>
-              <span>{selectedLanguage.name}</span>
-              <ChevronDown className="h-4 w-4 text-[#8b887e]" />
-            </button>
-            {languageOpen && (
-              <div className="absolute left-1/2 top-[50px] z-30 max-h-64 w-52 -translate-x-1/2 overflow-y-auto rounded-2xl border border-[#e3e2de] bg-white p-2 shadow-[0_18px_50px_rgba(25,28,22,.16)]">
-                {VOICE_LANGUAGES.map((language) => (
-                  <button
-                    key={language.code}
-                    onClick={() => {
-                      stopVoiceCall();
-                      setCallLanguage(language.code);
-                      setLanguageOpen(false);
-                    }}
-                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition hover:bg-[#f4f3f0] ${
-                      language.code === callLanguage ? "bg-[#f4f3f0] font-semibold" : ""
-                    }`}
-                  >
-                    <span className="text-base">{countryFlag(language.flag)}</span>
-                    <span>{language.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={() => void toggleFullscreen()}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f4f3f0] text-[#5d5b57] transition hover:bg-[#ebeae6] hover:text-[#212120]"
-            aria-label={isFullscreen ? "Exit fullscreen" : "Open fullscreen"}
-          >
-            {isFullscreen ? (
-              <Minimize2 className="h-[18px] w-[18px]" />
-            ) : (
-              <Maximize2 className="h-[18px] w-[18px]" />
-            )}
-          </button>
         </div>
 
         {voicePanelView === "voice" ? (
@@ -750,6 +665,7 @@ export default function SoulChat({
               )}
               <button
                 onClick={voiceCallActive ? stopVoiceCall : startVoiceCall}
+                style={voiceCallActive ? undefined : brandStyle}
                 className={`relative z-10 flex h-14 w-14 items-center justify-center rounded-full bg-white text-[#121110] shadow-[0_8px_28px_rgba(25,35,28,.2)] transition hover:scale-105 ${
                   voiceCallActive ? "text-[#b34b43]" : ""
                 }`}
@@ -763,7 +679,7 @@ export default function SoulChat({
               </button>
             </div>
             <h3 className="mt-6 text-[17px] font-semibold">{statusLabel}</h3>
-            <p className="mt-2 max-w-[300px] text-sm leading-5 text-[#7b7973]">
+            <p className={`mt-2 max-w-[300px] text-sm leading-5 ${mutedTone}`}>
               {voiceCallActive
                 ? "Speak naturally. The conversation keeps listening after every reply."
                 : "Ask about this website by voice or message."}
@@ -782,10 +698,13 @@ export default function SoulChat({
                 className={`flex ${message.role === "visitor" ? "justify-end" : "justify-start"}`}
               >
                 <div
+                  style={message.role === "visitor" ? brandStyle : undefined}
                   className={`max-w-[88%] rounded-[22px] px-4 py-3 text-sm leading-6 ${
                     message.role === "visitor"
-                      ? "rounded-br-md border border-[#e1e0dc] bg-white text-[#232220] shadow-sm"
-                      : "rounded-bl-md bg-[#f2f1ee] text-[#32312f]"
+                      ? "rounded-br-md shadow-sm"
+                      : isDark
+                        ? "rounded-bl-md bg-white/8 text-white/90"
+                        : "rounded-bl-md bg-black/5 text-[#32312f]"
                   }`}
                 >
                   <p className="whitespace-pre-wrap">{message.content}</p>
@@ -797,7 +716,7 @@ export default function SoulChat({
                           href={citation.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 rounded-full border border-[#dddcd9] bg-white px-2.5 py-1 text-[11px] text-[#64635f]"
+                          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] ${isDark ? "border-white/15 bg-white/5 text-white/80" : "border-black/10 bg-white/70 text-[#64635f]"}`}
                         >
                           {citation.title.slice(0, 26)}
                           <ExternalLink className="h-3 w-3" />
@@ -809,7 +728,7 @@ export default function SoulChat({
               </div>
             ))}
             {sending && messages.at(-1)?.role !== "assistant" && (
-              <div className="flex items-center gap-2 text-sm text-[#7b7973]">
+              <div className={`flex items-center gap-2 text-sm ${mutedTone}`}>
                 <LoaderCircle className="h-4 w-4 animate-spin" /> {soul.personality.name} is
                 thinking...
               </div>
@@ -824,7 +743,9 @@ export default function SoulChat({
 
         <div className="shrink-0 px-4 pb-4 pt-2">
           {contactAction}
-          <div className="flex items-end gap-2 rounded-full border border-[#deddda] bg-white p-1.5 pl-5 shadow-[0_4px_16px_rgba(25,29,22,.06)] focus-within:border-[#bcbab5]">
+          <div
+            className={`flex items-end gap-2 rounded-full border p-1.5 pl-5 focus-within:border-[var(--chat-accent)] ${isDark ? "border-white/20 bg-white/5" : "border-black/15 bg-white/70"}`}
+          >
             <textarea
               value={value}
               onChange={(event) => setValue(event.target.value)}
@@ -837,7 +758,7 @@ export default function SoulChat({
               }}
               rows={1}
               placeholder="Ask this website..."
-              className="max-h-24 min-h-10 flex-1 resize-none bg-transparent py-2.5 text-sm outline-none placeholder:text-[#a7a49d]"
+              className="max-h-24 min-h-10 min-w-0 flex-1 resize-none bg-transparent py-2.5 text-sm outline-none placeholder:text-[#a7a49d]"
             />
             <button
               onClick={() => {
@@ -845,13 +766,14 @@ export default function SoulChat({
                 if (voicePanelView === "voice") showPanelView("chat");
               }}
               disabled={!value.trim() || sending}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#232220] text-white transition hover:bg-black disabled:bg-[#eeede9] disabled:text-[#adaba5]"
+              style={brandStyle}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition hover:brightness-95 disabled:opacity-30"
               aria-label="Send message"
             >
               <ArrowUp className="h-4 w-4" />
             </button>
           </div>
-          <p className="mt-2 text-center text-[10px] text-[#a4a19a]">
+          <p className={`mt-2 text-center text-[10px] ${mutedTone}`}>
             Voice uses your microphone only while the call is active
           </p>
         </div>
@@ -861,6 +783,8 @@ export default function SoulChat({
 
   return (
     <div
+      data-chat-theme={theme}
+      style={appearanceStyle}
       className={`flex flex-col overflow-hidden rounded-2xl border ${shellTone} ${
         fill ? "h-full min-h-[420px]" : compact ? "h-[560px]" : "h-[650px]"
       }`}
@@ -869,7 +793,7 @@ export default function SoulChat({
         <div className="flex min-w-0 items-center gap-3">
           <span
             className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-[#212120]"
-            style={{ backgroundColor: soul.appearance.accent }}
+            style={brandStyle}
           >
             {soul.personality.name.charAt(0)}
             <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#22c55e]" />
@@ -907,6 +831,7 @@ export default function SoulChat({
             className={`flex ${message.role === "visitor" ? "justify-end" : "justify-start"}`}
           >
             <div
+              style={message.role === "visitor" ? brandStyle : undefined}
               className={`max-w-[88%] ${
                 message.role === "visitor"
                   ? "rounded-2xl rounded-br-md bg-[#212120] px-4 py-3 text-white"
@@ -1013,7 +938,8 @@ export default function SoulChat({
           <button
             onClick={() => void sendMessage()}
             disabled={!value.trim() || sending}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#212120] text-white hover:bg-black disabled:opacity-30"
+            style={brandStyle}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg hover:brightness-95 disabled:opacity-30"
             aria-label="Send message"
           >
             <ArrowUp className="h-4 w-4" />

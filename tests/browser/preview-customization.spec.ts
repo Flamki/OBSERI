@@ -50,6 +50,7 @@ for (const viewport of [
         body: '<html><body style="margin:0;background:#faf9f6;font-family:sans-serif"><div style="padding:40px"><h1>Merchant website</h1><p>Explore our services.</p><button onclick="this.textContent=\'Preview works\'">Try website</button><div style="height:1600px"></div></div></body></html>',
       }),
     );
+    await page.route("**/api/voice/speak", (route) => route.fulfill({ status: 503, json: {} }));
     await page.goto("/app?view=playground");
     const drawer = page.getByRole("complementary", { name: "Visitor experience customization" });
     const settings = page.getByRole("region", { name: "Customization settings" });
@@ -101,6 +102,25 @@ for (const viewport of [
     await drawer.getByRole("button", { name: "Close customization drawer" }).click();
     await expect(drawer).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Open voice chat" })).toBeInViewport();
+    if (viewport.width > 1024) {
+      await page.getByRole("button", { name: "Open voice chat", exact: true }).click();
+      const panel = page.locator("[data-chat-theme]");
+      await expect(panel).toHaveCSS("background-color", "rgb(19, 18, 17)");
+      await expect(panel.getByRole("button", { name: "Start voice call", exact: true })).toHaveCSS(
+        "background-color",
+        "rgb(125, 211, 252)",
+      );
+      await page.getByRole("button", { name: "Open customization drawer" }).click();
+      await drawer.getByRole("button", { name: "Clean Bright and minimal" }).click();
+      await expect(panel).toHaveCSS("background-color", "rgb(255, 255, 255)");
+      await drawer.getByRole("button", { name: "Use accent #0b0b0c" }).click();
+      await expect(panel.getByRole("button", { name: "Start voice call", exact: true })).toHaveCSS(
+        "color",
+        "rgb(255, 255, 255)",
+      );
+      await drawer.getByRole("button", { name: "Midnight Focused and cinematic" }).click();
+      await expect.poll(() => workspace.souls[0].appearance.theme).toBe("dark");
+    }
     await page.reload();
     await page.getByRole("button", { name: "Open customization drawer" }).click();
     await expect(

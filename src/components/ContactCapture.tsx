@@ -72,7 +72,7 @@ export default function ContactCapture({
       <button
         type="button"
         onClick={() => dialog.current?.showModal()}
-        className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#f3f0fb] px-3 py-2 text-xs font-medium text-[#6751a8] hover:bg-[#ebe4fb]"
+        className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--chat-accent,#f3f0fb)] px-3 py-2 text-xs font-medium text-[var(--chat-on-accent,#6751a8)] hover:brightness-95"
       >
         {saved ? (
           <>
@@ -87,7 +87,7 @@ export default function ContactCapture({
       <dialog
         ref={dialog}
         aria-label={config.title || "Contact request"}
-        className="m-auto max-h-[90vh] w-[calc(100%-24px)] max-w-sm overflow-y-auto rounded-2xl border border-[#e5e0ed] bg-white p-5 text-[#25212d] shadow-xl backdrop:bg-black/30"
+        className="m-auto max-h-[90vh] w-[calc(100%-24px)] max-w-sm overflow-y-auto rounded-2xl border border-[var(--chat-border,#e5e0ed)] bg-[var(--chat-surface,white)] p-5 text-[var(--chat-text,#25212d)] shadow-xl backdrop:bg-black/30"
       >
         <div className="mb-5 flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">
@@ -112,14 +112,14 @@ export default function ContactCapture({
             <button
               type="button"
               onClick={() => dialog.current?.close()}
-              className="mt-5 w-full rounded-xl bg-[#25212d] px-4 py-3 text-sm text-white"
+              className="mt-5 w-full rounded-xl bg-[var(--chat-accent,#25212d)] px-4 py-3 text-sm text-[var(--chat-on-accent,white)]"
             >
               Back to conversation
             </button>
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-4">
-            <p className="text-sm leading-6 text-[#77717e]">
+            <p className="text-sm leading-6 text-[var(--chat-muted,#77717e)]">
               {config.description ||
                 `Send your question to ${businessName} with a way to reach you.`}
             </p>
@@ -130,7 +130,7 @@ export default function ContactCapture({
                 autoComplete="name"
                 required
                 maxLength={100}
-                className="mt-1 block w-full rounded-xl border border-[#ded9e4] p-3 font-normal outline-none focus:border-[#8b71c2]"
+                className="mt-1 block w-full rounded-xl border border-[var(--chat-border,#ded9e4)] bg-transparent p-3 font-normal outline-none focus:border-[var(--chat-accent,#8b71c2)]"
               />
             </label>
             <label className="block text-sm font-medium">
@@ -141,7 +141,7 @@ export default function ContactCapture({
                 autoComplete="email"
                 required
                 maxLength={254}
-                className="mt-1 block w-full rounded-xl border border-[#ded9e4] p-3 font-normal outline-none focus:border-[#8b71c2]"
+                className="mt-1 block w-full rounded-xl border border-[var(--chat-border,#ded9e4)] bg-transparent p-3 font-normal outline-none focus:border-[var(--chat-accent,#8b71c2)]"
               />
             </label>
             <label className="block text-sm font-medium">
@@ -151,10 +151,10 @@ export default function ContactCapture({
                 required
                 maxLength={2000}
                 rows={3}
-                className="mt-1 block w-full rounded-xl border border-[#ded9e4] p-3 font-normal outline-none focus:border-[#8b71c2]"
+                className="mt-1 block w-full rounded-xl border border-[var(--chat-border,#ded9e4)] bg-transparent p-3 font-normal outline-none focus:border-[var(--chat-accent,#8b71c2)]"
               />
             </label>
-            <label className="flex items-start gap-2 text-xs leading-5 text-[#77717e]">
+            <label className="flex items-start gap-2 text-xs leading-5 text-[var(--chat-muted,#77717e)]">
               <input name="consent" type="checkbox" required className="mt-1" />I agree to share
               these details with {businessName} so they can contact me about my request.
             </label>
@@ -165,7 +165,7 @@ export default function ContactCapture({
             )}
             <button
               disabled={saving || preview}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#25212d] px-4 py-3 text-sm font-medium text-white disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--chat-accent,#25212d)] px-4 py-3 text-sm font-medium text-[var(--chat-on-accent,white)] disabled:opacity-60"
             >
               {saving && <LoaderCircle className="h-4 w-4 animate-spin" />}
               {preview

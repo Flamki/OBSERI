@@ -314,7 +314,7 @@
   panel.style.cssText =
     "position:absolute;bottom:0;" +
     position +
-    ":0;width:394px;height:620px;max-height:calc(100dvh - 40px);overflow:hidden;border-radius:28px;background:#fff;box-shadow:0 12px 40px rgba(24,29,20,.13),0 2px 8px rgba(24,29,20,.05);opacity:1;visibility:hidden;pointer-events:none;transform-origin:bottom " +
+    ":0;width:394px;height:620px;max-height:calc(100dvh - 40px);overflow:hidden;border-radius:28px;background:transparent;backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);box-shadow:0 12px 40px rgba(24,29,20,.13),0 2px 8px rgba(24,29,20,.05);opacity:1;visibility:hidden;pointer-events:none;transform-origin:bottom " +
     position +
     ";";
 
