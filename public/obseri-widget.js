@@ -188,10 +188,10 @@
       } catch (_) {
         return;
       }
-      if (document.hidden || frame.style.display === "block") return;
+      if (document.hidden || opened) return;
       help = document.createElement("div");
       help.style.cssText =
-        "max-width:280px;margin-bottom:12px;border:1px solid #e5e2df;border-radius:16px;padding:14px;background:white;color:#272725;box-shadow:0 8px 30px #0001;display:flex;gap:12px;font:14px/1.5 system-ui";
+        "pointer-events:auto;max-width:280px;margin-bottom:12px;border:1px solid #e5e2df;border-radius:16px;padding:14px;background:white;color:#272725;box-shadow:0 8px 30px #0001;display:flex;gap:12px;font:14px/1.5 system-ui";
       var offer = document.createElement("button");
       offer.type = "button";
       offer.textContent = /pricing|plans/i.test(location.pathname)
@@ -288,13 +288,56 @@
 
   var position = script.dataset.position === "bottom-left" ? "left" : "right";
   var mobile = window.matchMedia("(max-width: 520px)");
+  var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  var opened = false;
+  var preparing;
+  var frameReady = false;
 
   var root = document.createElement("div");
   root.id = "obseri-soul-" + soulId;
   root.style.cssText =
     "position:fixed;z-index:2147483000;bottom:20px;" +
     position +
-    ":20px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;";
+    ":20px;pointer-events:none;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;";
+
+  // One rounded surface owns the shadow. Shadows inside a transparent iframe
+  // are clipped to its rectangular viewport and create a visible square halo.
+  var panel = document.createElement("div");
+  panel.id = "obseri-panel-" + soulId;
+  panel.setAttribute("aria-hidden", "true");
+  panel.inert = true;
+  panel.style.cssText =
+    "position:absolute;bottom:0;" +
+    position +
+    ":0;width:394px;height:620px;max-height:calc(100dvh - 40px);overflow:hidden;border-radius:28px;background:#fff;box-shadow:0 12px 40px rgba(24,29,20,.13),0 2px 8px rgba(24,29,20,.05);opacity:0;visibility:hidden;pointer-events:none;transform:translateY(14px) scale(.96);transform-origin:bottom " +
+    position +
+    ";";
+
+  var loading = document.createElement("div");
+  loading.setAttribute("role", "status");
+  loading.setAttribute("aria-label", "Loading chat");
+  loading.style.cssText =
+    "position:absolute;inset:0;padding:24px;display:flex;flex-direction:column;gap:20px;box-sizing:border-box;color:#777;background:#fff;";
+  var loadingClose = document.createElement("button");
+  loadingClose.type = "button";
+  loadingClose.textContent = "×";
+  loadingClose.setAttribute("aria-label", "Close chat");
+  loadingClose.style.cssText =
+    "align-self:flex-end;border:0;border-radius:50%;background:#f4f3f0;color:#777;width:36px;height:36px;font:24px sans-serif;cursor:pointer;";
+  var skeleton = document.createElement("div");
+  skeleton.style.cssText =
+    "height:80px;width:82%;border-radius:22px;background:linear-gradient(110deg,#f4f3f0,#fafaf9,#f4f3f0);";
+  var loadingMessage = document.createElement("p");
+  loadingMessage.style.cssText = "font:14px/1.5 sans-serif;margin:0;";
+  var retry = document.createElement("button");
+  retry.type = "button";
+  retry.textContent = "Try again";
+  retry.style.cssText =
+    "display:none;align-self:flex-start;border:0;border-radius:18px;background:#f4f3f0;padding:10px 16px;color:#333;cursor:pointer;";
+  var skeletonInput = document.createElement("div");
+  skeletonInput.style.cssText =
+    "margin-top:auto;height:48px;border:1px solid #efeeeb;border-radius:24px;";
+  loading.append(loadingClose, skeleton, loadingMessage, retry, skeletonInput);
 
   var frame = document.createElement("iframe");
   frame.title = "Obseri website assistant";
@@ -302,14 +345,15 @@
   frame.allowFullscreen = true;
   frame.referrerPolicy = "strict-origin-when-cross-origin";
   frame.style.cssText =
-    "display:none;width:410px;height:680px;max-height:calc(100vh - 32px);border:0;background:transparent;filter:drop-shadow(0 24px 48px rgba(0,0,0,.18));";
+    "position:absolute;inset:0;display:block;width:100%;height:100%;border:0;border-radius:inherit;background:transparent;opacity:0;pointer-events:none;";
 
   var launcher = document.createElement("button");
   launcher.type = "button";
   launcher.setAttribute("aria-label", "Ask a question");
   launcher.setAttribute("aria-expanded", "false");
+  launcher.setAttribute("aria-controls", panel.id);
   launcher.style.cssText =
-    "margin-top:12px;display:flex;width:max-content;align-items:center;gap:12px;padding:8px 18px 8px 9px;border:1px solid rgba(25,28,23,.1);border-radius:999px;background:#fff;color:#20221f;box-shadow:0 12px 36px rgba(24,29,20,.12);cursor:pointer;font:500 16px/1.1 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;transition:transform 180ms ease,box-shadow 180ms ease;" +
+    "pointer-events:auto;display:flex;width:max-content;align-items:center;gap:12px;padding:8px 18px 8px 9px;border:1px solid rgba(25,28,23,.1);border-radius:999px;background:#fff;color:#20221f;box-shadow:0 12px 36px rgba(24,29,20,.12);cursor:pointer;font:500 16px/1.1 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;" +
     (position === "left" ? "margin-right:auto;" : "margin-left:auto;");
 
   var orb = document.createElement("span");
@@ -322,17 +366,19 @@
   launcher.appendChild(label);
 
   launcher.addEventListener("mouseenter", function () {
-    launcher.style.transform = "translateY(-2px)";
+    if (!opened) launcher.style.transform = "translateY(-2px)";
     launcher.style.boxShadow = "0 16px 42px rgba(24,29,20,.16)";
   });
   launcher.addEventListener("mouseleave", function () {
-    launcher.style.transform = "translateY(0)";
+    if (!opened) launcher.style.transform = "translateY(0)";
     launcher.style.boxShadow = "0 12px 36px rgba(24,29,20,.12)";
   });
-  launcher.addEventListener("click", async function () {
-    if (!frame.src) {
-      launcher.disabled = true;
-      label.textContent = "Connecting…";
+  function prepare() {
+    if (frame.src) return Promise.resolve();
+    if (preparing) return preparing;
+    preparing = (async function () {
+      loadingMessage.textContent = "";
+      retry.style.display = "none";
       try {
         var payload = await getSession();
         frame.name = JSON.stringify({
@@ -349,18 +395,45 @@
           encodeURIComponent(location.origin);
       } catch (error) {
         console.error("Obseri:", error);
-        label.textContent = "Unavailable";
-        launcher.disabled = false;
-        return;
+        loadingMessage.textContent = "Chat could not load. Please try again.";
+        retry.style.display = "block";
+      } finally {
+        preparing = null;
       }
-    }
+    })();
+    return preparing;
+  }
+
+  function setOpen(value) {
+    opened = value;
+    motion();
+    panel.inert = !value;
+    panel.setAttribute("aria-hidden", String(!value));
+    panel.style.opacity = value ? "1" : "0";
+    panel.style.transform = value ? "translateY(0) scale(1)" : "translateY(14px) scale(.96)";
+    panel.style.visibility = value ? "visible" : "hidden";
+    panel.style.pointerEvents = value ? "auto" : "none";
+    launcher.style.opacity = value ? "0" : "1";
+    launcher.style.transform = value ? "translateY(5px) scale(.94)" : "translateY(0) scale(1)";
+    launcher.style.visibility = value ? "hidden" : "visible";
+    launcher.style.pointerEvents = value ? "none" : "auto";
+    launcher.setAttribute("aria-expanded", String(value));
+    launcher.tabIndex = value ? -1 : 0;
+    if (!value) launcher.focus({ preventScroll: true });
+    else if (frameReady) frame.focus({ preventScroll: true });
+  }
+
+  loadingClose.onclick = function () {
+    setOpen(false);
+  };
+  retry.onclick = prepare;
+  launcher.addEventListener("pointerenter", prepare, { once: true });
+  launcher.addEventListener("focus", prepare, { once: true });
+  launcher.addEventListener("click", function () {
     hideHelp();
     track("widget_opened");
-    frame.style.display = "block";
-    launcher.style.display = "none";
-    launcher.setAttribute("aria-expanded", "true");
-    launcher.disabled = false;
-    label.textContent = "Ask a question";
+    setOpen(true);
+    void prepare();
   });
 
   window.addEventListener("message", function (event) {
@@ -370,36 +443,66 @@
       sendContext();
       return;
     }
+    if (event.data.type === "obseri:loaded") {
+      frameReady = true;
+      frame.style.opacity = "1";
+      frame.style.pointerEvents = "auto";
+      loading.style.display = "none";
+      if (opened) frame.focus({ preventScroll: true });
+      return;
+    }
     if (event.data.type === "obseri:conversation-started") {
       track("conversation_started");
       return;
     }
     if (event.data.type !== "obseri:close") return;
-    frame.style.display = "none";
-    launcher.style.display = "flex";
-    launcher.setAttribute("aria-expanded", "false");
+    setOpen(false);
   });
+
+  function motion() {
+    panel.style.transition = reducedMotion.matches
+      ? "none"
+      : "opacity 220ms ease,transform 260ms cubic-bezier(.22,1,.36,1),visibility 0s linear 260ms";
+    // Opening visibility is immediate; closing visibility waits for the fade.
+    panel.style.transitionDelay = opened ? "0s" : "0s,0s,260ms";
+    launcher.style.transition = reducedMotion.matches
+      ? "none"
+      : "opacity 160ms ease,transform 220ms cubic-bezier(.22,1,.36,1),visibility 0s linear 160ms";
+    launcher.style.transitionDelay = opened ? "0s,0s,160ms" : "0s";
+    frame.style.transition = reducedMotion.matches ? "none" : "opacity 140ms ease";
+  }
 
   function layout() {
     if (mobile.matches) {
       root.style.left = "12px";
       root.style.right = "12px";
       root.style.bottom = "12px";
-      frame.style.width = "100%";
-      frame.style.height = "min(680px, calc(100vh - 92px))";
+      panel.style.width = "100%";
+      panel.style.height = "min(620px, calc(100dvh - 24px))";
+      panel.style.maxHeight = "calc(100dvh - 24px)";
     } else {
       root.style.left = position === "left" ? "20px" : "auto";
       root.style.right = position === "right" ? "20px" : "auto";
       root.style.bottom = "20px";
-      frame.style.width = "410px";
-      frame.style.height = "680px";
+      panel.style.width = "394px";
+      panel.style.height = "620px";
+      panel.style.maxHeight = "calc(100dvh - 40px)";
     }
   }
 
   layout();
+  motion();
   mobile.addEventListener("change", layout);
-  root.appendChild(frame);
+  reducedMotion.addEventListener("change", motion);
+  panel.append(loading, frame);
+  root.appendChild(panel);
   root.appendChild(launcher);
   document.body.appendChild(root);
   pageChanged();
+  function warm() {
+    if (window.requestIdleCallback) window.requestIdleCallback(prepare, { timeout: 1500 });
+    else setTimeout(prepare, 250);
+  }
+  if (document.readyState === "complete") warm();
+  else window.addEventListener("load", warm, { once: true });
 })();

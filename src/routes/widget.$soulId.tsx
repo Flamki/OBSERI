@@ -77,12 +77,19 @@ function EmbeddedSoul() {
     return () => controller.abort();
   }, [context.session, context.parentOrigin, soulId]);
 
+  useEffect(() => {
+    if ((soul || error) && context.parentOrigin) {
+      window.parent.postMessage({ type: "obseri:loaded" }, context.parentOrigin);
+    }
+  }, [soul, error, context.parentOrigin]);
+
   return (
-    <main className="obs-app min-h-screen bg-transparent p-2 text-[#0b0b0c]">
+    <main className="obseri-widget-content obs-app h-dvh overflow-hidden rounded-[28px] bg-transparent text-[#0b0b0c]">
       {soul ? (
         <SoulChat
           soul={soul}
           compact
+          fill
           voiceMode
           sessionToken={context.session}
           initialPanelMode={mode}

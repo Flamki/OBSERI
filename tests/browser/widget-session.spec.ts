@@ -14,6 +14,7 @@ test("cross-site embed starts chat when the browser clears window.name", async (
     route.fulfill({ contentType: "application/javascript", body: embed }),
   );
   const soul = createSoul("http://127.0.0.2:8080");
+  let soulRequests = 0;
   soul.personality.leadCapture = true;
   await page.addInitScript(() => {
     window.name = "";
@@ -31,6 +32,7 @@ test("cross-site embed starts chat when the browser clears window.name", async (
     }),
   );
   await page.route(`**/api/souls/${soul.id}`, (route) => {
+    soulRequests++;
     expect(route.request().headers().authorization).toBe("Bearer test-session");
     return route.fulfill({ json: { soul } });
   });
@@ -41,10 +43,82 @@ test("cross-site embed starts chat when the browser clears window.name", async (
     }),
   );
   await page.goto("http://127.0.0.2:8080/");
+  const panel = page.locator(`#obseri-panel-${soul.id}`);
+  const iframe = page.locator('iframe[title="Obseri website assistant"]');
+  // It is fully prepared without opening it or starting a voice request.
+  await expect(iframe).toHaveCSS("opacity", "1");
+  await expect(panel).toHaveAttribute("aria-hidden", "true");
+  expect(soulRequests).toBe(1);
   await page.getByRole("button", { name: "Ask a question", exact: true }).click();
+  // Cross-origin locator actionability does not wait for the parent panel's transform.
+  await expect(panel).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, 0)");
   const frame = page.frameLocator('iframe[title="Obseri website assistant"]');
   await expect(frame.getByPlaceholder("Ask this website...")).toBeVisible();
+  await expect(iframe).toHaveCSS("filter", "none");
+  await expect(panel).toHaveCSS("border-radius", "28px");
+  await frame.getByPlaceholder("Ask this website...").fill("Keep my draft");
   expect(voiceRequests).toBe(0);
   await frame.getByRole("button", { name: "Close conversation", exact: true }).click();
   await expect(page.getByRole("button", { name: "Ask a question", exact: true })).toBeVisible();
+  await expect(panel).toHaveCSS("visibility", "hidden");
+  const openingOpacity = await page.evaluate(async () => {
+    document.querySelector<HTMLButtonElement>('button[aria-label="Ask a question"]')!.click();
+    await new Promise(requestAnimationFrame);
+    await new Promise(requestAnimationFrame);
+    return Number(getComputedStyle(document.querySelector('[id^="obseri-panel-"]')!).opacity);
+  });
+  expect(openingOpacity).toBeLessThan(1);
+  await expect(panel).toHaveCSS("opacity", "1");
+  await expect(frame.getByPlaceholder("Ask this website...")).toHaveValue("Keep my draft");
+  expect(soulRequests).toBe(1);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(panel).toHaveCSS("transition-duration", "0s");
+  await frame.getByRole("button", { name: "Close conversation", exact: true }).click();
+  await expect(panel).toHaveCSS("visibility", "hidden");
+});
+
+test("a cold connection opens immediately and can be closed before loading finishes", async ({
+  page,
+}) => {
+  const embed = await readFile(new URL("../../public/obseri-widget.js", import.meta.url), "utf8");
+  let release!: () => void;
+  const sessionGate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("https://merchant.example/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: '<html><body><button id="host-action">Website action</button><script src="https://obseri.example/obseri-widget.js" data-soul-id="cold" data-widget-token="test"></script></body></html>',
+    }),
+  );
+  await page.route("https://obseri.example/**", async (route) => {
+    if (route.request().url().endsWith(".js"))
+      return route.fulfill({ contentType: "application/javascript", body: embed });
+    if (route.request().url().includes("/session?")) {
+      await sessionGate;
+      return route.fulfill({
+        headers: { "access-control-allow-origin": "https://merchant.example" },
+        json: { session: "test", parentOrigin: "https://merchant.example" },
+      });
+    }
+    return route.fulfill({
+      contentType: "text/html",
+      body: '<script>parent.postMessage({type:"obseri:loaded"},"https://merchant.example")</script>',
+    });
+  });
+  await page.goto("https://merchant.example/");
+  const launcher = page.getByRole("button", { name: "Ask a question", exact: true });
+  await launcher.click();
+  const panel = page.locator("#obseri-panel-cold");
+  await expect(panel).toHaveAttribute("aria-hidden", "false");
+  await expect(page.getByRole("button", { name: "Close chat", exact: true })).toBeVisible();
+  await expect(page.getByText("Connecting…", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Close chat", exact: true }).click();
+  release();
+  await expect(page.locator("iframe")).toHaveCSS("opacity", "1");
+  await expect(panel).toHaveAttribute("aria-hidden", "true");
+  await expect(launcher).toBeFocused();
+  await page.getByRole("button", { name: "Website action" }).click();
+  await launcher.click();
+  await expect(panel).toHaveCSS("opacity", "1");
 });

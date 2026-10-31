@@ -8,6 +8,14 @@ html.obseri-embed body {
   background: transparent;
 }
 
+.obseri-widget-content > div {
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: inherit;
+  box-shadow: none;
+}
+
 .obseri-auth-page {
   --background: oklch(0.985 0.01 35);
   --foreground: oklch(0.16 0.015 25);
