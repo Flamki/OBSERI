@@ -100,6 +100,32 @@ function provider(answer: string, citationIds: string[] = []) {
   return mock;
 }
 
+it("applies structured personality controls to text and voice while preserving factual boundaries", async () => {
+  const input = fixture(["PostgreSQL"]);
+  input.personality.conversationStyle = {
+    length: "detailed",
+    language: "es",
+    emojis: "none",
+    nextStep: "direct",
+  };
+  input.personality.instructions = "Be concise and always end with a question.";
+  const mock = provider("El proyecto usa PostgreSQL.", ["cms"]);
+  await answerSoulQuestion(input);
+  const prompt = JSON.parse(mock.mock.calls[0][1].body).messages[0].content;
+  expect(prompt).toContain("Reply in Spanish");
+  expect(prompt).toContain("Explain relevant steps");
+  expect(prompt).toContain("Do not use emojis");
+  expect(prompt).toContain("without routinely adding follow-up questions");
+  expect(prompt).toContain("take precedence over conflicting style");
+  expect(prompt).toContain("Never claim facts that are absent");
+  const { streamSoulVoiceAnswer } = await import("./conversation");
+  mock.mockResolvedValue(new Response("data: [DONE]\n\n"));
+  await streamSoulVoiceAnswer(input);
+  const voicePrompt = JSON.parse(mock.mock.calls[1][1].body).messages[0].content;
+  expect(voicePrompt).toContain("Reply in Spanish");
+  expect(voicePrompt).toContain("at most 40 words");
+});
+
 it("does not confuse filler words, US or UI with unrelated portfolio content", async () => {
   const { rankKnowledgeChunks } = await import("./conversation");
   const { chunks } = fixture();

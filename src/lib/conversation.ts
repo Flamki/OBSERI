@@ -1,4 +1,5 @@
 import { getRuntimeEnvironment } from "@/lib/runtime-env";
+import { conversationStyleInstructions, resolveConversationStyle } from "@/lib/personality";
 import type { KnowledgeChunk, PersonalityConfig, SoulMessage } from "@/lib/soul";
 
 export type ChatRequest = {
@@ -352,6 +353,9 @@ function pageDirectory(chunks: KnowledgeChunk[]): KnowledgeChunk[] {
 }
 
 function navigationAnswer(input: ChatRequest, pages: KnowledgeChunk[]): ChatResponse | null {
+  const style = resolveConversationStyle(input.personality.conversationStyle);
+  // Let the model localize navigation when the owner selected a specific language.
+  if (!["visitor", "en"].includes(style.language)) return null;
   const question = input.messages.at(-1)?.content ?? "";
   const previous = input.messages
     .slice(0, -1)
@@ -364,6 +368,14 @@ function navigationAnswer(input: ChatRequest, pages: KnowledgeChunk[]): ChatResp
     return null;
   const choices = pages.slice(0, 3);
   const destinations = choices.map((page) => page.pageTitle).join(" or ");
+  if (style.nextStep === "direct")
+    return {
+      answer: `You can open ${destinations} using the links below.`,
+      citations: toCitations(choices),
+      followUp: "",
+      leadIntent: "none",
+      mode: "retrieval",
+    };
   const answer = `You can open ${destinations} using the links below. Which page would you like to explore, or what topic should I help you find?`;
   return {
     answer:
@@ -487,6 +499,7 @@ function buildSystemPrompt(personality: PersonalityConfig): string {
     `Purpose: ${personality.purpose}`,
     `Tone: ${personality.tone}. Traits: ${personality.traits.join(", ")}.`,
     personality.instructions,
+    ...conversationStyleInstructions(personality.conversationStyle),
     ...personality.guardrails.map((guardrail) => `Guardrail: ${guardrail}`),
     `Preferred uncertainty wording (adapt to context; do not repeat verbatim): ${personality.unknownResponse}`,
     ...CONVERSATION_RULES,
@@ -503,6 +516,7 @@ function buildVoiceSystemPrompt(personality: PersonalityConfig): string {
     `Purpose: ${personality.purpose}`,
     `Tone: ${personality.tone}. Traits: ${personality.traits.join(", ")}.`,
     personality.instructions,
+    ...conversationStyleInstructions(personality.conversationStyle, true),
     ...personality.guardrails.map((guardrail) => `Guardrail: ${guardrail}`),
     `Preferred uncertainty wording (adapt to context; do not repeat verbatim): ${personality.unknownResponse}`,
     ...CONVERSATION_RULES,

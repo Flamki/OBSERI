@@ -1,4 +1,5 @@
 import { followUpError, followUpSchema } from "@/lib/follow-up";
+import { personalitySchema } from "@/lib/personality";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import postgres from "postgres";
 import { normalizeVoice, type Soul, type SoulConversation } from "@/lib/soul";
@@ -62,6 +63,16 @@ export async function publishSoul(input: {
   assertCredential(input.widgetToken, "obswgt_");
 
   const source = structuredClone(input.value);
+  const personality = personalitySchema.safeParse(source.personality);
+  if (!personality.success) {
+    const issue = personality.error.issues[0];
+    throw new IntegrationStoreError(
+      `Check personality ${issue.path.join(" ")}: ${issue.message}`,
+      422,
+      "invalid_personality",
+    );
+  }
+  source.personality = { ...source.personality, ...personality.data };
   const followUpIssue = followUpError(source.personality);
   if (followUpIssue) throw new IntegrationStoreError(followUpIssue, 422, "invalid_follow_up");
   if (source.personality.leadCapture)

@@ -1,3 +1,4 @@
+import PersonalitySettings from "@/components/PersonalitySettings";
 import FollowUpSettings from "@/components/FollowUpSettings";
 import FollowUpAction from "@/components/FollowUpAction";
 import { followUpError } from "@/lib/follow-up";
@@ -735,7 +736,11 @@ function SoulStudio({ user }: { user: StudioUser }) {
                 onNotice={setNotice}
               />
             ) : view === "personality" ? (
-              <PersonalityView soul={soul} onUpdate={updateSoul} />
+              <PersonalitySettings
+                soul={soul}
+                onUpdate={updateSoul}
+                onInstall={() => navigate("deploy")}
+              />
             ) : view === "voice" ? (
               <VoiceView soul={soul} onUpdate={updateSoul} onNotice={setNotice} />
             ) : view === "playground" ? (
@@ -2480,141 +2485,6 @@ function CrawlProgressPanel({ events }: { events: CrawlProgressEvent[] }) {
         )}
       </div>
     </section>
-  );
-}
-
-function PersonalityView({
-  soul,
-  onUpdate,
-}: {
-  soul: Soul;
-  onUpdate: (updater: (soul: Soul) => Soul) => void;
-}) {
-  const update = (patch: Partial<Soul["personality"]>) =>
-    onUpdate((current) => ({ ...current, personality: { ...current.personality, ...patch } }));
-  return (
-    <Page
-      title="Shape the personality"
-      description="Keep it recognizable, useful, and true to the website."
-      hideHeader
-    >
-      <div className="grid min-h-[calc(100vh-64px)] xl:grid-cols-[minmax(0,1fr)_400px]">
-        <div className="min-w-0 xl:border-r xl:border-[#e5e5e3]">
-          <Card>
-            <SectionHeading title="Identity" description="What should visitors call it?" />
-            <div className="mt-6 grid gap-5 sm:grid-cols-2">
-              <Field label="Name">
-                <input
-                  value={soul.personality.name}
-                  onChange={(event) => update({ name: event.target.value })}
-                  className="clean-input"
-                />
-              </Field>
-              <Field label="Role">
-                <input
-                  value={soul.personality.role}
-                  onChange={(event) => update({ role: event.target.value })}
-                  className="clean-input"
-                />
-              </Field>
-            </div>
-            <Field label="Purpose" className="mt-5">
-              <textarea
-                value={soul.personality.purpose}
-                onChange={(event) => update({ purpose: event.target.value })}
-                rows={3}
-                className="clean-input resize-none"
-              />
-            </Field>
-          </Card>
-          <Card>
-            <SectionHeading title="Tone" description="Choose one clear communication style." />
-            <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {TONES.map((tone) => (
-                <button
-                  key={tone.id}
-                  onClick={() => update({ tone: tone.id })}
-                  className={`rounded-xl border px-4 py-3 text-left transition ${soul.personality.tone === tone.id ? "border-[#0b0b0c] bg-[#f1f1f0]" : "border-[#e2e1de] hover:bg-[#f9f9f9]"}`}
-                >
-                  <p className="text-sm font-semibold capitalize">{tone.id}</p>
-                  <p className="mt-1 text-xs text-[#7f7d78]">{tone.detail}</p>
-                </button>
-              ))}
-            </div>
-            <Field label="Traits" hint="Separate with commas" className="mt-5">
-              <input
-                value={soul.personality.traits.join(", ")}
-                onChange={(event) =>
-                  update({
-                    traits: event.target.value
-                      .split(",")
-                      .map((item) => item.trim())
-                      .filter(Boolean)
-                      .slice(0, 8),
-                  })
-                }
-                className="clean-input"
-              />
-            </Field>
-          </Card>
-          <Card>
-            <SectionHeading
-              title="Behavior"
-              description="Simple instructions are usually strongest."
-            />
-            <Field label="Greeting" className="mt-5">
-              <textarea
-                value={soul.personality.greeting}
-                onChange={(event) => update({ greeting: event.target.value })}
-                rows={2}
-                className="clean-input resize-none"
-              />
-            </Field>
-            <Field label="Answering instructions" className="mt-5">
-              <textarea
-                value={soul.personality.instructions}
-                onChange={(event) => update({ instructions: event.target.value })}
-                rows={4}
-                className="clean-input resize-none"
-              />
-            </Field>
-            <Field label="When it does not know" className="mt-5">
-              <textarea
-                value={soul.personality.unknownResponse}
-                onChange={(event) => update({ unknownResponse: event.target.value })}
-                rows={2}
-                className="clean-input resize-none"
-              />
-            </Field>
-          </Card>
-        </div>
-        <div className="min-w-0 bg-[#f9f9f9]">
-          <Card className="h-full border-b-0 bg-[#f9f9f9]">
-            <p className="text-xs font-semibold uppercase tracking-[.12em] text-[#7e7c77]">
-              Preview
-            </p>
-            <div className="mt-6 flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#ebeae8] font-semibold text-[#0b0b0c]">
-                {soul.personality.name.charAt(0)}
-              </span>
-              <div>
-                <p className="font-semibold">{soul.personality.name}</p>
-                <p className="text-sm text-[#7c7a75]">{soul.personality.role}</p>
-              </div>
-            </div>
-            <div className="mt-6 rounded-2xl rounded-tl-md bg-[#f0f0ef] p-4 text-sm leading-6 text-[#393836]">
-              {soul.personality.greeting}
-            </div>
-            <div className="mt-6 border-t border-[#ecebe9] pt-5">
-              <p className="text-sm font-medium">Current character</p>
-              <p className="mt-2 text-sm leading-6 text-[#767570]">
-                {soul.personality.tone}, {soul.personality.traits.join(", ") || "helpful"}
-              </p>
-            </div>
-          </Card>
-        </div>
-      </div>
-    </Page>
   );
 }
 
@@ -5444,15 +5314,6 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (checked: b
     </button>
   );
 }
-
-const TONES: Array<{ id: Soul["personality"]["tone"]; detail: string }> = [
-  { id: "warm", detail: "Friendly and welcoming" },
-  { id: "precise", detail: "Direct and expert" },
-  { id: "playful", detail: "Bright and expressive" },
-  { id: "luxury", detail: "Refined and assured" },
-  { id: "bold", detail: "Energetic and decisive" },
-  { id: "calm", detail: "Patient and reassuring" },
-];
 
 function safeHost(value: string) {
   try {
