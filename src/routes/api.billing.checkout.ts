@@ -11,6 +11,13 @@ export const Route = createFileRoute("/api/billing/checkout")({
         try {
           const user = await requireUser(request, true);
           const current = await billingSummary(user.id);
+          if (current.complimentary) {
+            return errorResponse(
+              "This workspace has complimentary plan access. Contact support before starting a paid subscription.",
+              409,
+              "complimentary_plan_active",
+            );
+          }
           if (
             current.subscription &&
             ["active", "authenticated", "pending"].includes(current.subscription.status)

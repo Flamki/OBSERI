@@ -4216,6 +4216,10 @@ function ProfileWorkspaceView({
 
   async function beginCheckout(planId: BillingPlanId) {
     if (planId === "free" || planId === "enterprise") return;
+    if (billing?.complimentary) {
+      setBillingNotice("Your workspace has complimentary access. Contact support to change plans.");
+      return;
+    }
     setBillingBusy(planId);
     setBillingNotice("");
     try {
@@ -4405,6 +4409,11 @@ function ProfileWorkspaceView({
             </p>
           )}
 
+          {billing?.complimentary && (
+            <p className="mx-auto mt-6 rounded-xl bg-stone-100 px-5 py-3 text-sm">
+              Complimentary {billing.plan.name} access. No subscription charge or automatic renewal.
+            </p>
+          )}
           <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {SELF_SERVE_PLAN_IDS.map((planId) => (
               <PlanCard
@@ -4413,7 +4422,9 @@ function ProfileWorkspaceView({
                 cycle={cycle}
                 current={
                   billing?.plan.id === planId &&
-                  (planId === "free" || billing.subscription?.cycle === cycle)
+                  (planId === "free" ||
+                    !!billing.complimentary ||
+                    billing.subscription?.cycle === cycle)
                 }
                 busy={billingBusy === planId}
                 onChoose={() => void beginCheckout(planId)}
@@ -4431,7 +4442,7 @@ function ProfileWorkspaceView({
             </a>
           </footer>
 
-          {billing?.subscription && (
+          {billing?.subscription && !billing.complimentary && (
             <div className="mx-auto mt-4 flex w-full max-w-3xl flex-wrap items-center justify-center gap-x-3 gap-y-2 text-center text-xs text-[#8a8984]">
               <div>
                 <span className="font-semibold">{billing.plan.name}</span>
@@ -4526,13 +4537,19 @@ function ProfileWorkspaceView({
               <div>
                 <h3 className="font-semibold">{billing?.plan.name ?? "Free"} plan</h3>
                 <p className="mt-1 text-sm text-[#777671]">
-                  {billing?.subscription?.currentPeriodEnd
-                    ? `${billing.subscription.cancelAtPeriodEnd ? "Ends" : "Renews"} ${new Date(billing.subscription.currentPeriodEnd).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`
-                    : "No payment method required"}
+                  {billing?.complimentary
+                    ? "Complimentary access · No subscription charge"
+                    : billing?.subscription?.currentPeriodEnd
+                      ? `${billing.subscription.cancelAtPeriodEnd ? "Ends" : "Renews"} ${new Date(billing.subscription.currentPeriodEnd).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`
+                      : "No payment method required"}
                 </p>
               </div>
               <span className="rounded-lg bg-[#212120] px-3 py-1.5 text-xs font-semibold text-white">
-                {billing?.subscription?.status === "active" ? "Active" : "Free"}
+                {billing?.complimentary
+                  ? "Complimentary"
+                  : billing?.subscription?.status === "active"
+                    ? "Active"
+                    : "Free"}
               </span>
             </div>
             <div className="mt-6 grid grid-cols-2 gap-3">
@@ -4612,7 +4629,9 @@ function ProfileWorkspaceView({
                   cycle={cycle}
                   current={
                     billing?.plan.id === planId &&
-                    (planId === "free" || billing.subscription?.cycle === cycle)
+                    (planId === "free" ||
+                      !!billing.complimentary ||
+                      billing.subscription?.cycle === cycle)
                   }
                   busy={billingBusy === planId}
                   onChoose={() => void beginCheckout(planId)}
@@ -4642,6 +4661,7 @@ function ProfileWorkspaceView({
 
 type BillingSummaryResponse = {
   plan: BillingPlan;
+  complimentary?: { expiresAt: string | null } | null;
   subscription: {
     id: string;
     status: string;

@@ -33,6 +33,7 @@ try {
     "obseri_webhook_deliveries",
     "obseri_user_workspaces",
     "obseri_billing_subscriptions",
+    "obseri_plan_grants",
     "obseri_billing_events",
     "obseri_usage_monthly",
     "obseri_usage_grants",

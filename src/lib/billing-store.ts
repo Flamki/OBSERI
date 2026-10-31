@@ -227,7 +227,18 @@ export async function billingSummary(ownerUserId: string) {
     limit 1
   `;
   const subscription = rows[0] ?? null;
-  const entitled = subscription && isEntitled(subscription) ? subscription.plan_id : "free";
+  const paid = subscription && isEntitled(subscription);
+  // Real paid subscriptions take precedence; grants never impersonate Razorpay subscriptions.
+  const grants = paid
+    ? []
+    : await sql<{ plan_id: BillingPlanId; expires_at: Date | null }[]>`
+    select plan_id, expires_at from obseri_plan_grants
+    where owner_user_id = ${ownerUserId} and revoked_at is null
+      and (expires_at is null or expires_at > now())
+    limit 1
+  `;
+  const grant = grants[0] ?? null;
+  const entitled = paid ? subscription.plan_id : (grant?.plan_id ?? "free");
   const plan = getBillingPlan(entitled);
   const period = billingPeriod(subscription);
   const usageRows = await sql<
@@ -244,6 +255,9 @@ export async function billingSummary(ownerUserId: string) {
   return {
     plan,
     period,
+    complimentary: grant
+      ? { expiresAt: grant.expires_at ? new Date(grant.expires_at).toISOString() : null }
+      : null,
     subscription: subscription
       ? {
           id: subscription.provider_subscription_id,

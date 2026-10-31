@@ -93,3 +93,17 @@ Review prices immediately if any of these occur:
 - more than 10% of paid accounts repeatedly hit a limit;
 - provider failures force material duplicate processing;
 - enterprise requests require dedicated always-on GPU capacity.
+
+## Complimentary account access
+
+Operator-managed grants live in `obseri_plan_grants`, separately from Razorpay subscriptions.
+They require an existing verified account and never change login credentials or expose other
+workspaces. Growth grants use the normal Growth limits, including five seats; existing monthly
+usage remains counted. Active paid subscriptions take precedence. Expired or revoked grants
+fall back to the normal subscription/Free entitlement.
+
+Use `scripts/manage-plan-grant.mjs grant EMAIL PLAN REASON` with database credentials supplied
+through the environment. The operator CLI rejects accounts with active or pending payment
+subscriptions. `revoke EMAIL` removes complimentary access while retaining the grant record.
+No public route can issue grants. Checkout is blocked while complimentary access is effective
+to avoid accidental charges; revoke the grant before starting a normal paid subscription.

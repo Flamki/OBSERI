@@ -157,3 +157,35 @@ test("full Free workspace explains the limit before submitting and opens team pl
   await page.getByRole("button", { name: "View team plans" }).click();
   await expect(page.getByText("Choose the plan that fits your traffic")).toBeVisible();
 });
+
+test("complimentary Growth is current without implying a paid subscription", async ({ page }) => {
+  await setup(page);
+  await page.route("**/api/billing/summary", (route) =>
+    route.fulfill({
+      json: {
+        plan: BILLING_PLANS.growth,
+        subscription: {
+          id: "sub_unpaid",
+          status: "created",
+          cycle: "monthly",
+          currentPeriodEnd: null,
+          cancelAtPeriodEnd: false,
+        },
+        complimentary: { expiresAt: null },
+        usage: { textResponses: 0, voiceSeconds: 0 },
+      },
+    }),
+  );
+  await page.route("**/api/team", (route) =>
+    route.fulfill({ json: { members: [], invitations: [], seatLimit: 5, plan: "Growth" } }),
+  );
+  await page.goto("/app?view=profile");
+  await expect(page.getByText("1 / 5 seats · Growth")).toBeVisible();
+  await expect(page.getByText("Complimentary access · No subscription charge")).toBeVisible();
+  await page.getByRole("button", { name: "Plans and billing", exact: true }).click();
+  await expect(
+    page.getByText("Complimentary Growth access. No subscription charge or automatic renewal."),
+  ).toBeVisible();
+  await expect(page.getByText("Active subscription", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Current plan", exact: true })).toBeVisible();
+});
