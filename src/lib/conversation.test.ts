@@ -198,6 +198,15 @@ it("uses only matching sentences and their source when a provider response is em
   expect(response.citations[0].chunkId).toBe("cms");
 });
 
+it("replaces a model's canned uncertainty response with a contextual next step", async () => {
+  const input = fixture();
+  provider(input.personality.unknownResponse);
+  const result = await answerSoulQuestion(input);
+  expect(result.answer).not.toBe(input.personality.unknownResponse);
+  expect(result.answer).toContain("clarify");
+  expect(result.citations).toEqual([]);
+});
+
 it("also lets voice clarify without keyword matches and does not invent streaming citations", async () => {
   const { streamSoulVoiceAnswer } = await import("./conversation");
   provider("unused");

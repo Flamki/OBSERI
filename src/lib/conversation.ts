@@ -117,8 +117,12 @@ export async function answerSoulQuestion(input: ChatRequest): Promise<ChatRespon
     const namedPages = pages.filter(
       (page) => page.pageTitle.length >= 4 && parsed.answer.includes(page.pageTitle),
     );
+    const answer = cleanAnswer(parsed.answer, [...ranked, ...pages]);
+    // A model can repeat the configured fallback despite conversational instructions.
+    // Resolve it through the same contextual clarification/navigation as a provider failure.
+    if (answer.trim() === input.personality.unknownResponse.trim()) return fallback;
     return {
-      answer: cleanAnswer(parsed.answer, [...ranked, ...pages]),
+      answer,
       citations: toCitations([...cited, ...namedPages]).slice(0, 4),
       followUp: parsed.followUp,
       leadIntent: parsed.leadIntent,
