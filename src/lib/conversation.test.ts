@@ -217,3 +217,21 @@ it("also lets voice clarify without keyword matches and does not invent streamin
   expect(result.citations).toEqual([]);
   expect(JSON.parse(mock.mock.calls[0][1].body).max_tokens).toBeGreaterThan(120);
 });
+
+it("keeps a project's technology list with its preceding context, not the next heading", async () => {
+  const mock = provider("The real-estate platform uses PostgreSQL.", ["cms"]);
+  const input = fixture(["Which project uses PostgreSQL?"]);
+  input.chunks = [
+    {
+      ...input.chunks[0],
+      text: "Freelancer operating system\nAutomates proposals and tracks revenue.\nNext.js Node.js PostgreSQL AI Razorpay\nFour-agent AI platform\nFour agents run marketing research on AWS Lambda.\nAWS Bedrock Lambda FastAPI\nProduction client platform\nA real-estate platform with a custom CMS.\nDeployed with PostgreSQL persistence and JWT authentication.",
+    },
+  ];
+  await answerSoulQuestion(input);
+  const evidence = JSON.parse(JSON.parse(mock.mock.calls[0][1].body).messages[1].content)
+    .evidence[0].text;
+  expect(evidence).toContain("Freelancer operating system");
+  expect(evidence).toContain("real-estate platform");
+  expect(evidence).not.toContain("Four-agent AI platform");
+  expect(evidence).not.toContain("Four agents run");
+});

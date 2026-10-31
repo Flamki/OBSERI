@@ -43,13 +43,7 @@ export async function answerSoulQuestion(input: ChatRequest): Promise<ChatRespon
   if (!apiUrl || !model) return fallback;
   const isFireworks = apiUrl.includes("api.fireworks.ai");
   try {
-    const context = ranked.map((chunk) => ({
-      id: chunk.id,
-      title: chunk.pageTitle,
-      url: chunk.pageUrl,
-      order: chunk.order,
-      text: chunk.text,
-    }));
+    const context = buildEvidence(ranked, query);
     const response = await fetch(`${apiUrl.replace(/\/$/, "")}/chat/completions`, {
       method: "POST",
       headers: {
@@ -180,11 +174,7 @@ export async function streamSoulVoiceAnswer(input: ChatRequest): Promise<VoiceSt
             role: "user",
             content: JSON.stringify({
               task: "Answer the visitor naturally using only the website evidence.",
-              evidence: ranked.map((chunk) => ({
-                title: chunk.pageTitle,
-                url: chunk.pageUrl,
-                text: chunk.text,
-              })),
+              evidence: buildEvidence(ranked, query),
               availablePages: pages.map(({ pageTitle, pageUrl }) => ({
                 title: pageTitle,
                 url: pageUrl,
@@ -275,6 +265,52 @@ function selectDiverseChunks(chunks: RankedChunk[], limit: number): RankedChunk[
     if (selected.length === limit) break;
   }
   return selected;
+}
+
+function buildEvidence(chunks: RankedChunk[], query: string) {
+  const terms = tokenize(query);
+  const groups = new Map<string, RankedChunk[]>();
+  for (const chunk of chunks)
+    groups.set(chunk.pageUrl, [...(groups.get(chunk.pageUrl) ?? []), chunk]);
+  return [...groups.values()].map((group) => {
+    group.sort((a, b) => a.order - b.order);
+    let text = "";
+    for (const chunk of group) {
+      let overlap = Math.min(text.length, chunk.text.length);
+      while (overlap >= 30 && !text.endsWith(chunk.text.slice(0, overlap))) overlap--;
+      text += overlap >= 30 ? chunk.text.slice(overlap) : `\n\n${chunk.text}`;
+    }
+    const lines = text.trim().split(/\n+/);
+    const included = new Set<number>();
+    for (let index = 0; index < lines.length; index++) {
+      const tokens = tokenizeWithDuplicates(lines[index]);
+      if (!terms.some((term) => tokens.includes(term))) continue;
+      // Include the section leading into a fact, not the next project's heading/technology list.
+      const heading =
+        tokens.length <= 3 &&
+        tokens.every((token) => terms.includes(token) || STOP_WORDS.has(token));
+      for (
+        let line = Math.max(0, index - 3);
+        line <= Math.min(lines.length - 1, index + (heading ? 3 : 0));
+        line++
+      )
+        included.add(line);
+    }
+    const passages: string[] = [];
+    let previous = -1;
+    for (const index of [...included].sort((a, b) => a - b)) {
+      if (previous >= 0 && index !== previous + 1) passages.push("---");
+      passages.push(lines[index]);
+      previous = index;
+    }
+    const first = group[0];
+    return {
+      id: first.id,
+      title: first.pageTitle,
+      url: first.pageUrl,
+      text: passages.length ? passages.join("\n") : text.trim(),
+    };
+  });
 }
 
 function retrievalQuery(messages: ChatRequest["messages"]): string {
@@ -654,9 +690,26 @@ const STOP_WORDS = new Set([
   "use",
   "uses",
   "using",
+  "offer",
+  "offers",
+  "provide",
+  "provides",
 ]);
 function tokenize(value: string): string[] {
-  return [...new Set(tokenizeWithDuplicates(value))].filter((term) => !STOP_WORDS.has(term));
+  const terms = [...new Set(tokenizeWithDuplicates(value))].filter((term) => !STOP_WORDS.has(term));
+  const topics = new Set([
+    "project",
+    "projects",
+    "service",
+    "services",
+    "product",
+    "products",
+    "page",
+    "pages",
+    "website",
+  ]);
+  const specific = terms.filter((term) => !topics.has(term));
+  return specific.length ? specific : terms;
 }
 function tokenizeWithDuplicates(value: string): string[] {
   return (
