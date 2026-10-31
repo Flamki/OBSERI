@@ -1,3 +1,4 @@
+import { launcherLabel, launcherMode } from "@/lib/launcher";
 import { createFileRoute } from "@tanstack/react-router";
 import { createWidgetSession, originAllowed } from "@/lib/integration-security";
 import { consumeRateLimit, getPublishedSoulByWidgetToken } from "@/lib/integration-store";
@@ -23,6 +24,11 @@ export const Route = createFileRoute("/api/widgets/$soulId/session")({
             {
               session: createWidgetSession(params.soulId, origin),
               parentOrigin: origin,
+              appearance: {
+                launcherMode: launcherMode(record.soul.appearance),
+                launcherLabel: launcherLabel(record.soul.appearance),
+                theme: record.soul.appearance.theme,
+              },
               analyticsEnabled: record.soul.channels.analyticsEnabled !== false,
               proactiveEnabled: record.soul.channels.proactiveEnabled !== false,
               consentRequired: Boolean(record.soul.channels.consentRequired),

@@ -101,10 +101,11 @@ for (const viewport of [
     await page.screenshot({ path: `test-results/preview-customization-${viewport.width}.png` });
     await drawer.getByRole("button", { name: "Close customization drawer" }).click();
     await expect(drawer).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Open voice chat" })).toBeInViewport();
+    await expect(page.getByRole("button", { name: "Ask a question" })).toBeInViewport();
     if (viewport.width > 1024) {
-      await page.getByRole("button", { name: "Open voice chat", exact: true }).click();
+      await page.getByRole("button", { name: "Ask a question", exact: true }).click();
       const panel = page.locator("[data-chat-theme]");
+      await panel.getByRole("button", { name: "Open voice chat", exact: true }).click();
       await expect(panel).toHaveCSS("background-color", "rgb(19, 18, 17)");
       await expect(panel.getByRole("button", { name: "Start voice call", exact: true })).toHaveCSS(
         "background-color",
@@ -121,12 +122,27 @@ for (const viewport of [
       await drawer.getByRole("button", { name: "Midnight Focused and cinematic" }).click();
       await expect.poll(() => workspace.souls[0].appearance.theme).toBe("dark");
     }
+    if (viewport.width <= 1024)
+      await page.getByRole("button", { name: "Open customization drawer" }).click();
+    await drawer.getByLabel("Launcher mode").selectOption("voice");
+    const label = drawer.getByLabel("Launcher text", { exact: true });
+    await label.fill("Talk with our team today please");
+    await expect(label).toHaveValue("Talk with our team");
+    await label.fill("abcdefghijklmnopqrstuvwxyz");
+    await expect(label).toHaveValue("abcdefghijklmnopqrstuvwx");
+    await label.fill("");
+    await label.pressSequentially("Speak to us");
+    await expect.poll(() => workspace.souls[0].appearance.launcherLabel).toBe("Speak to us");
+    await expect.poll(() => workspace.souls[0].appearance.launcherMode).toBe("voice");
+    await page.screenshot({ path: `test-results/launcher-settings-${viewport.width}.png` });
     await page.reload();
     await page.getByRole("button", { name: "Open customization drawer" }).click();
     await expect(
       drawer.getByRole("button", { name: "Midnight Focused and cinematic" }),
     ).toHaveAttribute("aria-pressed", "true");
     await expect(drawer.getByLabel("Launcher position")).toHaveValue("bottom-left");
+    await expect(drawer.getByLabel("Launcher mode")).toHaveValue("voice");
+    await expect(drawer.getByLabel("Launcher text", { exact: true })).toHaveValue("Speak to us");
     await integrate.click();
     await expect(page).toHaveURL(/view=deploy/);
   });

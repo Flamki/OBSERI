@@ -1,3 +1,6 @@
+import ChatLauncher from "@/components/ChatLauncher";
+import LauncherSettings from "@/components/LauncherSettings";
+import { launcherPanel, launcherMode } from "@/lib/launcher";
 import VoiceSettings from "@/components/VoiceSettings";
 import PersonalitySettings from "@/components/PersonalitySettings";
 import FollowUpSettings from "@/components/FollowUpSettings";
@@ -2630,31 +2633,22 @@ function PlaygroundView({
               </div>
 
               {assistantMode === "closed" && (
-                <button
-                  onClick={() => setAssistantMode("voice")}
-                  className={`absolute bottom-12 z-30 flex items-center gap-3 rounded-full border border-black/10 bg-white py-2 pl-2 pr-5 text-sm font-medium text-[#212120] shadow-[0_12px_36px_rgba(24,29,20,.15)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_42px_rgba(24,29,20,.18)] ${
-                    soul.appearance.position === "bottom-right"
-                      ? "right-4 sm:right-5"
-                      : "left-4 sm:left-5"
-                  }`}
-                  aria-label="Open voice chat"
-                >
-                  <span
-                    className="h-10 w-10 shrink-0 rounded-full shadow-[inset_0_0_12px_rgba(255,255,255,.25),0_5px_14px_rgba(56,143,165,.2)]"
-                    style={{
-                      background:
-                        "radial-gradient(circle at 28% 24%,rgba(255,229,76,.98),transparent 31%),radial-gradient(circle at 74% 70%,rgba(47,180,255,.98),transparent 35%),radial-gradient(circle at 24% 78%,rgba(75,205,224,.92),transparent 33%),radial-gradient(circle at 75% 20%,rgba(106,211,237,.88),transparent 31%),#88c8d4",
-                    }}
-                    aria-hidden="true"
-                  />
-                  Voice chat
-                </button>
+                <ChatLauncher
+                  appearance={soul.appearance}
+                  onClick={() => setAssistantMode(launcherPanel(soul.appearance))}
+                  className={`absolute bottom-12 z-30 ${soul.appearance.position === "bottom-right" ? "right-4 sm:right-5" : "left-4 sm:left-5"}`}
+                />
               )}
 
               <div className="absolute inset-x-0 bottom-0 z-20 flex h-9 items-center justify-between border-t border-black/10 bg-white/95 px-4 text-[11px] text-[#787671] backdrop-blur-xl">
                 <span className="flex min-w-0 items-center gap-2 truncate">
                   <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#22c55e]" />
-                  Live simulation · voice and chat in one conversation
+                  Live simulation ·{" "}
+                  {launcherMode(soul.appearance) === "both"
+                    ? "chat and voice"
+                    : launcherMode(soul.appearance) === "voice"
+                      ? "voice only"
+                      : "chat only"}
                 </span>
                 <span className="hidden shrink-0 text-[#a09d95] sm:inline">
                   {safeHost(previewUrl)}
@@ -2799,12 +2793,8 @@ function PlaygroundView({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Launcher">
-              <div className="flex h-11 items-center gap-2 rounded-lg border border-[#dfdedb] bg-[#f7f7f6] px-3 text-sm font-medium text-[#52514e]">
-                <Phone className="h-4 w-4 text-[#0b0b0c]" /> Voice + chat
-              </div>
-            </Field>
+          <div className="space-y-4">
+            <LauncherSettings appearance={soul.appearance} onChange={updateAppearance} />
             <Field label="Position">
               <select
                 aria-label="Launcher position"
@@ -2820,16 +2810,6 @@ function PlaygroundView({
                 <option value="bottom-left">Left</option>
               </select>
             </Field>
-          </div>
-
-          <div className="rounded-xl border border-[#e3e2e0] bg-[#f8f8f7] p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold">
-              <MessageCircle className="h-4 w-4 text-[#0b0b0c]" /> Two ways to connect
-            </div>
-            <p className="mt-2 text-xs leading-5 text-[#7c7a74]">
-              Visitors can start a hands-free voice call or open the normal text chat. Both use the
-              same knowledge, personality, citations, and selected voice.
-            </p>
           </div>
 
           <p className="text-center text-[11px] leading-4 text-[#98958d]">
@@ -3132,11 +3112,9 @@ function DeployView({
                     className="clean-input"
                   />
                 </Field>
-                <Field label="Launcher">
-                  <div className="flex h-11 items-center gap-2 rounded-lg border border-[#dfdedb] bg-[#f7f7f6] px-3 text-sm font-medium text-[#52514e]">
-                    <Phone className="h-4 w-4 text-[#0b0b0c]" /> Voice + chat
-                  </div>
-                </Field>
+                <div className="md:col-span-2">
+                  <LauncherSettings appearance={soul.appearance} onChange={updateAppearance} />
+                </div>
               </div>
             </Card>
           </div>
@@ -3166,20 +3144,11 @@ function DeployView({
                   )}
                 </div>
                 {previewMode === "closed" && (
-                  <button
-                    onClick={() => setPreviewMode("voice")}
-                    className={`absolute bottom-4 flex items-center gap-2.5 rounded-full border border-black/10 bg-white py-1.5 pl-1.5 pr-4 text-xs font-semibold text-[#212120] shadow-[0_10px_28px_rgba(24,29,20,.14)] transition hover:-translate-y-0.5 ${soul.appearance.position === "bottom-right" ? "right-4" : "left-4"}`}
-                    aria-label="Open voice chat preview"
-                  >
-                    <span
-                      className="h-9 w-9 rounded-full"
-                      style={{
-                        background:
-                          "radial-gradient(circle at 28% 24%,#ffe54c,transparent 31%),radial-gradient(circle at 74% 70%,#2fb4ff,transparent 35%),radial-gradient(circle at 24% 78%,#4bcde0,transparent 33%),#88c8d4",
-                      }}
-                    />
-                    Voice chat
-                  </button>
+                  <ChatLauncher
+                    appearance={soul.appearance}
+                    onClick={() => setPreviewMode(launcherPanel(soul.appearance))}
+                    className={`absolute bottom-4 ${soul.appearance.position === "bottom-right" ? "right-4" : "left-4"}`}
+                  />
                 )}
               </div>
             </div>

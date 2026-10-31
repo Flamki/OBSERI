@@ -25,7 +25,7 @@ for (const theme of ["light", "dark", "glass"] as const) {
     await expect(panel).toHaveAttribute("data-chat-theme", theme);
     if (theme === "glass") {
       // A translucent surface, not another opaque white theme.
-      await expect(panel).toHaveCSS("background-color", /0\.8\)$/);
+      await expect(panel).toHaveCSS("background-color", /0\.68\)$/);
       await expect(panel).not.toHaveCSS("backdrop-filter", "none");
     } else {
       await expect(panel).toHaveCSS(

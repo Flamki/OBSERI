@@ -20,3 +20,15 @@ export function chatAppearance(appearance: Soul["appearance"]): CSSProperties {
     colorScheme: dark ? "dark" : "light",
   } as CSSProperties;
 }
+
+/** Frosted neutral glass, with a bright inner edge and a soft grey tint. */
+export const glassSurface: CSSProperties = {
+  backgroundColor: "rgba(210, 212, 216, 0.68)",
+  backgroundImage:
+    "linear-gradient(145deg, rgba(255,255,255,.3), rgba(255,255,255,.04) 48%, rgba(140,145,155,.08))",
+  backdropFilter: "blur(28px) saturate(160%)",
+  WebkitBackdropFilter: "blur(28px) saturate(160%)",
+  borderColor: "rgba(255,255,255,.55)",
+  boxShadow:
+    "inset 0 1px 0 rgba(255,255,255,.65), inset 0 0 0 1px rgba(255,255,255,.12), 0 18px 50px rgba(30,35,45,.18)",
+};

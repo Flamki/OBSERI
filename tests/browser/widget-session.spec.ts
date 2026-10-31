@@ -132,3 +132,85 @@ test("a cold connection opens immediately and can be closed before loading finis
   await launcher.click();
   await expect(panel).toHaveAttribute("data-state", "open");
 });
+
+for (const mode of ["chat", "both", "voice"] as const) {
+  test(`published ${mode} launcher applies label, glass and allowed controls`, async ({ page }) => {
+    const embed = await readFile(new URL("../../public/obseri-widget.js", import.meta.url), "utf8");
+    const soul = createSoul("http://127.0.0.2:8080");
+    soul.appearance = {
+      ...soul.appearance,
+      theme: "glass",
+      launcherMode: mode,
+      launcherLabel: "Meet our team",
+    };
+    let voiceRequests = 0;
+    await page.route("**/api/voice/speak", (route) => {
+      voiceRequests++;
+      return route.fulfill({ status: 503, json: {} });
+    });
+    await page.route("**/obseri-widget.js", (route) =>
+      route.fulfill({ contentType: "application/javascript", body: embed }),
+    );
+    await page.route("http://127.0.0.2:8080/**", (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: `<html><body style="background:repeating-linear-gradient(30deg,#b8d6ea 0 60px,#e8d4c7 60px 120px);height:100vh"><script src="http://127.0.0.1:8080/obseri-widget.js" data-soul-id="${soul.id}" data-widget-token="test"></script></body></html>`,
+      }),
+    );
+    await page.route("**/api/widgets/*/session?*", (route) =>
+      route.fulfill({
+        headers: { "access-control-allow-origin": "http://127.0.0.2:8080" },
+        json: {
+          session: "test",
+          parentOrigin: "http://127.0.0.2:8080",
+          appearance: soul.appearance,
+        },
+      }),
+    );
+    await page.route(`**/api/souls/${soul.id}`, (route) => route.fulfill({ json: { soul } }));
+    await page.route("**/api/souls/*/analytics", (route) =>
+      route.fulfill({
+        headers: { "access-control-allow-origin": "http://127.0.0.2:8080" },
+        json: { accepted: true },
+      }),
+    );
+    await page.route("**/api/souls/*/events", (route) => route.fulfill({ json: { ok: true } }));
+    await page.goto("http://127.0.0.2:8080/");
+    const launcher = page.getByRole("button", { name: "Meet our team", exact: true });
+    await expect(launcher).toBeVisible();
+    await expect(launcher).toHaveCSS("backdrop-filter", "blur(28px) saturate(1.6)");
+    await launcher.click();
+    const frame = page.frameLocator('iframe[title="Obseri website assistant"]');
+    await expect(frame.locator("[data-chat-theme]")).toHaveAttribute("data-chat-theme", "glass");
+    await expect(page.locator(`[id="obseri-panel-${soul.id}"]`)).toHaveAttribute(
+      "data-state",
+      "open",
+    );
+    if (mode === "voice") {
+      await expect(
+        frame.getByRole("button", { name: "Start voice call", exact: true }),
+      ).toBeVisible();
+      await expect(frame.getByPlaceholder("Ask this website...")).toHaveCount(0);
+      await expect(frame.getByRole("button", { name: "Open text chat" })).toHaveCount(0);
+    } else {
+      await expect(frame.getByPlaceholder("Ask this website...")).toBeVisible();
+      expect(voiceRequests).toBe(0);
+      if (mode === "chat") {
+        await expect(frame.getByRole("button", { name: "Open voice chat" })).toHaveCount(0);
+        await expect(frame.getByText("Voice uses your microphone", { exact: false })).toHaveCount(
+          0,
+        );
+      } else {
+        await frame.getByRole("button", { name: "Open voice chat" }).click();
+        await expect(
+          frame.getByRole("button", { name: "Start voice call", exact: true }),
+        ).toBeVisible();
+        await frame.getByRole("button", { name: "Open text chat" }).click();
+        await expect(frame.getByText("Chat with us", { exact: true })).toBeVisible();
+      }
+    }
+    await page.screenshot({ path: `test-results/launcher-${mode}-glass.png` });
+    await frame.getByRole("button", { name: "Close conversation" }).click();
+    await expect(launcher).toBeVisible();
+  });
+}

@@ -1,3 +1,4 @@
+import { normalizeLauncher } from "./launcher";
 import { followUpError, followUpSchema } from "@/lib/follow-up";
 import { personalitySchema } from "@/lib/personality";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
@@ -430,7 +431,11 @@ type PublishedRow = {
 function rowToRecord(row: PublishedRow | undefined): PublishedSoulRecord | null {
   if (!row) return null;
   return {
-    soul: { ...row.soul, voice: normalizeVoice(row.soul.voice) },
+    soul: {
+      ...row.soul,
+      appearance: normalizeLauncher(row.soul.appearance),
+      voice: normalizeVoice(row.soul.voice),
+    },
     ownerUserId: row.owner_user_id,
     publishedAt:
       row.published_at instanceof Date ? row.published_at.toISOString() : row.published_at,
@@ -445,6 +450,7 @@ function rowToRecord(row: PublishedRow | undefined): PublishedSoulRecord | null 
 function createPublicSoul(source: Soul, allowedDomains: string[], now: string): Soul {
   const soul = structuredClone(source);
   soul.voice = normalizeVoice(soul.voice);
+  soul.appearance = normalizeLauncher(soul.appearance);
   soul.status = "live";
   soul.updatedAt = now;
   soul.conversations = [];

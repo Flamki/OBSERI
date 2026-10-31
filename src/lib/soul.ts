@@ -1,3 +1,4 @@
+import { normalizeLauncher } from "./launcher";
 import type { FollowUpConfig } from "./follow-up";
 import type { ConversationStyle } from "./personality";
 import { neuralVoice } from "./voice-catalog";
@@ -137,6 +138,8 @@ export type AppearanceConfig = {
   theme: "light" | "dark" | "glass";
   glass: number;
   welcomeLabel: string;
+  launcherMode?: "chat" | "both" | "voice";
+  launcherLabel?: string;
 };
 
 export type ChannelConfig = {
@@ -309,10 +312,10 @@ export function normalizeWorkspace(workspace: SoulWorkspace): SoulWorkspace {
     souls: workspace.souls.map((soul) => ({
       ...soul,
       knowledge: normalizeKnowledgeBase(soul.knowledge, soul.siteUrl),
-      appearance: {
+      appearance: normalizeLauncher({
         ...soul.appearance,
         theme: soul.appearance.theme ?? "light",
-      },
+      }),
       voice: normalizeVoice(soul.voice),
       channels: {
         ...soul.channels,
