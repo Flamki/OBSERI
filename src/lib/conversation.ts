@@ -172,7 +172,7 @@ export async function streamSoulVoiceAnswer(input: ChatRequest): Promise<VoiceSt
       body: JSON.stringify({
         model,
         temperature: 0.25,
-        max_tokens: model.includes("gpt-oss") ? 1024 : 160,
+        max_tokens: model.includes("gpt-oss") ? 2048 : 160,
         stream: true,
         ...(isFireworks ? { reasoning_effort: model.includes("gpt-oss") ? "low" : "none" } : {}),
         messages: [
@@ -201,7 +201,7 @@ export async function streamSoulVoiceAnswer(input: ChatRequest): Promise<VoiceSt
       return { stream: textStream(fallback.answer), ...metadata, mode: "retrieval" };
     }
     return {
-      stream: openAITextStream(response.body),
+      stream: openAITextStream(response.body, fallback.answer),
       ...metadata,
       // Streaming prose has no validated citation IDs; don't attach unrelated retrieval hits.
       citations: [],
@@ -537,7 +537,7 @@ function textStream(text: string) {
   });
 }
 
-function openAITextStream(source: ReadableStream<Uint8Array>) {
+function openAITextStream(source: ReadableStream<Uint8Array>, fallback: string) {
   let sourceReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
   return new ReadableStream<string>({
     async start(controller) {
@@ -546,8 +546,13 @@ function openAITextStream(source: ReadableStream<Uint8Array>) {
       const decoder = new TextDecoder();
       let buffer = "";
       let closed = false;
+      let emitted = false;
       const close = () => {
         if (closed) return;
+        if (!emitted) {
+          console.warn("soul_voice_stream_empty_answer");
+          controller.enqueue(fallback);
+        }
         closed = true;
         controller.close();
       };
@@ -570,7 +575,10 @@ function openAITextStream(source: ReadableStream<Uint8Array>) {
                 choices?: Array<{ delta?: { content?: string } }>;
               };
               const delta = payload.choices?.[0]?.delta?.content;
-              if (typeof delta === "string" && delta) controller.enqueue(delta);
+              if (typeof delta === "string" && delta) {
+                if (delta.trim()) emitted = true;
+                controller.enqueue(delta);
+              }
             } catch {
               // Ignore provider keep-alives and non-JSON stream metadata.
             }

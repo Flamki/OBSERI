@@ -258,6 +258,18 @@ it("also lets voice clarify without keyword matches and does not invent streamin
   expect(JSON.parse(mock.mock.calls[0][1].body).max_tokens).toBeGreaterThan(120);
 });
 
+it("does not leave a silent voice reply when the provider ends without content", async () => {
+  const mock = provider("unused");
+  mock.mockResolvedValue(
+    new Response('data: {"choices":[{"delta":{},"finish_reason":"length"}]}\n\ndata: [DONE]\n\n'),
+  );
+  const { streamSoulVoiceAnswer } = await import("./conversation");
+  const result = await streamSoulVoiceAnswer(fixture(["Can you see my current UI?"]));
+  const reader = result.stream.getReader();
+  expect((await reader.read()).value).toContain("can’t see your screen");
+  expect((await reader.read()).done).toBe(true);
+});
+
 it("keeps a project's technology list with its preceding context, not the next heading", async () => {
   const mock = provider("The real-estate platform uses PostgreSQL.", ["cms"]);
   const input = fixture(["Which project uses PostgreSQL?"]);
