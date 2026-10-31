@@ -50,8 +50,7 @@ test("cross-site embed starts chat when the browser clears window.name", async (
   await expect(panel).toHaveAttribute("aria-hidden", "true");
   expect(soulRequests).toBe(1);
   await page.getByRole("button", { name: "Ask a question", exact: true }).click();
-  // Cross-origin locator actionability does not wait for the parent panel's transform.
-  await expect(panel).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, 0)");
+  await expect(panel).toHaveAttribute("data-state", "open");
   const frame = page.frameLocator('iframe[title="Obseri website assistant"]');
   await expect(frame.getByPlaceholder("Ask this website...")).toBeVisible();
   await expect(iframe).toHaveCSS("filter", "none");
@@ -61,17 +60,28 @@ test("cross-site embed starts chat when the browser clears window.name", async (
   await frame.getByRole("button", { name: "Close conversation", exact: true }).click();
   await expect(page.getByRole("button", { name: "Ask a question", exact: true })).toBeVisible();
   await expect(panel).toHaveCSS("visibility", "hidden");
-  const openingOpacity = await page.evaluate(async () => {
+  const openingSize = await page.evaluate(async () => {
     document.querySelector<HTMLButtonElement>('button[aria-label="Ask a question"]')!.click();
-    await new Promise(requestAnimationFrame);
-    await new Promise(requestAnimationFrame);
-    return Number(getComputedStyle(document.querySelector('[id^="obseri-panel-"]')!).opacity);
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    const rect = document.querySelector('[id^="obseri-panel-"]')!.getBoundingClientRect();
+    return { width: rect.width, height: rect.height };
   });
-  expect(openingOpacity).toBeLessThan(1);
-  await expect(panel).toHaveCSS("opacity", "1");
+  expect(openingSize.width).toBeLessThan(394);
+  expect(openingSize.height).toBeGreaterThan(60);
+  expect(openingSize.height).toBeLessThan(620);
+  await expect(panel).toHaveAttribute("data-state", "open");
   await expect(frame.getByPlaceholder("Ask this website...")).toHaveValue("Keep my draft");
   expect(soulRequests).toBe(1);
+  await frame.getByRole("button", { name: "Close conversation", exact: true }).click();
+  await expect(panel).toHaveAttribute("data-state", "closing");
+  await page.waitForTimeout(160);
+  const shrinking = await panel.boundingBox();
+  expect(shrinking!.height).toBeGreaterThan(60);
+  expect(shrinking!.height).toBeLessThan(620);
+  await expect(panel).toHaveAttribute("data-state", "closed");
   await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.getByRole("button", { name: "Ask a question", exact: true }).click();
+  await expect(panel).toHaveAttribute("data-state", "open");
   await expect(panel).toHaveCSS("transition-duration", "0s");
   await frame.getByRole("button", { name: "Close conversation", exact: true }).click();
   await expect(panel).toHaveCSS("visibility", "hidden");
@@ -120,5 +130,5 @@ test("a cold connection opens immediately and can be closed before loading finis
   await expect(launcher).toBeFocused();
   await page.getByRole("button", { name: "Website action" }).click();
   await launcher.click();
-  await expect(panel).toHaveCSS("opacity", "1");
+  await expect(panel).toHaveAttribute("data-state", "open");
 });

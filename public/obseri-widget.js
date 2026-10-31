@@ -292,6 +292,10 @@
   var opened = false;
   var preparing;
   var frameReady = false;
+  var animations = [];
+  var motionVersion = 0;
+  var panelWidth = 394;
+  var panelHeight = 620;
 
   var root = document.createElement("div");
   root.id = "obseri-soul-" + soulId;
@@ -306,12 +310,17 @@
   panel.id = "obseri-panel-" + soulId;
   panel.setAttribute("aria-hidden", "true");
   panel.inert = true;
+  panel.dataset.state = "closed";
   panel.style.cssText =
     "position:absolute;bottom:0;" +
     position +
-    ":0;width:394px;height:620px;max-height:calc(100dvh - 40px);overflow:hidden;border-radius:28px;background:#fff;box-shadow:0 12px 40px rgba(24,29,20,.13),0 2px 8px rgba(24,29,20,.05);opacity:0;visibility:hidden;pointer-events:none;transform:translateY(14px) scale(.96);transform-origin:bottom " +
+    ":0;width:394px;height:620px;max-height:calc(100dvh - 40px);overflow:hidden;border-radius:28px;background:#fff;box-shadow:0 12px 40px rgba(24,29,20,.13),0 2px 8px rgba(24,29,20,.05);opacity:1;visibility:hidden;pointer-events:none;transform-origin:bottom " +
     position +
     ";";
+
+  // Keep the chat at its final size while the outer surface grows; text never stretches.
+  var content = document.createElement("div");
+  content.style.cssText = "position:absolute;top:0;" + position + ":0;";
 
   var loading = document.createElement("div");
   loading.setAttribute("role", "status");
@@ -404,23 +413,98 @@
     return preparing;
   }
 
+  function cancelMotion() {
+    animations.forEach(function (animation) {
+      animation.cancel();
+    });
+    animations = [];
+  }
+
   function setOpen(value) {
+    if (opened === value) return;
+    var version = ++motionVersion;
+    var current = panel.getBoundingClientRect();
+    var wasHidden = panel.style.visibility === "hidden";
+    var currentRadius = getComputedStyle(panel).borderRadius;
+    var currentContent = getComputedStyle(content).opacity;
+    var currentLauncher = getComputedStyle(launcher).opacity;
+    cancelMotion();
     opened = value;
-    motion();
     panel.inert = !value;
     panel.setAttribute("aria-hidden", String(!value));
-    panel.style.opacity = value ? "1" : "0";
-    panel.style.transform = value ? "translateY(0) scale(1)" : "translateY(14px) scale(.96)";
-    panel.style.visibility = value ? "visible" : "hidden";
+    panel.dataset.state = value ? "opening" : "closing";
+    panel.style.visibility = "visible";
     panel.style.pointerEvents = value ? "auto" : "none";
+    launcher.style.transform = "none";
     launcher.style.opacity = value ? "0" : "1";
-    launcher.style.transform = value ? "translateY(5px) scale(.94)" : "translateY(0) scale(1)";
-    launcher.style.visibility = value ? "hidden" : "visible";
     launcher.style.pointerEvents = value ? "none" : "auto";
+    launcher.setAttribute("aria-hidden", String(value));
     launcher.setAttribute("aria-expanded", String(value));
     launcher.tabIndex = value ? -1 : 0;
-    if (!value) launcher.focus({ preventScroll: true });
-    else if (frameReady) frame.focus({ preventScroll: true });
+    content.style.opacity = "1";
+
+    function settle() {
+      if (version !== motionVersion) return;
+      panel.style.visibility = opened ? "visible" : "hidden";
+      panel.dataset.state = opened ? "open" : "closed";
+      cancelMotion();
+      if (opened && frameReady) frame.focus({ preventScroll: true });
+      if (!opened) launcher.focus({ preventScroll: true });
+    }
+    if (reducedMotion.matches) {
+      settle();
+      return;
+    }
+    var pillWidth = launcher.offsetWidth;
+    var pillHeight = launcher.offsetHeight;
+    var duration = value ? 540 : 440;
+    var surface = panel.animate(
+      [
+        {
+          width: (wasHidden ? pillWidth : current.width) + "px",
+          height: (wasHidden ? pillHeight : current.height) + "px",
+          borderRadius: wasHidden ? pillHeight / 2 + "px" : currentRadius,
+        },
+        {
+          width: (value ? panelWidth : pillWidth) + "px",
+          height: (value ? panelHeight : pillHeight) + "px",
+          borderRadius: value ? "28px" : pillHeight / 2 + "px",
+        },
+      ],
+      {
+        duration: duration,
+        easing: value ? "cubic-bezier(.22,1,.36,1)" : "cubic-bezier(.65,0,.35,1)",
+        fill: "both",
+      },
+    );
+    animations.push(surface);
+    animations.push(
+      content.animate(
+        value
+          ? [
+              { opacity: wasHidden ? 0 : currentContent, transform: "translateY(12px)", offset: 0 },
+              { opacity: 0, transform: "translateY(12px)", offset: 0.18 },
+              { opacity: 1, transform: "translateY(0)", offset: 1 },
+            ]
+          : [
+              { opacity: currentContent, transform: "translateY(0)", offset: 0 },
+              { opacity: 0, transform: "translateY(8px)", offset: 0.45 },
+              { opacity: 0, transform: "translateY(8px)", offset: 1 },
+            ],
+        { duration: duration, easing: "ease-out", fill: "both" },
+      ),
+    );
+    animations.push(
+      launcher.animate(
+        value
+          ? [{ opacity: currentLauncher }, { opacity: 0, offset: 0.18 }, { opacity: 0 }]
+          : [{ opacity: currentLauncher }, { opacity: 0, offset: 0.72 }, { opacity: 1 }],
+        { duration: duration, easing: "ease", fill: "both" },
+      ),
+    );
+    surface.finished.then(settle).catch(function () {
+      /* Reversed or resized. */
+    });
   }
 
   loadingClose.onclick = function () {
@@ -448,7 +532,7 @@
       frame.style.opacity = "1";
       frame.style.pointerEvents = "auto";
       loading.style.display = "none";
-      if (opened) frame.focus({ preventScroll: true });
+      if (opened && panel.dataset.state === "open") frame.focus({ preventScroll: true });
       return;
     }
     if (event.data.type === "obseri:conversation-started") {
@@ -460,41 +544,47 @@
   });
 
   function motion() {
-    panel.style.transition = reducedMotion.matches
-      ? "none"
-      : "opacity 220ms ease,transform 260ms cubic-bezier(.22,1,.36,1),visibility 0s linear 260ms";
-    // Opening visibility is immediate; closing visibility waits for the fade.
-    panel.style.transitionDelay = opened ? "0s" : "0s,0s,260ms";
-    launcher.style.transition = reducedMotion.matches
-      ? "none"
-      : "opacity 160ms ease,transform 220ms cubic-bezier(.22,1,.36,1),visibility 0s linear 160ms";
-    launcher.style.transitionDelay = opened ? "0s,0s,160ms" : "0s";
+    // An accessibility preference change must finish any active morph immediately.
+    if (reducedMotion.matches && animations.length) {
+      ++motionVersion;
+      cancelMotion();
+      panel.style.visibility = opened ? "visible" : "hidden";
+      panel.dataset.state = opened ? "open" : "closed";
+    }
     frame.style.transition = reducedMotion.matches ? "none" : "opacity 140ms ease";
   }
 
   function layout() {
+    ++motionVersion;
+    cancelMotion();
+    var viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
     if (mobile.matches) {
       root.style.left = "12px";
       root.style.right = "12px";
       root.style.bottom = "12px";
-      panel.style.width = "100%";
-      panel.style.height = "min(620px, calc(100dvh - 24px))";
-      panel.style.maxHeight = "calc(100dvh - 24px)";
+      panelWidth = window.innerWidth - 24;
+      panelHeight = Math.min(620, viewportHeight - 24);
     } else {
       root.style.left = position === "left" ? "20px" : "auto";
       root.style.right = position === "right" ? "20px" : "auto";
       root.style.bottom = "20px";
-      panel.style.width = "394px";
-      panel.style.height = "620px";
-      panel.style.maxHeight = "calc(100dvh - 40px)";
+      panelWidth = 394;
+      panelHeight = Math.min(620, viewportHeight - 40);
     }
+    panel.style.width = content.style.width = panelWidth + "px";
+    panel.style.height = content.style.height = panelHeight + "px";
+    panel.style.visibility = opened ? "visible" : "hidden";
+    panel.dataset.state = opened ? "open" : "closed";
   }
 
   layout();
   motion();
   mobile.addEventListener("change", layout);
   reducedMotion.addEventListener("change", motion);
-  panel.append(loading, frame);
+  window.addEventListener("resize", layout);
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", layout);
+  content.append(loading, frame);
+  panel.appendChild(content);
   root.appendChild(panel);
   root.appendChild(launcher);
   document.body.appendChild(root);
