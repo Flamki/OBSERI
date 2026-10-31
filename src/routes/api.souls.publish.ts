@@ -1,9 +1,10 @@
+import { workspaceChanges } from "@/lib/workspace-merge";
 import { warmKnowledgeIndex } from "@/lib/server/semantic-search";
 import { activeKnowledgeChunks } from "@/lib/knowledge-content";
 import { createFileRoute } from "@tanstack/react-router";
 import { publishSoul } from "@/lib/published-souls";
 import type { Soul } from "@/lib/soul";
-import { requireWorkspaceUser as requireUser } from "@/lib/server/team-store";
+import { requireWorkspaceUser as requireUser, visibleWorkspace } from "@/lib/server/team-store";
 import { assertPlanFeature, assertWorkspaceWithinPlan } from "@/lib/billing-store";
 import { readUserWorkspace } from "@/lib/user-workspace-store";
 
@@ -14,8 +15,8 @@ export const Route = createFileRoute("/api/souls/publish")({
         try {
           const length = Number(request.headers.get("content-length") ?? "0");
           if (length > 1_500_000) return responseError("Soul payload is too large.", 413);
-          const user = await requireUser(request);
-          const value = (await request.json()) as Partial<Soul>;
+          const user = await requireUser(request, { section: "deploy", write: true });
+          let value = (await request.json()) as Partial<Soul>;
           const workspace = await readUserWorkspace(user.id);
           if (
             !workspace ||
@@ -34,6 +35,18 @@ export const Route = createFileRoute("/api/souls/publish")({
           ) {
             return responseError("The publish credentials do not match this website.", 403);
           }
+          const visible = visibleWorkspace(workspace, user)!;
+          const changes = workspaceChanges(visible, {
+            ...visible,
+            souls: visible.souls.map((s) => (s.id === value.id ? (value as Soul) : s)),
+          });
+          const expected = request.headers.get("x-obseri-workspace-revision");
+          if (changes.length || (expected !== null && expected !== String(workspace.revision || 0)))
+            return responseError(
+              "The workspace changed. Save and review the latest changes before publishing.",
+              409,
+            );
+          value = savedSoul;
           await assertWorkspaceWithinPlan(user.id, {
             ...workspace,
             souls: workspace.souls.map((candidate) =>
@@ -46,6 +59,7 @@ export const Route = createFileRoute("/api/souls/publish")({
             ownerKey: request.headers.get("x-obseri-publish-key") ?? "",
             widgetToken: value.channels?.widgetToken ?? "",
             ownerUserId: user.id,
+            audit: { actorId: user.actorUserId, email: user.email || "" },
           });
           const searchIndex = await warmKnowledgeIndex(
             user.id,

@@ -137,7 +137,7 @@ async function resolveVoiceOwner(request: Request, input: z.infer<typeof schema>
   }
   if (authorization) {
     try {
-      return (await requireUser(request)).id;
+      return (await requireUser(request, { section: "voice", write: false })).id;
     } catch (error) {
       const status =
         typeof error === "object" && error && "status" in error ? Number(error.status) : 401;

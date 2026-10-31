@@ -21,7 +21,12 @@ import {
   requireWorkspaceUser,
   revokeAccess,
   teamDetails,
+  updateMemberAccess,
+  visibleWorkspace,
+  teamActivity,
 } from "./server/team-store";
+import { permissionPreset } from "./workspace-access";
+import { createSoul } from "./soul";
 import {
   reserveEmbeddingCharacters,
   acquireImportLease,
@@ -53,6 +58,7 @@ beforeAll(async () => {
     "create table obseri_user_workspaces (user_id text primary key, workspace jsonb, created_at timestamptz default now())",
   );
   await pg.exec(await readFile("db/migrations/007_teams_and_operations.sql", "utf8"));
+  await pg.exec(await readFile("db/migrations/009_team_collaboration.sql", "utf8"));
 });
 beforeEach(async () => {
   await pg.exec(
@@ -187,4 +193,60 @@ it("rejects oversized chunked JSON and accepts valid UTF-8 requests", async () =
     } as RequestInit);
   await expect(readBoundedJson(request(), 100)).resolves.toEqual({ name: "Café" });
   await expect(readBoundedJson(request(), 5)).rejects.toMatchObject({ status: 413 });
+});
+
+it("enforces invited section permissions and immediate owner changes", async () => {
+  const permissions = {
+    ...permissionPreset("none"),
+    knowledge: "write" as const,
+    voice: "read" as const,
+  };
+  await acceptInvitation(member, await inviteEditor("owner", member.email, permissions));
+  state.actor = member;
+  const user = await requireWorkspaceUser(request(), { section: "knowledge", write: true });
+  expect(user.role).toBe("custom");
+  await expect(requireWorkspaceUser(request(), { section: "voice" })).resolves.toBeDefined();
+  await expect(
+    requireWorkspaceUser(request(), { section: "voice", write: true }),
+  ).rejects.toMatchObject({ status: 403 });
+  await expect(requireWorkspaceUser(request(), { section: "personality" })).rejects.toMatchObject({
+    status: 403,
+  });
+  await updateMemberAccess("owner", member.id, permissionPreset("read"));
+  expect((await requireWorkspaceUser(request())).role).toBe("viewer");
+  await expect(
+    requireWorkspaceUser(request(), { section: "knowledge", write: true }),
+  ).rejects.toMatchObject({ status: 403 });
+  await expect(
+    updateMemberAccess("other", member.id, permissionPreset("write")),
+  ).rejects.toMatchObject({ status: 404 });
+  const log = await teamActivity("owner");
+  expect(log.events.map((e) => e.action)).toEqual([
+    "member.permissions",
+    "member.joined",
+    "invitation.created",
+  ]);
+  expect(log.events[0].changes[0].after.voice).toBe("read");
+  expect((await teamActivity("other")).events).toEqual([]);
+  expect((await teamActivity("owner", log.events[1].id)).events.map((e) => e.action)).toEqual([
+    "invitation.created",
+  ]);
+});
+it("redacts hidden content deterministically without changing saved data", async () => {
+  await acceptInvitation(
+    member,
+    await inviteEditor("owner", member.email, permissionPreset("none")),
+  );
+  state.actor = member;
+  const user = await requireWorkspaceUser(request());
+  const soul = createSoul("https://example.com");
+  soul.knowledge.keywords = ["private"];
+  soul.personality.name = "secret name";
+  const workspace = { id: "test", name: "Shared", souls: [soul], activeSoulId: soul.id };
+  const visible = visibleWorkspace(workspace, user)!;
+  expect(JSON.stringify(visible)).not.toContain("secret name");
+  expect(visible.souls[0].knowledge.keywords).not.toContain("private");
+  expect(visible.souls[0].channels.publishKey).toBe("restricted");
+  expect(visibleWorkspace(workspace, user)).toEqual(visible);
+  expect(workspace.souls[0].personality.name).toBe("secret name");
 });

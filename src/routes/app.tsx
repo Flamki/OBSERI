@@ -1,4 +1,15 @@
 import {
+  canAccess,
+  normalizePermissions,
+  VIEW_SECTION,
+  type AccessSection,
+} from "@/lib/workspace-access";
+import {
+  workspaceChanges,
+  mergeWorkspaceChanges,
+  assertChangesAllowed,
+} from "@/lib/workspace-merge";
+import {
   TeamWorkspaceGate,
   WorkspaceSwitcher,
   TeamSettings,
@@ -223,6 +234,8 @@ function AuthenticatedStudio() {
 
 function SoulStudio({ user }: { user: StudioUser }) {
   const team = useTeamWorkspace();
+  const isOwner = !team || team.current.role === "owner";
+  const permissions = normalizePermissions(team?.current.permissions);
   const workspaceCacheKey = `${STORAGE_KEY}:${user.id}:${team?.current.ownerId || user.id}`;
   const [loadError, setLoadError] = useState("");
   const [workspace, setWorkspace] = useState<SoulWorkspace>(DEMO_WORKSPACE);
@@ -244,6 +257,15 @@ function SoulStudio({ user }: { user: StudioUser }) {
   const lastPersistedWorkspace = useRef<SoulWorkspace>(EMPTY_WORKSPACE);
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const saveConflict = useRef(false);
+  const workspaceRef = useRef(workspace);
+  workspaceRef.current = workspace;
+  const saving = useRef(false);
+  const [syncStatus, setSyncStatus] = useState("Connecting…");
+  const [syncCycle, setSyncCycle] = useState(0);
+  const section = VIEW_SECTION[view];
+  const allowedView =
+    (!section || isOwner || canAccess(permissions, section)) && (view !== "billing" || isOwner);
+  const readOnly = !!section && !isOwner && !canAccess(permissions, section, true);
 
   useEffect(() => {
     let active = true;
@@ -258,6 +280,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
           const savedWorkspace = normalizeWorkspace(payload.workspace);
           lastPersistedWorkspace.current = savedWorkspace;
           setWorkspace(savedWorkspace);
+          setSyncStatus("All changes saved");
           setNeedsOnboarding(savedWorkspace.souls.length === 0);
         } else {
           lastPersistedWorkspace.current = EMPTY_WORKSPACE;
@@ -315,11 +338,12 @@ function SoulStudio({ user }: { user: StudioUser }) {
   }, []);
 
   useEffect(() => {
-    if (!hydrated || needsOnboarding || workspace.souls.length === 0) return;
+    if (!hydrated || loadError || needsOnboarding || saving.current) return;
+    if (!workspaceChanges(lastPersistedWorkspace.current, workspace).length) return;
     localStorage.setItem(workspaceCacheKey, JSON.stringify(workspace));
     const timer = window.setTimeout(() => {
       if (saveConflict.current) return;
-      void persistWorkspace(workspace)
+      void persistWorkspace(workspace, true)
         .then(async (response) => {
           if (response.ok) return;
           const payload = (await response.json().catch(() => null)) as {
@@ -332,7 +356,97 @@ function SoulStudio({ user }: { user: StudioUser }) {
         .catch(() => setNotice("The workspace could not be saved."));
     }, 650);
     return () => window.clearTimeout(timer);
-  }, [hydrated, needsOnboarding, user.id, workspace, workspaceCacheKey]);
+  }, [hydrated, needsOnboarding, user.id, workspace, workspaceCacheKey, syncCycle, loadError]);
+
+  useEffect(() => {
+    if (!hydrated || needsOnboarding || loadError) return;
+    let active = true;
+    let fetching = false;
+    const poll = async () => {
+      if (
+        fetching ||
+        saving.current ||
+        saveConflict.current ||
+        document.visibilityState === "hidden"
+      )
+        return;
+      fetching = true;
+      const baseline = lastPersistedWorkspace.current;
+      try {
+        const response = await authFetch("/api/workspace", { cache: "no-store" });
+        if (!active) return;
+        if (response.status === 403 || response.status === 401) {
+          saveConflict.current = true;
+          localStorage.removeItem(workspaceCacheKey);
+          setWorkspace(EMPTY_WORKSPACE);
+          setLoadError(
+            "Your workspace access changed. Reload to continue with your current permissions.",
+          );
+          return;
+        }
+        if (!response.ok) throw new Error("Connection interrupted");
+        const payload = await response.json();
+        if (!active) return;
+        if (
+          payload.access &&
+          (payload.access.role !== team?.current.role ||
+            JSON.stringify(normalizePermissions(payload.access.permissions)) !==
+              JSON.stringify(permissions))
+        ) {
+          saveConflict.current = true;
+          localStorage.removeItem(workspaceCacheKey);
+          setWorkspace(EMPTY_WORKSPACE);
+          setLoadError("Your permissions changed. Reload to see your updated access.");
+          return;
+        }
+        if (saving.current || baseline !== lastPersistedWorkspace.current) return;
+        const remote = payload.workspace ? normalizeWorkspace(payload.workspace) : EMPTY_WORKSPACE;
+        if ((remote.revision || 0) !== (baseline.revision || 0)) {
+          const local = workspaceRef.current;
+          const merged = mergeWorkspaceChanges(remote, workspaceChanges(baseline, local));
+          merged.activeSoulId = merged.souls.some((s) => s.id === local.activeSoulId)
+            ? local.activeSoulId
+            : remote.activeSoulId;
+          lastPersistedWorkspace.current = remote;
+          workspaceRef.current = merged;
+          setWorkspace(merged);
+        }
+        setSyncStatus(
+          workspaceChanges(lastPersistedWorkspace.current, workspaceRef.current).length
+            ? "Changes waiting to save"
+            : "All changes saved",
+        );
+      } catch (error) {
+        if (!active) return;
+        if ((error as { status?: number }).status === 409) {
+          saveConflict.current = true;
+          setSyncStatus("Conflicting edits · review needed");
+          setNotice(
+            error instanceof Error
+              ? error.message
+              : "Conflicting edits. Download your changes before reloading.",
+          );
+        } else setSyncStatus("Reconnecting… Your edits are kept here");
+      } finally {
+        fetching = false;
+      }
+    };
+    const timer = window.setInterval(() => void poll(), 3000);
+    const focus = () => void poll();
+    window.addEventListener("focus", focus);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", focus);
+    };
+  }, [
+    hydrated,
+    needsOnboarding,
+    loadError,
+    workspaceCacheKey,
+    team?.current.role,
+    JSON.stringify(permissions),
+  ]);
 
   useEffect(() => {
     if (hydrated) localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarCollapsed));
@@ -351,7 +465,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
   const soulId = soul?.id ?? null;
 
   useEffect(() => {
-    if (!hydrated || !soulId) return;
+    if (!hydrated || !soulId || (!isOwner && !canAccess(permissions, "conversations"))) return;
     let active = true;
     const load = () => {
       if (document.visibilityState === "hidden") return;
@@ -392,14 +506,25 @@ function SoulStudio({ user }: { user: StudioUser }) {
 
   function updateSoul(updater: (current: Soul) => Soul) {
     if (!soul) return;
-    setWorkspace((current) => ({
+    const current = workspaceRef.current;
+    const next = {
       ...current,
       souls: current.souls.map((candidate) =>
         candidate.id === soul.id
           ? { ...updater(candidate), updatedAt: new Date().toISOString() }
           : candidate,
       ),
-    }));
+    };
+    try {
+      assertChangesAllowed(workspaceChanges(current, next), permissions, isOwner);
+    } catch {
+      setNotice(
+        "You have view-only access to these settings. Ask the workspace owner for edit access.",
+      );
+      return;
+    }
+    workspaceRef.current = next;
+    setWorkspace(next);
   }
 
   function navigate(next: StudioView) {
@@ -418,6 +543,10 @@ function SoulStudio({ user }: { user: StudioUser }) {
   }
 
   function openCreateWebsite() {
+    if (!isOwner) {
+      setNotice("Only the workspace owner can add websites.");
+      return;
+    }
     const limit = activePlan.limits.websites;
     if (limit !== null && workspace.souls.length >= limit) {
       setNotice(
@@ -429,22 +558,62 @@ function SoulStudio({ user }: { user: StudioUser }) {
     setCreateOpen(true);
   }
 
-  function persistWorkspace(value: SoulWorkspace): Promise<Response> {
+  function persistWorkspace(value: SoulWorkspace, reconcile = false): Promise<Response> {
+    const base = lastPersistedWorkspace.current;
     const pending = saveQueue.current.then(async () => {
       if (saveConflict.current) throw new Error("Reload the workspace before saving.");
-      const response = await authFetch("/api/workspace", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...value, revision: lastPersistedWorkspace.current.revision }),
-      });
-      if (response.ok) {
-        const saved = (await response.clone().json()) as { workspace?: SoulWorkspace };
-        lastPersistedWorkspace.current = saved.workspace ?? value;
-      } else if (response.status === 409) {
-        saveConflict.current = true;
-        setNotice("Workspace updated elsewhere. Download your local edits before reloading.");
+      if (!workspaceChanges(base, value).length) return Response.json({ workspace: base });
+      saving.current = true;
+      setSyncStatus("Saving…");
+      try {
+        const response = await authFetch("/api/workspace", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ workspace: value, base }),
+        });
+        if (response.ok) {
+          const payload = await response.clone().json();
+          const saved = normalizeWorkspace(payload.workspace);
+          if (reconcile) {
+            const local = workspaceRef.current;
+            const merged = mergeWorkspaceChanges(saved, workspaceChanges(value, local));
+            merged.activeSoulId = local.activeSoulId;
+            workspaceRef.current = merged;
+            setWorkspace(merged);
+          }
+          lastPersistedWorkspace.current = saved;
+          setSyncStatus("All changes saved");
+        } else {
+          setSyncStatus("Changes not saved");
+          if (response.status === 409) {
+            saveConflict.current = true;
+            setNotice(
+              "A teammate changed the same field. Download your local edits before reloading.",
+            );
+          }
+          if (response.status === 403 || response.status === 401) {
+            saveConflict.current = true;
+            localStorage.removeItem(workspaceCacheKey);
+            setLoadError("Your access changed. Reload to continue with your current permissions.");
+          }
+        }
+        return response;
+      } catch (error) {
+        if ((error as { status?: number }).status === 409) {
+          saveConflict.current = true;
+          setNotice(
+            error instanceof Error
+              ? error.message
+              : "Conflicting edits. Download your local edits before reloading.",
+          );
+        }
+        setSyncStatus("Changes not saved · reconnecting");
+        throw error;
+      } finally {
+        saving.current = false;
+        // Retry after a short delay if offline; never loop requests immediately.
+        window.setTimeout(() => setSyncCycle((c) => c + 1), 3000);
       }
-      return response;
     });
     saveQueue.current = pending.then(
       () => undefined,
@@ -658,7 +827,12 @@ function SoulStudio({ user }: { user: StudioUser }) {
   }
 
   function saveConversation(messages: SoulMessage[], leadIntent: ChatResponse["leadIntent"]) {
-    if (!soul || messages.length < 2) return;
+    if (
+      !soul ||
+      messages.length < 2 ||
+      (!isOwner && !canAccess(permissions, "conversations", true))
+    )
+      return;
     updateSoul((current) => {
       const id = `playground-${current.id}`;
       const previous = current.conversations.find((conversation) => conversation.id === id);
@@ -765,6 +939,16 @@ function SoulStudio({ user }: { user: StudioUser }) {
             onNavigate={navigate}
           />
 
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[#ecebe9] bg-white px-5 py-2 text-xs text-[#77716e]">
+            <span role="status" aria-live="polite">
+              {syncStatus}
+            </span>
+            <span>
+              {readOnly
+                ? "View only · ask your owner for edit access"
+                : "Team changes sync automatically"}
+            </span>
+          </div>
           <main
             className={`mx-auto min-h-0 w-full flex-1 ${
               view === "playground" || view === "conversations"
@@ -772,111 +956,137 @@ function SoulStudio({ user }: { user: StudioUser }) {
                 : "max-w-none overflow-y-auto bg-white p-0"
             }`}
           >
-            {!soul ? (
-              <EmptyState onCreate={openCreateWebsite} />
-            ) : view === "overview" ? (
-              <OverviewView
-                soul={soul}
-                user={user}
-                plan={activePlan}
-                conversations={allConversations}
-                onNavigate={navigate}
-                onOpenConversation={openConversation}
-                onRefresh={() => void refreshKnowledge()}
-              />
-            ) : view === "analytics" ? (
-              <ConversionDashboard
-                key={soul.id}
-                soulId={soul.id}
-                onInstall={() => navigate("deploy")}
-              />
-            ) : view === "knowledge" ? (
-              <KnowledgeView
-                soul={soul}
-                crawlEvents={crawlEvents[soul.id] ?? []}
-                onRefresh={() => void refreshKnowledge()}
-                onAddSource={(source) => crawlKnowledgeSource(source)}
-                onUpdate={(updater) =>
-                  updateSoul((current) => ({ ...current, knowledge: updater(current.knowledge) }))
-                }
-                onNotice={setNotice}
-              />
-            ) : view === "personality" ? (
-              <PersonalitySettings
-                soul={soul}
-                onUpdate={updateSoul}
-                onInstall={() => navigate("deploy")}
-              />
-            ) : view === "voice" ? (
-              <VoiceSettings
-                key={soul.id}
-                soul={soul}
-                onUpdate={updateSoul}
-                onInstall={() => navigate("deploy")}
-              />
-            ) : view === "playground" ? (
-              <PlaygroundView
-                soul={soul}
-                onUpdate={updateSoul}
-                onMessagesChange={saveConversation}
-                onIntegrate={() => navigate("deploy")}
-              />
-            ) : view === "deploy" ? (
-              <DeployView
-                soul={soul}
-                plan={activePlan}
-                onUpdate={updateSoul}
-                onNotice={setNotice}
-                onUpgrade={() => navigate("billing")}
-              />
-            ) : view === "conversations" ? (
-              <ConversationsView
-                soul={soul}
-                conversations={allConversations}
-                focusId={focusConversationId}
-                onCorrect={(question, answer) => {
-                  updateSoul((current) => ({
-                    ...current,
-                    knowledge: addApprovedAnswer(current.knowledge, question, answer),
-                  }));
-                  setNotice(
-                    "Approved answer saved to Knowledge. Publish to update your live assistant.",
-                  );
-                }}
-                onTest={() => navigate("playground")}
-                onInstall={() => navigate("deploy")}
-              />
-            ) : view === "billing" ? (
-              <ProfileWorkspaceView
-                workspace={workspace}
-                onWorkspaceNameChange={(name) => setWorkspace((current) => ({ ...current, name }))}
-                billingOnly
-                onViewPlans={() => navigate("billing")}
-                onPlanChange={setActivePlan}
-                onClose={() => navigate("playground")}
-              />
-            ) : view === "profile" ? (
-              <ProfileWorkspaceView
-                workspace={workspace}
-                onWorkspaceNameChange={(name) => setWorkspace((current) => ({ ...current, name }))}
-                onPlanChange={setActivePlan}
-                onViewPlans={() => navigate("billing")}
-              />
-            ) : view === "settings" ? (
-              <SettingsView
-                soul={soul}
-                onUpdate={updateSoul}
-                onDelete={() => {
-                  setWorkspace((current) => {
-                    const souls = current.souls.filter((candidate) => candidate.id !== soul.id);
-                    return { ...current, souls, activeSoulId: souls[0]?.id ?? null };
-                  });
-                  setView("knowledge");
-                }}
-              />
-            ) : (
-              <HelpView />
-            )}
+            <fieldset
+              disabled={readOnly && !["analytics", "conversations", "playground"].includes(view)}
+              className="m-0 h-full min-h-0 min-w-0 border-0 p-0"
+            >
+              {!allowedView ? (
+                <div className="p-8">
+                  <h2 className="text-xl font-semibold">This section is not shared with you</h2>
+                  <p className="mt-2 text-sm text-gray-500">
+                    Ask the workspace owner to update your access in Manage team.
+                  </p>
+                </div>
+              ) : !soul ? (
+                <EmptyState onCreate={openCreateWebsite} />
+              ) : view === "overview" ? (
+                <OverviewView
+                  soul={soul}
+                  user={user}
+                  plan={activePlan}
+                  conversations={allConversations}
+                  onNavigate={navigate}
+                  onOpenConversation={openConversation}
+                  onRefresh={() => void refreshKnowledge()}
+                />
+              ) : view === "analytics" ? (
+                <ConversionDashboard
+                  key={soul.id}
+                  soulId={soul.id}
+                  onInstall={() => navigate("deploy")}
+                />
+              ) : view === "knowledge" ? (
+                <KnowledgeView
+                  soul={soul}
+                  crawlEvents={crawlEvents[soul.id] ?? []}
+                  onRefresh={() => void refreshKnowledge()}
+                  onAddSource={(source) => crawlKnowledgeSource(source)}
+                  onUpdate={(updater) =>
+                    updateSoul((current) => ({ ...current, knowledge: updater(current.knowledge) }))
+                  }
+                  onNotice={setNotice}
+                />
+              ) : view === "personality" ? (
+                <PersonalitySettings
+                  soul={soul}
+                  onUpdate={updateSoul}
+                  onInstall={() => navigate("deploy")}
+                />
+              ) : view === "voice" ? (
+                <VoiceSettings
+                  key={soul.id}
+                  soul={soul}
+                  onUpdate={updateSoul}
+                  onInstall={() => navigate("deploy")}
+                />
+              ) : view === "playground" ? (
+                <PlaygroundView
+                  soul={soul}
+                  onUpdate={updateSoul}
+                  onMessagesChange={saveConversation}
+                  onIntegrate={() => navigate("deploy")}
+                />
+              ) : view === "deploy" ? (
+                <DeployView
+                  soul={soul}
+                  plan={activePlan}
+                  onSave={async () => {
+                    const response = await persistWorkspace(workspaceRef.current, true);
+                    if (!response.ok) throw new Error("Save your changes before publishing.");
+                    return normalizeWorkspace((await response.json()).workspace);
+                  }}
+                  onUpdate={updateSoul}
+                  onNotice={setNotice}
+                  onUpgrade={() => navigate("billing")}
+                />
+              ) : view === "conversations" ? (
+                <ConversationsView
+                  soul={soul}
+                  conversations={allConversations}
+                  focusId={focusConversationId}
+                  onCorrect={(question, answer) => {
+                    if (!isOwner && !canAccess(permissions, "knowledge", true)) return;
+                    updateSoul((current) => ({
+                      ...current,
+                      knowledge: addApprovedAnswer(current.knowledge, question, answer),
+                    }));
+                    setNotice(
+                      "Approved answer saved to Knowledge. Publish to update your live assistant.",
+                    );
+                  }}
+                  onTest={() => navigate("playground")}
+                  onInstall={() => navigate("deploy")}
+                />
+              ) : view === "billing" ? (
+                <ProfileWorkspaceView
+                  workspace={workspace}
+                  onWorkspaceNameChange={(name) =>
+                    setWorkspace((current) => ({ ...current, name }))
+                  }
+                  billingOnly
+                  onViewPlans={() => navigate("billing")}
+                  onPlanChange={setActivePlan}
+                  onClose={() => navigate("playground")}
+                />
+              ) : view === "profile" ? (
+                <ProfileWorkspaceView
+                  workspace={workspace}
+                  onWorkspaceNameChange={(name) =>
+                    setWorkspace((current) => ({ ...current, name }))
+                  }
+                  onPlanChange={setActivePlan}
+                  onViewPlans={() => navigate("billing")}
+                />
+              ) : view === "settings" ? (
+                <SettingsView
+                  soul={soul}
+                  onUpdate={updateSoul}
+                  onDelete={() => {
+                    if (!isOwner) {
+                      setNotice("Only the owner can remove websites.");
+                      return;
+                    }
+                    setWorkspace((current) => {
+                      const souls = current.souls.filter((candidate) => candidate.id !== soul.id);
+                      return { ...current, souls, activeSoulId: souls[0]?.id ?? null };
+                    });
+                    setView("knowledge");
+                  }}
+                />
+              ) : (
+                <HelpView />
+              )}
+            </fieldset>
           </main>
         </div>
       </div>
@@ -955,6 +1165,13 @@ function Sidebar({
   onSoulChange: (id: string) => void;
 }) {
   const [soulMenuOpen, setSoulMenuOpen] = useState(false);
+  const team = useTeamWorkspace();
+  const allowed = (view: StudioView) =>
+    !VIEW_SECTION[view] ||
+    !team ||
+    team.current.role === "owner" ||
+    canAccess(normalizePermissions(team.current.permissions), VIEW_SECTION[view]!);
+
   const groups: Array<{
     label: string;
     items: Array<{ id: StudioView; label: string; icon: ReactNode; badge?: number }>;
@@ -1110,19 +1327,23 @@ function Sidebar({
                   </button>
                 ))}
               </div>
-              <div className="my-1 h-px bg-[#ececeb]" />
-              <button
-                onClick={() => {
-                  setSoulMenuOpen(false);
-                  onNew();
-                }}
-                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-[#0b0b0c] hover:bg-[#f1f0ef]"
-              >
-                <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[#dbdad7] bg-white">
-                  <Plus className="h-3.5 w-3.5" />
-                </span>
-                Add another website
-              </button>
+              {(!team || team.current.role === "owner") && (
+                <>
+                  <div className="my-1 h-px bg-[#ececeb]" />
+                  <button
+                    onClick={() => {
+                      setSoulMenuOpen(false);
+                      onNew();
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-[#0b0b0c] hover:bg-[#f1f0ef]"
+                  >
+                    <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[#dbdad7] bg-white">
+                      <Plus className="h-3.5 w-3.5" />
+                    </span>
+                    Add another website
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -1138,29 +1359,31 @@ function Sidebar({
                 </p>
               )}
               <div className="space-y-0.5">
-                {group.items.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => onNavigate(item.id)}
-                    className={`relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${collapsed ? "lg:justify-center lg:px-0" : ""} ${view === item.id ? "bg-[#0b0b0c] text-white" : "text-[#5f5e5a] hover:bg-[#f3f3f1] hover:text-[#0b0b0c]"}`}
-                    aria-label={item.label}
-                    aria-current={view === item.id ? "page" : undefined}
-                    title={collapsed ? item.label : undefined}
-                  >
-                    <span className="[&_svg]:h-[18px] [&_svg]:w-[18px]">{item.icon}</span>
-                    <span className={`flex-1 text-left ${collapsed ? "lg:hidden" : ""}`}>
-                      {item.label}
-                    </span>
-                    {Boolean(item.badge) && (
-                      <span
-                        className={`min-w-5 rounded-full px-1.5 py-0.5 text-center text-[11px] font-semibold ${view === item.id ? "bg-white/20 text-white" : "bg-[#ff5c7a] text-white"} ${collapsed ? "lg:absolute lg:right-1.5 lg:top-1 lg:min-w-4 lg:px-1 lg:py-0 lg:text-[9px]" : ""}`}
-                        title={`${item.badge} leads`}
-                      >
-                        {item.badge}
+                {group.items
+                  .filter((item) => allowed(item.id))
+                  .map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => onNavigate(item.id)}
+                      className={`relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${collapsed ? "lg:justify-center lg:px-0" : ""} ${view === item.id ? "bg-[#0b0b0c] text-white" : "text-[#5f5e5a] hover:bg-[#f3f3f1] hover:text-[#0b0b0c]"}`}
+                      aria-label={item.label}
+                      aria-current={view === item.id ? "page" : undefined}
+                      title={collapsed ? item.label : undefined}
+                    >
+                      <span className="[&_svg]:h-[18px] [&_svg]:w-[18px]">{item.icon}</span>
+                      <span className={`flex-1 text-left ${collapsed ? "lg:hidden" : ""}`}>
+                        {item.label}
                       </span>
-                    )}
-                  </button>
-                ))}
+                      {Boolean(item.badge) && (
+                        <span
+                          className={`min-w-5 rounded-full px-1.5 py-0.5 text-center text-[11px] font-semibold ${view === item.id ? "bg-white/20 text-white" : "bg-[#ff5c7a] text-white"} ${collapsed ? "lg:absolute lg:right-1.5 lg:top-1 lg:min-w-4 lg:px-1 lg:py-0 lg:text-[9px]" : ""}`}
+                          title={`${item.badge} leads`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  ))}
               </div>
             </div>
           ))}
@@ -1168,6 +1391,7 @@ function Sidebar({
 
         <div className="border-t border-[#ecebe9] p-3">
           <button
+            hidden={!!team && team.current.role !== "owner"}
             onClick={() => onNavigate("billing")}
             className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${collapsed ? "lg:justify-center lg:px-0" : ""} ${view === "billing" ? "bg-[#0b0b0c] text-white" : "text-[#5f5e5a] hover:bg-[#f3f3f1]"}`}
             aria-label="Plans and billing"
@@ -1177,6 +1401,7 @@ function Sidebar({
             <span className={collapsed ? "lg:hidden" : ""}>Plans</span>
           </button>
           <button
+            hidden={!allowed("settings")}
             onClick={() => onNavigate("settings")}
             className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${collapsed ? "lg:justify-center lg:px-0" : ""} ${view === "settings" ? "bg-[#0b0b0c] text-white" : "text-[#5f5e5a] hover:bg-[#f3f3f1]"}`}
             aria-label="Settings"
@@ -2678,6 +2903,11 @@ function PlaygroundView({
   onMessagesChange: (messages: SoulMessage[], leadIntent: ChatResponse["leadIntent"]) => void;
   onIntegrate: () => void;
 }) {
+  const previewTeam = useTeamWorkspace();
+  const canCustomize =
+    !previewTeam ||
+    previewTeam.current.role === "owner" ||
+    canAccess(previewTeam.current.permissions, "appearance", true);
   const [assistantMode, setAssistantMode] = useState<"closed" | "chat" | "voice">("closed");
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [address, setAddress] = useState(soul.siteUrl);
@@ -3008,6 +3238,7 @@ function PlaygroundView({
         }`}
       >
         <button
+          disabled={!canCustomize}
           onClick={() => setCustomizeOpen((current) => !current)}
           className="flex h-12 w-full items-center justify-center gap-2 px-3 text-sm font-semibold text-[#373633] transition hover:bg-[#f3f3f2]"
           aria-label={customizeOpen ? "Close customization drawer" : "Open customization drawer"}
@@ -3048,6 +3279,7 @@ function PlaygroundView({
 }
 
 function DeployView({
+  onSave,
   soul,
   plan,
   onUpdate,
@@ -3056,10 +3288,20 @@ function DeployView({
 }: {
   soul: Soul;
   plan: BillingPlan;
+  onSave: () => Promise<SoulWorkspace>;
   onUpdate: (updater: (soul: Soul) => Soul) => void;
   onNotice: (message: string) => void;
   onUpgrade: () => void;
 }) {
+  const deployTeam = useTeamWorkspace();
+  const writable = (section: AccessSection) =>
+    !deployTeam ||
+    deployTeam.current.role === "owner" ||
+    canAccess(deployTeam.current.permissions, section, true);
+  const readable = (section: AccessSection) =>
+    !deployTeam ||
+    deployTeam.current.role === "owner" ||
+    canAccess(deployTeam.current.permissions, section);
   const [tab, setTab] = useState<"widget" | "followup" | "webhook">("widget");
   const [busy, setBusy] = useState(false);
   const [previewMode, setPreviewMode] = useState<"closed" | "chat" | "voice">("closed");
@@ -3083,14 +3325,15 @@ function DeployView({
     }
     setBusy(true);
     try {
-      const publishableSoul = webhookAvailable
-        ? soul
-        : { ...soul, channels: { ...soul.channels, webhookEnabled: false } };
+      const saved = await onSave();
+      const publishableSoul = saved.souls.find((candidate) => candidate.id === soul.id);
+      if (!publishableSoul) throw new Error("This website was removed. Reload the workspace.");
       const response = await authFetch("/api/souls/publish", {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "x-obseri-publish-key": soul.channels.publishKey,
+          "x-obseri-publish-key": publishableSoul.channels.publishKey,
+          "x-obseri-workspace-revision": String(saved.revision || 0),
         },
         body: JSON.stringify(publishableSoul),
       });
@@ -3183,7 +3426,15 @@ function DeployView({
         </button>
       </div>
       {tab === "followup" ? (
-        <FollowUpSettings soul={soul} onUpdate={onUpdate} />
+        readable("personality") ? (
+          <fieldset disabled={!writable("personality")}>
+            <FollowUpSettings soul={soul} onUpdate={onUpdate} />
+          </fieldset>
+        ) : (
+          <p className="p-6 text-sm text-stone-500">
+            Ask your workspace owner for Personality access to view follow-up settings.
+          </p>
+        )
       ) : tab === "widget" ? (
         <div className="grid min-h-[calc(100vh-112px)] xl:grid-cols-[minmax(0,1fr)_440px]">
           <div className="min-w-0 xl:border-r xl:border-[#e5e5e3]">
@@ -3252,35 +3503,37 @@ function DeployView({
                 description="Keep the launcher subtle and on-brand."
               />
               <div className="mt-5 grid gap-5 sm:grid-cols-2">
-                <Field label="Accent color">
-                  <div className="flex gap-2">
-                    <input
-                      type="color"
-                      value={soul.appearance.accent}
-                      onChange={(event) => updateAppearance({ accent: event.target.value })}
-                      className="h-11 w-12 rounded-lg border border-[#dfdedb] bg-white p-1"
-                    />
-                    <input
-                      value={soul.appearance.accent}
-                      onChange={(event) => updateAppearance({ accent: event.target.value })}
+                <fieldset disabled={!writable("appearance")}>
+                  <Field label="Accent color">
+                    <div className="flex gap-2">
+                      <input
+                        type="color"
+                        value={soul.appearance.accent}
+                        onChange={(event) => updateAppearance({ accent: event.target.value })}
+                        className="h-11 w-12 rounded-lg border border-[#dfdedb] bg-white p-1"
+                      />
+                      <input
+                        value={soul.appearance.accent}
+                        onChange={(event) => updateAppearance({ accent: event.target.value })}
+                        className="clean-input"
+                      />
+                    </div>
+                  </Field>
+                  <Field label="Position">
+                    <select
+                      value={soul.appearance.position}
+                      onChange={(event) =>
+                        updateAppearance({
+                          position: event.target.value as Soul["appearance"]["position"],
+                        })
+                      }
                       className="clean-input"
-                    />
-                  </div>
-                </Field>
-                <Field label="Position">
-                  <select
-                    value={soul.appearance.position}
-                    onChange={(event) =>
-                      updateAppearance({
-                        position: event.target.value as Soul["appearance"]["position"],
-                      })
-                    }
-                    className="clean-input"
-                  >
-                    <option value="bottom-right">Bottom right</option>
-                    <option value="bottom-left">Bottom left</option>
-                  </select>
-                </Field>
+                    >
+                      <option value="bottom-right">Bottom right</option>
+                      <option value="bottom-left">Bottom left</option>
+                    </select>
+                  </Field>
+                </fieldset>
                 <Field label="Allowed domains" hint="Comma-separated">
                   <input
                     value={soul.channels.allowedDomains.join(", ")}
@@ -3296,9 +3549,9 @@ function DeployView({
                     className="clean-input"
                   />
                 </Field>
-                <div className="md:col-span-2">
+                <fieldset disabled={!writable("appearance")} className="md:col-span-2">
                   <LauncherSettings appearance={soul.appearance} onChange={updateAppearance} />
-                </div>
+                </fieldset>
               </div>
             </Card>
           </div>
@@ -3798,6 +4051,11 @@ function ConversationsView({
   onTest: () => void;
   onInstall: () => void;
 }) {
+  const conversationTeam = useTeamWorkspace();
+  const canCorrect =
+    !conversationTeam ||
+    conversationTeam.current.role === "owner" ||
+    canAccess(conversationTeam.current.permissions, "knowledge", true);
   const [filter, setFilter] = useState<ConversationFilter>("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(focusId ?? conversations[0]?.id ?? "");
@@ -4062,7 +4320,8 @@ function ConversationsView({
                     >
                       {relativeTime(message.createdAt)}
                     </p>
-                    {message.role === "assistant" &&
+                    {canCorrect &&
+                      message.role === "assistant" &&
                       conversation.messages[messageIndex - 1]?.role === "visitor" && (
                         <button
                           type="button"
@@ -4179,7 +4438,8 @@ function ProfileWorkspaceView({
 }) {
   const session = authClient.useSession();
   const user = session.data?.user;
-  const isOwner = useTeamWorkspace()?.current.role !== "editor";
+  const profileTeam = useTeamWorkspace();
+  const isOwner = !profileTeam || profileTeam.current.role === "owner";
   const displayName = user?.name || user?.email?.split("@")[0] || "Obseri user";
   const initials = displayName
     .split(/\s+/)

@@ -20,7 +20,11 @@ export async function readUserWorkspace(userId: string): Promise<SoulWorkspace |
   return rows[0]?.workspace ? normalizeWorkspace(rows[0].workspace) : null;
 }
 
-export async function saveUserWorkspace(userId: string, value: unknown): Promise<SoulWorkspace> {
+export async function saveUserWorkspace(
+  userId: string,
+  value: unknown,
+  audit?: { actorId: string; email: string; changes: unknown[] },
+): Promise<SoulWorkspace> {
   if (!isWorkspace(value)) throw new WorkspaceStoreError("The workspace payload is invalid.", 422);
   if (Buffer.byteLength(JSON.stringify(value), "utf8") > 1_500_000) {
     throw new WorkspaceStoreError("The workspace is too large to save.", 413);
@@ -43,7 +47,21 @@ export async function saveUserWorkspace(userId: string, value: unknown): Promise
     Number.isSafeInteger(value.revision) && (value.revision ?? 0) >= 0 ? (value.revision ?? 0) : 0;
   normalized.revision = expectedRevision + 1;
   const now = new Date().toISOString();
-  const saved = await db()`
+  const saved = audit
+    ? await db()`
+    with saved as (
+    insert into obseri_user_workspaces (user_id, workspace_id, workspace, created_at, updated_at)
+    values (${userId}, ${workspaceId}, ${db().json(normalized)}, ${now}, ${now})
+    on conflict (user_id) do update set workspace = excluded.workspace, updated_at = excluded.updated_at
+    where coalesce((obseri_user_workspaces.workspace->>'revision')::bigint, 0) = ${expectedRevision}
+    returning user_id
+    ), logged as (
+      insert into obseri_team_activity (owner_user_id, actor_user_id, actor_email, action, changes, revision)
+      select user_id, ${audit?.actorId || userId}, ${audit?.email || ""}, 'workspace.updated', ${JSON.stringify(audit?.changes || [])}::jsonb, ${normalized.revision}
+      from saved returning id
+    ) select user_id from saved
+  `
+    : await db()`
     insert into obseri_user_workspaces (user_id, workspace_id, workspace, created_at, updated_at)
     values (${userId}, ${workspaceId}, ${db().json(normalized)}, ${now}, ${now})
     on conflict (user_id) do update set

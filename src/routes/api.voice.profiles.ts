@@ -7,9 +7,17 @@ export const Route = createFileRoute("/api/voice/profiles")({
     handlers: {
       GET: async ({ request }) => {
         try {
-          await requireUser(request);
-        } catch {
-          return Response.json({ error: { message: "Sign in to continue." } }, { status: 401 });
+          await requireUser(request, { section: "voice", write: false });
+        } catch (error) {
+          return Response.json(
+            { error: { message: error instanceof Error ? error.message : "Access denied." } },
+            {
+              status:
+                typeof error === "object" && error && "status" in error
+                  ? Number(error.status)
+                  : 500,
+            },
+          );
         }
         return Response.json({ provider: "supertonic", profiles: supertonicVoices });
       },

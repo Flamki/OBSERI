@@ -179,7 +179,7 @@ test("owner can test and save an approved answer from a conversation", async ({ 
   });
   await page.route("**/api/workspace", async (route) => {
     if (route.request().method() !== "PUT") return route.fallback();
-    const workspace = route.request().postDataJSON();
+    const workspace = route.request().postDataJSON().workspace;
     saved = workspace.souls.some((soul: { knowledge: { pages: { content?: string }[] } }) =>
       soul.knowledge.pages.some((p) =>
         p.content?.includes("Approved answer: Our service costs $29 per month."),

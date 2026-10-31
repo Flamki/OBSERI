@@ -7,7 +7,7 @@ export const Route = createFileRoute("/api/souls/$soulId/conversations")({
     handlers: {
       GET: async ({ request, params }) => {
         try {
-          const user = await requireUser(request);
+          const user = await requireUser(request, { section: "conversations", write: false });
           const limit = Number(new URL(request.url).searchParams.get("limit") ?? "100");
           const conversations = await listOwnerConversations({
             soulId: params.soulId,

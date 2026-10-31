@@ -56,6 +56,7 @@ export async function publishSoul(input: {
   ownerKey: string;
   widgetToken: string;
   ownerUserId: string;
+  audit?: { actorId: string; email: string };
 }): Promise<PublishedSoulRecord> {
   if (!isSoul(input.value)) {
     throw new IntegrationStoreError("The published soul payload is invalid.", 422, "invalid_soul");
@@ -137,6 +138,9 @@ export async function publishSoul(input: {
         webhook_secret = excluded.webhook_secret,
         updated_at = excluded.updated_at
     `;
+    if (input.audit)
+      await transaction`insert into obseri_team_activity (owner_user_id, actor_user_id, actor_email, action, changes)
+      values (${input.ownerUserId}, ${input.audit.actorId}, ${input.audit.email}, 'assistant.published', ${JSON.stringify([{ website: source.name, soulId: source.id }])}::jsonb)`;
   });
 
   return {

@@ -6,7 +6,7 @@ export const Route = createFileRoute("/api/operations")({
     handlers: {
       GET: async ({ request }) => {
         try {
-          const user = await requireWorkspaceUser(request);
+          const user = await requireWorkspaceUser(request, { section: "knowledge", write: false });
           const events =
             await integrationDatabase()`select operation, status, max(created_at) as latest
       from obseri_operation_events where owner_user_id = ${user.id} and created_at > now() - interval '24 hours'

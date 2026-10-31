@@ -51,11 +51,11 @@ export const Route = createFileRoute("/api/souls/$soulId/leads")({
       },
       PATCH: async ({ request, params }) => {
         try {
-          const user = await requireUser(request);
+          const user = await requireUser(request, { section: "conversations", write: true });
           await requireAnalyticsOwner(params.soulId, user.id);
           const parsed = statusSchema.safeParse(await request.json());
           if (!parsed.success) throw new IntegrationStoreError("Invalid lead status.", 400);
-          await updateLeadStatus(params.soulId, parsed.data.id, parsed.data.status);
+          await updateLeadStatus(params.soulId, parsed.data.id, parsed.data.status, user);
           return Response.json({ updated: true });
         } catch (error) {
           return fail(error);

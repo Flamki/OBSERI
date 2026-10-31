@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { createSoul } from "../../src/lib/soul";
+import { permissionPreset } from "../../src/lib/workspace-access";
 import { BILLING_PLANS } from "../../src/lib/billing-plans";
 
 async function setup(page: Page, shared = false) {
@@ -56,6 +57,7 @@ async function setup(page: Page, shared = false) {
         sessionStorage.getItem("obseri-active-workspace:actor") ||
         sessionStorage.setItem("obseri-active-workspace:actor", "company"),
     );
+  return workspace;
 }
 
 test("owner creates an email-bound invitation link and can revoke it", async ({ page }) => {
@@ -95,15 +97,10 @@ test("editor uses the selected workspace and cannot see billing or invitation co
   await page.goto("/app?view=profile");
   expect((await request).headers()["x-obseri-workspace-owner"]).toBe("company");
   await expect(page.getByRole("combobox", { name: "Switch workspace" })).toHaveValue("company");
-  await expect(
-    page.getByText("Ask the owner to manage billing and invitations.", { exact: false }),
-  ).toBeVisible();
+  await expect(page.getByText("Your owner controls access.", { exact: false })).toBeVisible();
   await expect(page.getByRole("button", { name: "Create invite link" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Cancel subscription" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Plans and billing", exact: true }).click();
-  await expect(page.getByText("Billing is managed by the workspace owner.")).toBeVisible();
-  await expect(page.getByText("Choose the plan that fits your traffic")).toHaveCount(0);
-  await page.getByRole("button", { name: "Close plans" }).click();
+  await expect(page.getByRole("button", { name: "Plans and billing", exact: true })).toHaveCount(0);
   await page.getByRole("combobox", { name: "Switch workspace" }).selectOption("actor");
   await expect(page.getByRole("combobox", { name: "Switch workspace" })).toHaveValue("actor");
 });
@@ -188,4 +185,124 @@ test("complimentary Growth is current without implying a paid subscription", asy
   ).toBeVisible();
   await expect(page.getByText("Active subscription", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Current plan", exact: true })).toBeVisible();
+});
+
+test("owner sets section access and reads the audit log", async ({ page }) => {
+  await setup(page);
+  let policy = permissionPreset("write");
+  await page.route("**/api/team", async (route) => {
+    if (route.request().method() === "POST") {
+      const body = route.request().postDataJSON();
+      expect(body.action).toBe("permissions");
+      expect(body.userId).toBe("member");
+      policy = body.permissions;
+      return route.fulfill({ json: { ok: true } });
+    }
+    return route.fulfill({
+      json: {
+        members: [{ userId: "member", email: "member@example.com", permissions: policy }],
+        invitations: [],
+        seatLimit: 5,
+        plan: "Growth",
+      },
+    });
+  });
+  await page.route("**/api/team?view=activity", (route) =>
+    route.fulfill({
+      json: {
+        events: [
+          {
+            id: "1",
+            actorEmail: "member@example.com",
+            action: "workspace.updated",
+            changes: [
+              {
+                section: "voice",
+                field: "speed",
+                website: "merchant.example",
+                operation: "updated",
+              },
+            ],
+            revision: 2,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+        nextCursor: null,
+      },
+    }),
+  );
+  await page.goto("/app?view=profile");
+  await page.getByRole("button", { name: "Edit access" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("combobox", { name: "Knowledge access", exact: true })
+    .selectOption("read");
+  await dialog
+    .getByRole("combobox", { name: "Personality access", exact: true })
+    .selectOption("none");
+  await dialog.getByRole("button", { name: "Save access" }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(policy.knowledge).toBe("read");
+  expect(policy.personality).toBe("none");
+  await page.getByRole("tab", { name: "Activity log" }).click();
+  await expect(page.getByText("Revision 2")).toBeVisible();
+  await expect(page.getByText("merchant.example · Voice · speed · updated")).toBeVisible();
+});
+
+test("restricted teammate sees only allowed sections and read-only knowledge", async ({ page }) => {
+  const workspace = await setup(page, true);
+  const permissions = { ...permissionPreset("none"), knowledge: "read", voice: "write" };
+  await page.route("**/api/team?view=workspaces", (route) =>
+    route.fulfill({
+      json: { workspaces: [{ ownerId: "company", name: "Company", role: "custom", permissions }] },
+    }),
+  );
+  await page.route("**/api/workspace", (route) =>
+    route.fulfill({ json: { workspace, access: { role: "custom", permissions } } }),
+  );
+  await page.goto("/app?view=knowledge");
+  await expect(page.getByRole("button", { name: "Personality", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Voice", exact: true })).toBeVisible();
+  await expect(page.locator("fieldset[disabled]")).toHaveCount(1);
+  await page.goto("/app?view=personality");
+  await expect(
+    page.getByRole("heading", { name: "This section is not shared with you" }),
+  ).toBeVisible();
+});
+
+test("remote workspace edits arrive without a reload", async ({ page }) => {
+  const initial = await setup(page);
+  let workspace = { ...initial, revision: 1 };
+  await page.route("**/api/workspace", (route) => route.fulfill({ json: { workspace } }));
+  await page.route("**/api/team", (route) =>
+    route.fulfill({ json: { members: [], invitations: [], seatLimit: 5, plan: "Growth" } }),
+  );
+  await page.goto("/app?view=profile");
+  await expect(page.locator('input[value="Company"]')).toHaveCount(1);
+  workspace = { ...workspace, name: "Updated by teammate", revision: 2 };
+  await expect(page.locator('input[value="Updated by teammate"]')).toBeVisible({ timeout: 8000 });
+});
+
+test("a conflicting save preserves local edits and offers an export", async ({ page }) => {
+  const initial = await setup(page);
+  await page.route("**/api/workspace", (route) =>
+    route.request().method() === "PUT"
+      ? route.fulfill({
+          status: 409,
+          json: {
+            error: {
+              message:
+                "A teammate changed the same field. Download your local edits before reloading.",
+            },
+          },
+        })
+      : route.fulfill({ json: { workspace: { ...initial, revision: 1 } } }),
+  );
+  await page.route("**/api/team", (route) =>
+    route.fulfill({ json: { members: [], invitations: [], seatLimit: 5, plan: "Growth" } }),
+  );
+  await page.goto("/app?view=profile");
+  await page.locator('input[value="Company"]').fill("My unsaved name");
+  await expect(page.getByRole("button", { name: "Download local edits" })).toBeVisible();
+  await expect(page.locator('input[value="My unsaved name"]')).toBeVisible();
 });

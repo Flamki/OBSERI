@@ -1,7 +1,22 @@
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  ACCESS_SECTIONS,
+  normalizePermissions,
+  permissionPreset,
+  accessRole,
+  canAccess,
+  type WorkspacePermissions,
+  type AccessSection,
+} from "@/lib/workspace-access";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { authFetch, setActiveWorkspaceOwner } from "@/lib/auth-client";
 
-type Workspace = { ownerId: string; name: string; role: "owner" | "editor" };
+type Workspace = {
+  ownerId: string;
+  name: string;
+  role: "owner" | "editor" | "viewer" | "custom";
+  permissions?: WorkspacePermissions;
+};
 const Context = createContext<{
   current: Workspace;
   workspaces: Workspace[];
@@ -81,7 +96,7 @@ export function TeamWorkspaceGate({ userId, children }: { userId: string; childr
           </h1>
           <p className="mt-3 text-sm text-stone-600">
             {invite
-              ? "Join as an Editor to manage websites, knowledge, conversations and analytics. Sign in with the verified email address your teammate invited."
+              ? "Your owner has chosen which sections you can view and edit. Sign in with the verified email address your teammate invited."
               : "Checking your workspace access…"}
           </p>
           {error && (
@@ -157,14 +172,21 @@ export function WorkspaceSwitcher({
         onClick={onTeam}
         className="shrink-0 rounded-full px-3 py-1.5 font-medium hover:bg-stone-200"
       >
-        {team.current.role === "owner" ? "Manage team" : "Editor · Team workspace"}
+        {team.current.role === "owner"
+          ? "Manage team"
+          : `${team.current.role === "custom" ? "Custom access" : team.current.role === "viewer" ? "Viewer" : "Editor"} · Team workspace`}
       </button>
     </div>
   );
 }
 type Details = {
-  members: { userId: string; email: string }[];
-  invitations: { id: string; email: string; expiresAt: string }[];
+  members: { userId: string; email: string; permissions?: WorkspacePermissions }[];
+  invitations: {
+    id: string;
+    email: string;
+    expiresAt: string;
+    permissions?: WorkspacePermissions;
+  }[];
   seatLimit: number | null;
   plan: string;
 };
@@ -172,6 +194,9 @@ export function TeamSettings({ onViewPlans }: { onViewPlans: () => void }) {
   const team = useTeamWorkspace();
   const [details, setDetails] = useState<Details | null>(null);
   const [email, setEmail] = useState("");
+  const [permissions, setPermissions] = useState<WorkspacePermissions>(permissionPreset("write"));
+  const [editing, setEditing] = useState<Details["members"][number] | null>(null);
+  const [tab, setTab] = useState<"members" | "activity">("members");
   const [link, setLink] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -188,7 +213,7 @@ export function TeamSettings({ onViewPlans }: { onViewPlans: () => void }) {
   useEffect(() => {
     if (owner) void load().catch((e) => setNotice(e.message));
   }, [owner]);
-  async function act(action: Record<string, string>) {
+  async function act(action: Record<string, unknown>) {
     setBusy(true);
     setNotice("");
     setLink("");
@@ -203,6 +228,7 @@ export function TeamSettings({ onViewPlans }: { onViewPlans: () => void }) {
         setEmail("");
       }
       await load();
+      setEditing(null);
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "Please try again.");
     } finally {
@@ -214,10 +240,33 @@ export function TeamSettings({ onViewPlans }: { onViewPlans: () => void }) {
       <h2 className="text-lg font-semibold">Team access</h2>
       <p className="mt-2 text-sm leading-6 text-stone-500">
         {owner
-          ? "Editors can manage websites, publish assistants and work with conversations. Only you can change billing or team access."
-          : "You can manage websites, knowledge and conversations. Ask the owner to manage billing and invitations."}
+          ? "Choose what each teammate can see and change. Billing, team access, and adding or removing websites stay with you."
+          : "Your owner controls access. View your permissions below; ask them when you need a different level."}
       </p>
       {owner && (
+        <div className="mt-5 flex gap-2 border-b pb-3" role="tablist" aria-label="Team settings">
+          {(["members", "activity"] as const).map((item) => (
+            <button
+              key={item}
+              role="tab"
+              aria-selected={tab === item}
+              onClick={() => setTab(item)}
+              className={`rounded-full px-4 py-2 text-sm ${tab === item ? "bg-black text-white" : "bg-stone-100"}`}
+            >
+              {item === "members" ? "People & access" : "Activity log"}
+            </button>
+          ))}
+        </div>
+      )}
+      {!owner && (
+        <PermissionEditor
+          value={normalizePermissions(team?.current.permissions)}
+          onChange={() => undefined}
+          disabled
+        />
+      )}
+      {owner && tab === "activity" && <TeamActivity />}
+      {owner && tab === "members" && (
         <>
           {details && (
             <p className="mt-4 text-sm font-medium">
@@ -245,11 +294,17 @@ export function TeamSettings({ onViewPlans }: { onViewPlans: () => void }) {
               </button>
             </div>
           )}
+          <details className="mt-5 rounded-2xl border p-4">
+            <summary className="cursor-pointer text-sm font-medium">
+              New invitation access · {accessRole(permissions)}
+            </summary>
+            <PermissionEditor value={permissions} onChange={setPermissions} disabled={busy} />
+          </details>
           <form
             className="mt-5 flex flex-wrap gap-2"
             onSubmit={(e) => {
               e.preventDefault();
-              if (!busy && canInvite) void act({ action: "invite", email });
+              if (!busy && canInvite) void act({ action: "invite", email, permissions });
             }}
           >
             <input
@@ -308,8 +363,19 @@ export function TeamSettings({ onViewPlans }: { onViewPlans: () => void }) {
               <div key={m.userId} className="flex items-center justify-between gap-3 py-3 text-sm">
                 <span className="min-w-0 break-all">
                   {m.email}
-                  <small className="block text-stone-500">Editor</small>
+                  <small className="block capitalize text-stone-500">
+                    {accessRole(normalizePermissions(m.permissions))}
+                  </small>
                 </span>
+                <button
+                  disabled={busy}
+                  className="ml-auto rounded-lg border px-3 py-2"
+                  onClick={() =>
+                    setEditing({ ...m, permissions: normalizePermissions(m.permissions) })
+                  }
+                >
+                  Edit access
+                </button>
                 <button
                   disabled={busy}
                   className="text-red-700"
@@ -327,7 +393,8 @@ export function TeamSettings({ onViewPlans }: { onViewPlans: () => void }) {
                 <span className="min-w-0 break-all">
                   {i.email}
                   <small className="block text-stone-500">
-                    Pending · expires {new Date(i.expiresAt).toLocaleDateString()}
+                    {accessRole(normalizePermissions(i.permissions))} · Pending · expires{" "}
+                    {new Date(i.expiresAt).toLocaleDateString()}
                   </small>
                 </span>
                 <button
@@ -342,6 +409,50 @@ export function TeamSettings({ onViewPlans }: { onViewPlans: () => void }) {
           </div>
         </>
       )}
+      <Dialog
+        open={Boolean(editing)}
+        onOpenChange={(open) => {
+          if (!open && !busy) setEditing(null);
+        }}
+      >
+        {editing && (
+          <DialogContent className="z-[90] max-h-[90dvh] overflow-y-auto rounded-3xl bg-white p-6 sm:max-w-xl">
+            <DialogTitle>Edit teammate access</DialogTitle>
+            <DialogDescription>{editing.email}</DialogDescription>
+            <PermissionEditor
+              value={normalizePermissions(editing.permissions)}
+              onChange={(value) => setEditing({ ...editing, permissions: value })}
+              disabled={busy}
+            />
+            <p className="mt-3 text-xs text-stone-500">
+              Applies to all websites in this workspace. Changes take effect on their next request.
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button disabled={busy} onClick={() => setEditing(null)}>
+                Cancel
+              </button>
+              <button
+                disabled={busy}
+                onClick={() =>
+                  void act({
+                    action: "permissions",
+                    userId: editing.userId,
+                    permissions: editing.permissions,
+                  })
+                }
+                className="rounded-full bg-black px-5 py-2 text-white"
+              >
+                Save access
+              </button>
+            </div>
+            {notice && (
+              <p role="alert" className="mt-3 text-sm text-red-700">
+                {notice}
+              </p>
+            )}
+          </DialogContent>
+        )}
+      </Dialog>
       {notice && (
         <p role="status" className="mt-4 text-sm text-stone-700">
           {notice}
@@ -352,6 +463,8 @@ export function TeamSettings({ onViewPlans }: { onViewPlans: () => void }) {
 }
 
 export function OperationHealth() {
+  const team = useTeamWorkspace();
+  const allowed = !team || canAccess(team.current.permissions, "knowledge");
   const [events, setEvents] = useState<
     { operation: string; status: string; latest: string }[] | null
   >(null);
@@ -365,8 +478,9 @@ export function OperationHealth() {
     }
   }
   useEffect(() => {
-    void refresh();
-  }, []);
+    if (allowed) void refresh();
+  }, [allowed]);
+  if (!allowed) return null;
   return (
     <section className="border-t border-stone-200 p-6 sm:p-8">
       <div className="flex items-center justify-between">
@@ -415,5 +529,200 @@ export function OperationHealth() {
         </div>
       ))}
     </section>
+  );
+}
+
+function PermissionEditor({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: WorkspacePermissions;
+  onChange: (value: WorkspacePermissions) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="mt-4">
+      {!disabled && (
+        <label className="mb-4 flex items-center justify-between text-sm">
+          Start with a role
+          <select
+            aria-label="Permission preset"
+            value={accessRole(value)}
+            onChange={(e) =>
+              onChange(
+                permissionPreset(
+                  e.target.value === "editor"
+                    ? "write"
+                    : e.target.value === "viewer"
+                      ? "read"
+                      : "none",
+                ),
+              )
+            }
+            className="rounded-lg border bg-white p-2"
+          >
+            <option value="editor">Editor · all sections</option>
+            <option value="viewer">Viewer · read only</option>
+            <option value="custom">Custom · choose sections</option>
+          </select>
+        </label>
+      )}
+      <div className="overflow-hidden rounded-xl border divide-y">
+        {Object.entries(ACCESS_SECTIONS).map(([key, label]) => (
+          <label key={key} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+            <span>{label}</span>
+            <select
+              aria-label={`${label} access`}
+              disabled={disabled}
+              value={value[key as AccessSection]}
+              onChange={(e) => onChange({ ...value, [key]: e.target.value })}
+              className="rounded-lg border bg-white p-2 disabled:opacity-70"
+            >
+              <option value="none">No access</option>
+              <option value="read">Can view</option>
+              <option value="write">Can edit</option>
+            </select>
+          </label>
+        ))}
+      </div>
+      <p className="mt-3 text-xs leading-5 text-stone-500">
+        Can edit includes viewing. Publishing can release the saved assistant, including changes
+        made by other teammates.
+      </p>
+    </div>
+  );
+}
+type ActivityEvent = {
+  id: string;
+  actorId: string;
+  actorEmail: string;
+  action: string;
+  changes: Array<{
+    section?: string;
+    field?: string;
+    website?: string;
+    email?: string;
+    operation?: string;
+    before?: WorkspacePermissions;
+    after?: WorkspacePermissions;
+    permissions?: WorkspacePermissions;
+  }>;
+  revision?: number;
+  createdAt: string;
+};
+function TeamActivity() {
+  const [events, setEvents] = useState<ActivityEvent[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function load(before?: string) {
+    setBusy(true);
+    try {
+      const data = await authFetch(
+        `/api/team?view=activity${before ? `&before=${before}` : ""}`,
+      ).then(result);
+      setEvents((old) => (before ? [...old, ...data.events] : data.events));
+      setCursor(data.nextCursor);
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load activity.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  useEffect(() => {
+    void load();
+  }, []);
+  const labels: Record<string, string> = {
+    "workspace.updated": "Updated workspace",
+    "assistant.published": "Published assistant",
+    "member.permissions": "Changed teammate access",
+    "member.removed": "Removed teammate",
+    "invitation.created": "Created invitation",
+    "invitation.revoked": "Revoked invitation",
+    "member.joined": "Joined workspace",
+    "lead.status": "Changed lead status",
+  };
+  return (
+    <div className="mt-5">
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm text-stone-500">
+          Changes recorded from this update onward. Private content and credentials are excluded.
+        </p>
+        <button disabled={busy} onClick={() => void load()} className="text-sm underline">
+          Refresh log
+        </button>
+      </div>
+      {error && (
+        <p role="alert" className="mt-3 text-red-700">
+          {error}
+        </p>
+      )}
+      {!events.length && !busy && !error && (
+        <p className="py-8 text-sm text-stone-500">
+          No team activity yet. Saved edits, invitations and access changes will appear here.
+        </p>
+      )}
+      <ol className="mt-4 divide-y">
+        {events.map((event) => (
+          <li key={event.id} className="py-4">
+            <div className="flex flex-wrap justify-between gap-2">
+              <p className="text-sm font-medium">
+                {event.actorEmail || "Workspace owner"}{" "}
+                <span className="font-normal text-stone-500">
+                  · {labels[event.action] || event.action}
+                </span>
+              </p>
+              <time className="text-xs text-stone-500" dateTime={event.createdAt}>
+                {new Date(event.createdAt).toLocaleString()}
+              </time>
+            </div>
+            <ul className="mt-2 space-y-1 text-xs text-stone-600">
+              {event.changes.map((change, index) => (
+                <li key={index}>
+                  {[
+                    change.website,
+                    change.email,
+                    change.section &&
+                      (ACCESS_SECTIONS[change.section as AccessSection] || change.section),
+                    change.field,
+                    change.operation,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                  {change.after && (
+                    <span className="block">
+                      {Object.entries(change.after)
+                        .filter(([key, value]) => value !== change.before?.[key as AccessSection])
+                        .map(
+                          ([key, value]) =>
+                            `${ACCESS_SECTIONS[key as AccessSection]}: ${change.before?.[key as AccessSection] || "none"} → ${value}`,
+                        )
+                        .join(" · ")}
+                    </span>
+                  )}
+                  {change.permissions && (
+                    <span className="block">{accessRole(change.permissions)} access</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {event.revision != null && (
+              <p className="mt-2 text-xs text-stone-400">Revision {event.revision}</p>
+            )}
+          </li>
+        ))}
+      </ol>
+      {cursor && (
+        <button
+          disabled={busy}
+          onClick={() => void load(cursor)}
+          className="mt-4 rounded-full border px-4 py-2 text-sm"
+        >
+          Load older activity
+        </button>
+      )}
+    </div>
   );
 }

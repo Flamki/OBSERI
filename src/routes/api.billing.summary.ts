@@ -10,7 +10,7 @@ export const Route = createFileRoute("/api/billing/summary")({
           const user = await requireUser(request);
           const summary = await billingSummary(user.id);
           return Response.json(
-            user.role === "editor"
+            user.role !== "owner"
               ? {
                   plan: summary.plan,
                   usage: summary.usage,

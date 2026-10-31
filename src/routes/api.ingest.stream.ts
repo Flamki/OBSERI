@@ -36,7 +36,7 @@ export const Route = createFileRoute("/api/ingest/stream")({
       POST: async ({ request }) => {
         let ownerUserId: string;
         try {
-          ownerUserId = (await requireUser(request)).id;
+          ownerUserId = (await requireUser(request, { section: "knowledge", write: true })).id;
         } catch (error) {
           const status =
             typeof error === "object" && error && "status" in error ? Number(error.status) : 401;

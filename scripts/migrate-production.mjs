@@ -40,6 +40,7 @@ try {
     "obseri_usage_reservations",
     "obseri_workspace_members",
     "obseri_workspace_invitations",
+    "obseri_team_activity",
     "obseri_operation_events",
     "obseri_embedding_budgets",
     "obseri_import_leases",

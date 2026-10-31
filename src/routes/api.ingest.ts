@@ -43,7 +43,7 @@ export const Route = createFileRoute("/api/ingest")({
         let release: (() => Promise<void>) | undefined;
         let owner: string | undefined;
         try {
-          const user = await requireUser(request);
+          const user = await requireUser(request, { section: "knowledge", write: true });
           const length = Number(request.headers.get("content-length") ?? "0");
           if (length > 250_000)
             return errorResponse("Request is too large.", 413, "request_too_large");

@@ -98,7 +98,7 @@ test("customer can save, preview, validate, publish and disable follow-up settin
     }),
   );
   await page.route("**/api/workspace", (route) => {
-    if (route.request().method() === "PUT") workspace = route.request().postDataJSON();
+    if (route.request().method() === "PUT") workspace = route.request().postDataJSON().workspace;
     return route.fulfill({ json: { workspace } });
   });
   await page.route("**/api/billing/summary", (route) =>

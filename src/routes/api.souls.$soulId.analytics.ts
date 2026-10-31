@@ -23,7 +23,7 @@ export const Route = createFileRoute("/api/souls/$soulId/analytics")({
       OPTIONS: ({ request }) => new Response(null, { status: 204, headers: headers(request) }),
       GET: async ({ request, params }) => {
         try {
-          const user = await requireUser(request);
+          const user = await requireUser(request, { section: "analytics", write: false });
           await requireAnalyticsOwner(params.soulId, user.id);
           const days = new URL(request.url).searchParams.get("days") === "7" ? 7 : 30;
           return Response.json(await analyticsReport(params.soulId, days), {

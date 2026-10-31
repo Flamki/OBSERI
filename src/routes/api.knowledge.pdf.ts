@@ -14,7 +14,7 @@ export const Route = createFileRoute("/api/knowledge/pdf")({
         let release: (() => Promise<void>) | undefined;
         let owner: string | undefined;
         try {
-          const user = await requireUser(request);
+          const user = await requireUser(request, { section: "knowledge", write: true });
           if (!(await consumeRateLimit(`pdf-import:${user.id}`, 10, 60)))
             return Response.json(
               { error: { message: "Please wait a minute before importing another PDF." } },

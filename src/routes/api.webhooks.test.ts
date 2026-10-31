@@ -14,7 +14,7 @@ export const Route = createFileRoute("/api/webhooks/test")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const user = await requireUser(request);
+          const user = await requireUser(request, { section: "deploy", write: true });
           await assertPlanFeature(user.id, "webhooks");
           const parsed = schema.safeParse(await request.json());
           if (!parsed.success) return responseError("Choose a valid published soul.", 400);

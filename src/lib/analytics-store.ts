@@ -82,10 +82,23 @@ export async function captureLead(soulId: string, input: ContactRequest) {
   });
 }
 
-export async function updateLeadStatus(soulId: string, id: string, status: CapturedLead["status"]) {
-  const result =
-    await integrationDatabase()`update obseri_leads set status = ${status} where soul_id = ${soulId} and id = ${id} returning id`;
-  if (!result.length) throw new IntegrationStoreError("Contact request not found.", 404);
+export async function updateLeadStatus(
+  soulId: string,
+  id: string,
+  status: CapturedLead["status"],
+  actor?: { id: string; actorUserId: string; email?: string | null },
+) {
+  const sql = integrationDatabase();
+  await sql.begin(async (tx) => {
+    const existing =
+      await tx`select status from obseri_leads where soul_id = ${soulId} and id = ${id} for update`;
+    if (!existing.length) throw new IntegrationStoreError("Contact request not found.", 404);
+    if (existing[0].status === status) return;
+    await tx`update obseri_leads set status = ${status} where soul_id = ${soulId} and id = ${id}`;
+    if (actor)
+      await tx`insert into obseri_team_activity (owner_user_id, actor_user_id, actor_email, action, changes)
+      values (${actor.id}, ${actor.actorUserId}, ${actor.email || ""}, 'lead.status', ${JSON.stringify([{ section: "conversations", field: "Lead status", soulId, leadId: id, operation: `${existing[0].status} → ${status}` }])}::jsonb)`;
+  });
 }
 
 /** Conversion data has a fixed 30-day pilot retention window, independent of chat history. */

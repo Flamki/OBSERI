@@ -28,7 +28,7 @@ export async function resolveChatRequest(
   }
 
   if (authorization) {
-    const user = await requireUser(request);
+    const user = await requireUser(request, { section: "appearance" });
     const allowed = await consumeRateLimit(`studio-chat:${user.id}`, 40, 60);
     if (!allowed) throw new ChatAccessError("Too many messages. Try again shortly.", 429);
     return { input, ownerUserId: user.id };

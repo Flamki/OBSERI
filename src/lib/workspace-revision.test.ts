@@ -23,10 +23,11 @@ beforeAll(async () => {
   state.sql = sql;
   vi.stubEnv("DATABASE_URL", "postgres://test");
   await pg.exec(`create table obseri_user_workspaces (user_id text primary key, workspace_id text, workspace jsonb, created_at timestamptz, updated_at timestamptz);
+    create table obseri_team_activity (id bigserial primary key, owner_user_id text references obseri_user_workspaces(user_id) on delete cascade, actor_user_id text, actor_email text, action text, changes jsonb, revision bigint);
     create table obseri_published_souls (soul_id text primary key, owner_user_id text, soul jsonb, updated_at timestamptz);`);
 });
 beforeEach(async () => {
-  await pg.exec("truncate obseri_user_workspaces, obseri_published_souls");
+  await pg.exec("truncate obseri_user_workspaces, obseri_published_souls cascade");
 });
 afterAll(async () => {
   await pg.close();
@@ -88,4 +89,28 @@ it("selects scheduled sources while excluding manual-only workspaces", async () 
   expect(await scheduledWorkspaces()).toEqual([]);
   await pg.exec("update obseri_user_workspaces set updated_at = now() - interval '10 minutes'");
   expect((await scheduledWorkspaces()).map((row) => row.user_id)).toEqual(["scheduled"]);
+});
+
+it("records an attributed audit event atomically and never logs rejected stale saves", async () => {
+  const audit = {
+    actorId: "editor",
+    email: "editor@example.com",
+    changes: [{ section: "voice", field: "voice.speed" }],
+  };
+  const saved = await saveUserWorkspace("owner", fixture(), audit);
+  await expect(
+    saveUserWorkspace("owner", { ...saved, revision: 0, name: "stale" }, audit),
+  ).rejects.toMatchObject({ status: 409 });
+  const rows = (await pg.query("select * from obseri_team_activity")).rows;
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({
+    actor_user_id: "editor",
+    revision: 1,
+    action: "workspace.updated",
+  });
+  await pg.exec("drop table obseri_team_activity");
+  await expect(
+    saveUserWorkspace("owner", { ...saved, name: "should roll back" }, audit),
+  ).rejects.toThrow();
+  expect((await readUserWorkspace("owner"))?.name).toBe(saved.name);
 });
