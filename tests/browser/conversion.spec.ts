@@ -204,12 +204,39 @@ test("owner dashboard shows real response data, status changes, and empty states
         },
         sources: [],
         pages: [],
-        journeys: [],
+        daily: [
+          { date: "2026-10-30", sessions: 4, views: 8 },
+          { date: "2026-10-31", sessions: 6, views: 12 },
+        ],
+        countries: empty
+          ? []
+          : [
+              { country: "IN", sessions: 6, contacts: 1 },
+              { country: "US", sessions: 3, contacts: 0 },
+              { country: null, sessions: 1, contacts: 0 },
+            ],
+        devices: [
+          { name: "Mobile", sessions: 6 },
+          { name: "Desktop", sessions: 4 },
+        ],
+        browsers: [{ name: "Chrome", sessions: 10 }],
+        journeys: [
+          {
+            sessionId: "session-one",
+            country: "IN",
+            device: "Mobile",
+            browser: "Chrome",
+            source: "google",
+            startedAt: new Date().toISOString(),
+            events: [{ name: "page_view", path: "/pricing", createdAt: new Date().toISOString() }],
+          },
+        ],
         leads: empty
           ? []
           : [
               {
                 id: leadId,
+                sessionId: "session-one",
                 name: "Sam",
                 email: "sam@example.com",
                 message: "Please help me choose",
@@ -227,7 +254,25 @@ test("owner dashboard shows real response data, status changes, and empty states
     return route.fulfill({ json: { updated: true } });
   });
   await page.goto("/app?view=analytics");
-  await expect(page.getByRole("heading", { name: "Every visit has a story." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Website analytics" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Traffic over time" })).toBeVisible();
+  await expect(page.getByText("sam@example.com", { exact: true })).not.toBeVisible();
+  await page.getByRole("tab", { name: "audience", exact: true }).click();
+  await expect(page.getByRole("cell", { name: "India" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Unknown", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "India: 6 sessions" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "audience", exact: true })).toHaveCSS(
+    "background-color",
+    "oklch(0.205 0 0)",
+  );
+  await page.screenshot({ path: "test-results/audience-desktop.png", fullPage: true });
+  await page.getByRole("button", { name: "India: 6 sessions" }).click();
+  await expect(page.getByLabel("Search countries")).toHaveValue("India");
+  await expect(page.getByRole("cell", { name: "United States" })).not.toBeVisible();
+  await page.getByLabel("Search countries").fill("zzzz");
+  await expect(page.getByText("No matching countries.")).toBeVisible();
+  await page.getByLabel("Search countries").fill("");
+  await page.getByRole("tab", { name: "conversions", exact: true }).click();
   await expect(page.getByText("sam@example.com", { exact: true })).toBeVisible();
   await page.getByLabel("Outcome for Sam").selectOption("qualified");
   await expect(page.getByLabel("Outcome for Sam")).toHaveValue("qualified");
@@ -237,7 +282,25 @@ test("owner dashboard shows real response data, status changes, and empty states
     true,
   );
   await page.screenshot({ path: "test-results/conversions-mobile.png", fullPage: true });
+  await page.getByRole("button", { name: "View visitor journey" }).click();
+  await expect(page.getByRole("tab", { name: "journeys", exact: true })).toHaveAttribute(
+    "data-state",
+    "active",
+  );
+  await expect(page.getByText("Contact request received from Sam")).toBeVisible();
+  await page.getByRole("tab", { name: "audience", exact: true }).click();
+  await expect(page.getByRole("button", { name: "India: 6 sessions" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "audience", exact: true })).toHaveCSS(
+    "background-color",
+    "oklch(0.205 0 0)",
+  );
+  await page.screenshot({ path: "test-results/audience-mobile.png", fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.getByLabel("Reporting period").selectOption("7");
+  await expect(page.getByRole("cell", { name: "India" })).toBeVisible();
   empty = true;
   await page.getByRole("button", { name: "Refresh analytics" }).click();
-  await expect(page.getByText("Your first visitor is the beginning.")).toBeVisible();
+  await expect(page.getByText("Waiting for your first visit")).toBeVisible();
 });

@@ -140,7 +140,7 @@ const SIDEBAR_STORAGE_KEY = "obseri.sidebar-collapsed.v1";
 
 const PAGE_META: Record<StudioView, { title: string; description: string }> = {
   analytics: {
-    title: "Conversions",
+    title: "Analytics",
     description: "Visitor journeys, contact requests, and outcomes.",
   },
   overview: { title: "Overview", description: "How your website agent is doing." },
@@ -866,7 +866,7 @@ function Sidebar({
     {
       label: "Results",
       items: [
-        { id: "analytics", label: "Conversions", icon: <Activity /> },
+        { id: "analytics", label: "Analytics", icon: <Activity /> },
         {
           id: "conversations",
           label: "Conversations",

@@ -80,6 +80,7 @@ beforeAll(async () => {
     "001_production_integrations.sql",
     "002_user_workspaces.sql",
     "004_conversion_analytics.sql",
+    "005_visitor_context.sql",
   ]) {
     await pg.exec(await readFile(new URL(`../../db/migrations/${name}`, import.meta.url), "utf8"));
   }
@@ -142,6 +143,59 @@ describe("durable conversion flow", () => {
     const deliveries = await pg.query("select event from obseri_webhook_deliveries");
     expect(deliveries.rows).toHaveLength(1);
     expect((deliveries.rows[0] as { event: { type: string } }).event.type).toBe("lead.captured");
+  });
+  it("groups first known visitor context per session, preserves unknown history, and fills daily gaps", async () => {
+    const session = crypto.randomUUID();
+    const view = event("page_view");
+    await recordAnalytics("site-a", session, [view]);
+    await recordAnalytics("site-a", session, [event("widget_opened")], {
+      country: "IN",
+      device: "Mobile",
+      browser: "Chrome",
+    });
+    // A retried event must neither duplicate a session nor overwrite its context.
+    await recordAnalytics("site-a", session, [view], {
+      country: "US",
+      device: "Desktop",
+      browser: "Firefox",
+    });
+    await recordAnalytics("site-a", crypto.randomUUID(), [event("page_view")]);
+    await recordAnalytics("site-b", crypto.randomUUID(), [event("page_view")], {
+      country: "US",
+      device: "Desktop",
+      browser: "Safari",
+    });
+    await captureLead("site-a", lead(session));
+    const report = await analyticsReport("site-a", 7);
+    expect(report.countries).toEqual(
+      expect.arrayContaining([
+        { country: "IN", sessions: 1, contacts: 1 },
+        { country: null, sessions: 1, contacts: 0 },
+      ]),
+    );
+    expect(report.countries).toHaveLength(2);
+    expect(report.devices).toEqual(
+      expect.arrayContaining([
+        { name: "Mobile", sessions: 1 },
+        { name: "Unknown", sessions: 1 },
+      ]),
+    );
+    expect(report.browsers).toEqual(
+      expect.arrayContaining([
+        { name: "Chrome", sessions: 1 },
+        { name: "Unknown", sessions: 1 },
+      ]),
+    );
+    expect(report.journeys.find((j) => j.sessionId === session)).toMatchObject({
+      country: "IN",
+      device: "Mobile",
+      browser: "Chrome",
+    });
+    expect(report.daily).toHaveLength(7);
+    expect(report.daily.slice(0, -1).every((day) => day.sessions === 0 && day.views === 0)).toBe(
+      true,
+    );
+    expect(report.daily.at(-1)).toMatchObject({ sessions: 2, views: 2 });
   });
   it("isolates tenant reports and refuses another owner's mutations", async () => {
     const contact = lead();

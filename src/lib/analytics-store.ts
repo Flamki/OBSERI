@@ -1,3 +1,4 @@
+import type { VisitorContext } from "@/lib/visitor-context";
 import { integrationDatabase, IntegrationStoreError } from "@/lib/integration-store";
 import {
   cleanAnalyticsPath,
@@ -21,7 +22,12 @@ export async function requireAnalyticsOwner(soulId: string, ownerId: string) {
     );
 }
 
-export async function recordAnalytics(soulId: string, sessionId: string, events: AnalyticsEvent[]) {
+export async function recordAnalytics(
+  soulId: string,
+  sessionId: string,
+  events: AnalyticsEvent[],
+  context?: VisitorContext,
+) {
   const sql = integrationDatabase();
   const rows = events.map((event) => ({
     soul_id: soulId,
@@ -32,6 +38,9 @@ export async function recordAnalytics(soulId: string, sessionId: string, events:
     referrer: cleanReferrer(event.referrer),
     source: cleanCampaign(event.source),
     campaign: cleanCampaign(event.campaign),
+    country_code: context?.country ?? null,
+    device_type: context?.device ?? null,
+    browser_name: context?.browser ?? null,
   }));
   await sql`insert into obseri_analytics_events ${sql(rows)} on conflict (soul_id, event_id) do nothing`;
 }
@@ -88,8 +97,11 @@ export async function pruneConversionData() {
 
 export async function analyticsReport(soulId: string, days: number): Promise<AnalyticsReport> {
   const sql = integrationDatabase();
-  const since = new Date(Date.now() - days * 86400000);
-  const [totals, leadTotals, sources, pages, journeys, leads] = await Promise.all([
+  const today = new Date();
+  const since = new Date(
+    Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - days + 1),
+  );
+  const [totals, leadTotals, sources, pages, journeys, leads, daily, audience] = await Promise.all([
     sql`select count(distinct session_id)::int as sessions, count(*) filter (where name = 'page_view')::int as views,
       count(distinct session_id) filter (where name = 'conversation_started')::int as engaged
       from obseri_analytics_events where soul_id = ${soulId} and created_at >= ${since}`,
@@ -102,17 +114,39 @@ export async function analyticsReport(soulId: string, days: number): Promise<Ana
       from obseri_analytics_events where soul_id = ${soulId} and created_at >= ${since} order by session_id, created_at, event_id
     ) select f.source, count(*)::int as sessions,
       count(*) filter (where exists (select 1 from obseri_leads l where l.soul_id = ${soulId} and l.session_id = f.session_id and l.created_at >= ${since}))::int as contacts
-      from first_touch f group by f.source order by contacts desc, sessions desc limit 8`,
+      from first_touch f group by f.source order by sessions desc, contacts desc, f.source limit 50`,
     sql`select path, count(*)::int as views from obseri_analytics_events
-      where soul_id = ${soulId} and created_at >= ${since} and name = 'page_view' group by path order by views desc limit 8`,
+      where soul_id = ${soulId} and created_at >= ${since} and name = 'page_view' group by path order by views desc, path limit 50`,
     sql`with recent as (
       select session_id, min(created_at) as started_at from obseri_analytics_events
       where soul_id = ${soulId} and created_at >= ${since} group by session_id order by max(created_at) desc limit 30
     ) select r.session_id, r.started_at,
+      (select e.country_code from obseri_analytics_events e where e.soul_id = ${soulId} and e.session_id = r.session_id and e.created_at >= ${since} and e.country_code is not null order by e.created_at, e.event_id limit 1) as country,
+      (select e.device_type from obseri_analytics_events e where e.soul_id = ${soulId} and e.session_id = r.session_id and e.created_at >= ${since} and e.device_type is not null order by e.created_at, e.event_id limit 1) as device,
+      (select e.browser_name from obseri_analytics_events e where e.soul_id = ${soulId} and e.session_id = r.session_id and e.created_at >= ${since} and e.browser_name is not null order by e.created_at, e.event_id limit 1) as browser,
       (select coalesce(nullif(e.source, ''), nullif(e.referrer, ''), 'Direct') from obseri_analytics_events e where e.soul_id = ${soulId} and e.session_id = r.session_id and e.created_at >= ${since} order by e.created_at, e.event_id limit 1) as source,
       (select json_agg(t) from (select name, path, created_at as "createdAt" from obseri_analytics_events where soul_id = ${soulId} and session_id = r.session_id and created_at >= ${since} order by created_at limit 40) t) as events
       from recent r order by r.started_at desc`,
     sql`select * from obseri_leads where soul_id = ${soulId} and created_at >= ${since} order by created_at desc limit 100`,
+    sql`with dates as (
+      select generate_series((${since}::timestamptz at time zone 'UTC')::date, (now() at time zone 'UTC')::date, '1 day'::interval)::date as day
+    ), activity as (
+      select (created_at at time zone 'UTC')::date as day, count(distinct session_id)::int as sessions,
+        count(*) filter (where name = 'page_view')::int as views
+      from obseri_analytics_events where soul_id = ${soulId} and created_at >= ${since} group by 1
+    ) select to_char(d.day, 'YYYY-MM-DD') as date, coalesce(a.sessions, 0)::int as sessions, coalesce(a.views, 0)::int as views
+      from dates d left join activity a on a.day = d.day order by d.day`,
+    sql`with sessions as (
+      select session_id,
+        (array_agg(country_code order by created_at, event_id) filter (where country_code is not null))[1] as country,
+        coalesce((array_agg(device_type order by created_at, event_id) filter (where device_type is not null))[1], 'Unknown') as device,
+        coalesce((array_agg(browser_name order by created_at, event_id) filter (where browser_name is not null))[1], 'Unknown') as browser
+      from obseri_analytics_events where soul_id = ${soulId} and created_at >= ${since} group by session_id
+    ) select 'country' as dimension, country as name, count(*)::int as sessions,
+        count(*) filter (where exists (select 1 from obseri_leads l where l.soul_id = ${soulId} and l.session_id = s.session_id and l.created_at >= ${since}))::int as contacts
+      from sessions s group by country
+      union all select 'device', device, count(*)::int, 0 from sessions group by device
+      union all select 'browser', browser, count(*)::int, 0 from sessions group by browser`,
   ]);
   return {
     days,
@@ -131,8 +165,28 @@ export async function analyticsReport(soulId: string, days: number): Promise<Ana
       contacts: Number(r.contacts),
     })),
     pages: pages.map((r) => ({ path: r.path, views: Number(r.views) })),
+    daily: daily.map((r) => ({
+      date: r.date,
+      sessions: Number(r.sessions),
+      views: Number(r.views),
+    })),
+    countries: audience
+      .filter((r) => r.dimension === "country")
+      .map((r) => ({ country: r.name, sessions: Number(r.sessions), contacts: Number(r.contacts) }))
+      .sort((a, b) => b.sessions - a.sessions),
+    devices: audience
+      .filter((r) => r.dimension === "device")
+      .map((r) => ({ name: r.name, sessions: Number(r.sessions) }))
+      .sort((a, b) => b.sessions - a.sessions),
+    browsers: audience
+      .filter((r) => r.dimension === "browser")
+      .map((r) => ({ name: r.name, sessions: Number(r.sessions) }))
+      .sort((a, b) => b.sessions - a.sessions),
     journeys: journeys.map((r) => ({
       sessionId: r.session_id,
+      country: r.country ?? null,
+      device: r.device ?? "Unknown",
+      browser: r.browser ?? "Unknown",
       source: r.source,
       startedAt: new Date(r.started_at).toISOString(),
       events: r.events ?? [],

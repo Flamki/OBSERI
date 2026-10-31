@@ -112,7 +112,12 @@ try {
   assert.equal(session.status, 200, "widget session");
   const sessionBody = JSON.parse(session.body);
   assert.equal(sessionBody.consentRequired, true);
-  const headers = { origin, authorization: `Bearer ${sessionBody.session}` };
+  const headers = {
+    origin,
+    authorization: `Bearer ${sessionBody.session}`,
+    "user-agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+  };
   const analyticsPath = `/api/souls/${id}/analytics`;
   const leadsPath = `/api/souls/${id}/leads`;
   for (let i = 0; i < 2; i++)
@@ -156,9 +161,13 @@ try {
     401,
     "status changes require login",
   );
-  const events = await sql`select path from obseri_analytics_events where soul_id=${id}`;
+  const events =
+    await sql`select path,country_code,device_type,browser_name from obseri_analytics_events where soul_id=${id}`;
   assert.equal(events.length, 1, "events deduplicated");
   assert.equal(events[0].path, "/pricing", "queries stripped");
+  assert.match(events[0].country_code || "", /^[A-Z]{2}$/, "edge country recorded");
+  assert.equal(events[0].device_type, "Desktop", "device recorded");
+  assert.equal(events[0].browser_name, "Chrome", "browser recorded");
   const leads = await sql`select id,status,email from obseri_leads where soul_id=${id}`;
   assert.equal(leads.length, 1, "contacts deduplicated");
   assert.equal(leads[0].status, "new");
@@ -175,6 +184,7 @@ try {
         "consent setting",
         "analytics ingestion and deduplication",
         "query redaction",
+        "server country, device and browser",
         "contact consent",
         "durable contact and deduplication",
         "owner read/write auth gates",

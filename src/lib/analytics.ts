@@ -50,7 +50,19 @@ export type AnalyticsReport = {
   };
   sources: Array<{ source: string; sessions: number; contacts: number }>;
   pages: Array<{ path: string; views: number }>;
-  journeys: Array<{ sessionId: string; source: string; startedAt: string; events: JourneyEvent[] }>;
+  daily: Array<{ date: string; sessions: number; views: number }>;
+  countries: Array<{ country: string | null; sessions: number; contacts: number }>;
+  devices: Array<{ name: string; sessions: number }>;
+  browsers: Array<{ name: string; sessions: number }>;
+  journeys: Array<{
+    sessionId: string;
+    source: string;
+    country: string | null;
+    device: string;
+    browser: string;
+    startedAt: string;
+    events: JourneyEvent[];
+  }>;
   leads: CapturedLead[];
 };
 

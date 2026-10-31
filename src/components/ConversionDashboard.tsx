@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
+import { Download, LoaderCircle, RefreshCw } from "lucide-react";
 import {
-  Activity,
-  ArrowDown,
-  ArrowUpRight,
-  CheckCircle2,
-  Download,
-  Globe2,
-  LoaderCircle,
-  MessageSquareText,
-  RefreshCw,
-  Users,
-} from "lucide-react";
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+} from "recharts";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { CountryMap } from "@/components/CountryMap";
+import { countryName, countryFlag } from "@/lib/country";
 import { authFetch } from "@/lib/auth-client";
 import { conversionRate, type AnalyticsReport, type CapturedLead } from "@/lib/analytics";
 import { relativeTime } from "@/lib/conversation-insights";
@@ -22,7 +23,7 @@ const eventLabels: Record<string, string> = {
   help_shown: "Offered help",
   help_clicked: "Accepted help",
 };
-const panel = "rounded-2xl border border-[#e9e6ed] bg-white";
+const panel = "rounded-2xl border border-neutral-200 bg-white";
 
 export default function ConversionDashboard({
   soulId,
@@ -31,6 +32,8 @@ export default function ConversionDashboard({
   soulId: string;
   onInstall: () => void;
 }) {
+  const [tab, setTab] = useState("traffic");
+  const [countrySearch, setCountrySearch] = useState("");
   const [days, setDays] = useState(30);
   const [report, setReport] = useState<AnalyticsReport | null>(null);
   const [error, setError] = useState("");
@@ -132,29 +135,21 @@ export default function ConversionDashboard({
     : [];
 
   return (
-    <div className="min-h-full bg-[#f8f7fa] px-5 py-8 sm:px-8">
+    <div className="min-h-full bg-[#fafafa] px-4 py-6 text-[#242424] sm:px-8">
       <div className="mx-auto max-w-[1240px] space-y-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[.14em] text-[#8a7b9e]">
-              <Activity className="h-3.5 w-3.5" /> Observe → understand → convert
-            </p>
-            <h1 className="text-3xl font-semibold tracking-[-.045em] text-[#25212d]">
-              Every visit has a story.
-            </h1>
-            <p className="mt-2 text-sm text-[#82798d]">
-              See what brought people in, what they asked, and who wants to hear from you.
+            <h1 className="text-2xl font-semibold tracking-tight">Website analytics</h1>
+            <p className="mt-1 text-sm text-neutral-500">
+              Understand your traffic and turn visits into enquiries.
             </p>
           </div>
           <div className="flex gap-2">
-            <label className="sr-only" htmlFor="analytics-range">
-              Reporting period
-            </label>
             <select
-              id="analytics-range"
+              aria-label="Reporting period"
               value={days}
               onChange={(e) => setDays(Number(e.target.value))}
-              className="rounded-xl border border-[#e3dfea] bg-white px-3 py-2 text-sm"
+              className="rounded-lg border bg-white px-3 py-2 text-sm"
             >
               <option value={7}>Last 7 days</option>
               <option value={30}>Last 30 days</option>
@@ -162,7 +157,7 @@ export default function ConversionDashboard({
             <button
               aria-label="Refresh analytics"
               onClick={() => setRevision((v) => v + 1)}
-              className="rounded-xl border border-[#e3dfea] bg-white p-2.5"
+              className="rounded-lg border bg-white p-2.5"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             </button>
@@ -171,7 +166,7 @@ export default function ConversionDashboard({
         {error && (
           <div
             role="alert"
-            className="rounded-xl border border-[#f1d6d6] bg-[#fff7f7] p-4 text-sm text-[#9b4444]"
+            className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
           >
             {error}
             <button onClick={onInstall} className="ml-3 underline">
@@ -182,296 +177,480 @@ export default function ConversionDashboard({
         {loading && !report && (
           <div
             role="status"
-            className={`${panel} flex items-center gap-3 p-10 text-sm text-[#82798d]`}
+            className={`${panel} flex items-center gap-3 p-10 text-sm text-neutral-500`}
           >
-            <LoaderCircle className="h-5 w-5 animate-spin" /> Loading your website’s activity…
+            <LoaderCircle className="h-5 w-5 animate-spin" /> Loading website activity…
           </div>
         )}
         {totals && report && (
-          <>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {[
-                {
-                  label: "Sessions",
-                  value: totals.sessions,
-                  detail: `${totals.pageViews.toLocaleString()} page views`,
-                  icon: Globe2,
-                },
-                {
-                  label: "Conversations",
-                  value: totals.engaged,
-                  detail: `${conversionRate(totals.engaged, totals.sessions)} of sessions`,
-                  icon: MessageSquareText,
-                },
-                {
-                  label: "Contact requests",
-                  value: totals.contacts,
-                  detail: "Details shared with permission",
-                  icon: Users,
-                },
-                {
-                  label: "Qualified / won",
-                  value: `${totals.qualified} / ${totals.won}`,
-                  detail: "Outcomes marked by your team",
-                  icon: CheckCircle2,
-                },
-              ].map(({ label, value, detail, icon: Icon }) => (
-                <div key={label} className={`${panel} p-5`}>
-                  <div className="flex items-center justify-between text-sm text-[#82798d]">
-                    {label}
-                    <Icon className="h-4 w-4 text-[#a592be]" />
-                  </div>
-                  <p className="mt-5 text-3xl font-semibold tracking-tight text-[#25212d]">
-                    {typeof value === "number" ? value.toLocaleString() : value}
-                  </p>
-                  <p className="mt-2 text-xs text-[#958d9e]">{detail}</p>
-                </div>
+          <Tabs value={tab} onValueChange={setTab} className="space-y-6">
+            <TabsList
+              aria-label="Analytics views"
+              className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b bg-transparent p-0 pb-2"
+            >
+              {["traffic", "audience", "conversions", "journeys"].map((value) => (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  className="shrink-0 rounded-lg px-3 py-2.5 text-xs text-neutral-500 capitalize sm:px-4 sm:text-sm data-[state=active]:bg-neutral-900 data-[state=active]:text-white data-[state=active]:shadow-none"
+                >
+                  {value}
+                </TabsTrigger>
               ))}
-            </div>
+            </TabsList>
             {!totals.sessions && !totals.contacts && (
-              <div className="flex flex-wrap items-center justify-between gap-5 rounded-2xl bg-[#eee8f8] p-6">
+              <div className={`${panel} flex flex-wrap items-center justify-between gap-4 p-6`}>
                 <div>
-                  <h2 className="font-semibold text-[#4c396a]">
-                    Your first visitor is the beginning.
-                  </h2>
-                  <p className="mt-1 max-w-xl text-sm leading-6 text-[#7e6a97]">
-                    Publish your assistant and install the embed on your website. Real visits and
-                    submitted requests will appear here. Studio tests are excluded.
+                  <h2 className="font-semibold">Waiting for your first visit</h2>
+                  <p className="mt-1 text-sm text-neutral-500">
+                    Install your published assistant to start collecting real website activity.
                   </p>
                 </div>
                 <button
                   onClick={onInstall}
-                  className="flex items-center gap-2 rounded-xl bg-[#67518a] px-4 py-3 text-sm font-medium text-white"
+                  className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white"
                 >
-                  Install Obseri <ArrowUpRight className="h-4 w-4" />
+                  Check installation
                 </button>
               </div>
             )}
-            <div className="grid gap-5 lg:grid-cols-2">
-              <section className={`${panel} p-6`}>
-                <h2 className="font-semibold text-[#25212d]">From interest to a conversation.</h2>
-                <p className="mt-1 text-xs text-[#958d9e]">
-                  Session-based funnel · last {days} days
-                </p>
-                <div className="mt-6 space-y-3">
-                  {funnel.map((stage, index) => (
-                    <div key={stage.label}>
-                      {index > 0 && <ArrowDown className="mb-3 ml-3 h-3.5 w-3.5 text-[#b7a9c9]" />}
-                      <div className="relative overflow-hidden rounded-xl bg-[#f6f3f9] p-4">
-                        <div
-                          className="absolute inset-y-0 left-0 bg-[#e9dff6]"
-                          style={{
-                            width: `${totals.sessions ? (stage.count / totals.sessions) * 100 : 0}%`,
-                          }}
-                        />
-                        <div className="relative flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-medium text-[#58446f]">{stage.label}</p>
-                            <p className="mt-1 text-[11px] text-[#8e7c9f]">{stage.detail}</p>
-                          </div>
-                          <strong className="text-xl text-[#58446f]">{stage.count}</strong>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+            <TabsContent value="traffic" className="space-y-5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <Metric label="Sessions" value={totals.sessions.toLocaleString()} />
+                <Metric label="Page views" value={totals.pageViews.toLocaleString()} />
+                <Metric
+                  label="Views per session"
+                  value={totals.sessions ? (totals.pageViews / totals.sessions).toFixed(1) : "—"}
+                />
+              </div>
+              <section className={`${panel} p-5`}>
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="font-semibold">Traffic over time</h2>
+                  <span className="text-xs text-neutral-500">Daily sessions · UTC</span>
                 </div>
-                <p className="mt-5 text-xs leading-5 text-[#958d9e]">
-                  Attribution shows association, not incremental lift. Requests without analytics
-                  consent still appear in your inbox, but are excluded from this funnel.
-                </p>
-              </section>
-              <section className={`${panel} p-6`}>
-                <h2 className="font-semibold text-[#25212d]">Where interest comes from.</h2>
-                <p className="mt-1 text-xs text-[#958d9e]">
-                  First observed source in this reporting period
-                </p>
-                <div className="mt-6 grid grid-cols-[1fr_auto_auto] gap-x-5 gap-y-4 text-sm">
-                  <span className="text-xs text-[#958d9e]">Source</span>
-                  <span className="text-xs text-[#958d9e]">Sessions</span>
-                  <span className="text-xs text-[#958d9e]">With contact</span>
-                  {report.sources.map((source) => (
-                    <SourceRow key={source.source} {...source} />
-                  ))}
-                </div>
-                {!report.sources.length && (
-                  <p className="py-10 text-center text-sm text-[#a49aaa]">
-                    Sources appear after the first tracked visit.
-                  </p>
-                )}
-                <div className="mt-7 border-t border-[#eee9f3] pt-5">
-                  <h3 className="text-sm font-medium">Most visited pages</h3>
-                  {report.pages.map((page) => (
-                    <div
-                      key={page.path}
-                      className="mt-3 flex justify-between gap-4 text-xs text-[#8e8498]"
-                    >
-                      <span className="truncate">{page.path}</span>
-                      <span>{page.views}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </div>
-            <section className={`${panel} overflow-hidden`}>
-              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#eee9f3] p-6">
-                <div>
-                  <h2 className="font-semibold text-[#25212d]">People ready for the next step.</h2>
-                  <p className="mt-1 text-xs text-[#958d9e]">
-                    Latest 100 submitted requests · qualified includes won · reply from your email
-                  </p>
-                </div>
-                <button
-                  disabled={!report.leads.length}
-                  onClick={exportLeads}
-                  className="flex items-center gap-2 rounded-xl border border-[#e3dfea] px-3 py-2 text-xs disabled:opacity-40"
+                <div
+                  className="h-60 w-full"
+                  role="img"
+                  aria-label={`Daily traffic for the last ${days} days. ${totals.sessions} sessions in total.`}
                 >
-                  <Download className="h-3.5 w-3.5" /> Export CSV
-                </button>
-              </div>
-              {!report.leads.length ? (
-                <p className="p-10 text-center text-sm text-[#a49aaa]">
-                  When a visitor asks for a follow-up, their request will appear here.
-                </p>
-              ) : (
-                <div className="divide-y divide-[#eee9f3]">
-                  {report.leads.map((lead) => (
-                    <div
-                      key={lead.id}
-                      className="flex flex-wrap items-start justify-between gap-5 p-6"
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={report.daily || []}
+                      margin={{ top: 8, right: 8, left: -24, bottom: 0 }}
                     >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-3">
-                          <strong className="text-sm text-[#40354e]">{lead.name}</strong>
-                          <span className="text-xs text-[#a49aaa]">
-                            {relativeTime(lead.createdAt)}
-                          </span>
-                        </div>
-                        <a
-                          href={`mailto:${encodeURIComponent(lead.email)}?subject=${encodeURIComponent("Your website enquiry")}`}
-                          className="mt-1 inline-block break-all text-sm text-[#8b6ab0] hover:underline"
-                        >
-                          {lead.email}
-                        </a>
-                        <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-[#756a80]">
-                          {lead.message}
+                      <CartesianGrid vertical={false} stroke="#eeeeee" />
+                      <XAxis
+                        dataKey="date"
+                        tickFormatter={(date) =>
+                          new Date(date + "T00:00:00Z").toLocaleDateString("en", {
+                            month: "short",
+                            day: "numeric",
+                            timeZone: "UTC",
+                          })
+                        }
+                        tickLine={false}
+                        axisLine={false}
+                        minTickGap={36}
+                        tick={{ fontSize: 11, fill: "#737373" }}
+                      />
+                      <YAxis
+                        allowDecimals={false}
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fontSize: 11, fill: "#737373" }}
+                      />
+                      <Tooltip labelFormatter={(date) => String(date)} />
+                      <Area
+                        name="Sessions"
+                        type="monotone"
+                        dataKey="sessions"
+                        stroke="#ff557c"
+                        fill="#fff0f4"
+                        strokeWidth={2}
+                        isAnimationActive={false}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </section>
+              <div className="grid gap-5 lg:grid-cols-2">
+                <Breakdown
+                  title="Traffic sources"
+                  label="Source"
+                  rows={report.sources.map((row) => ({ name: row.source, count: row.sessions }))}
+                  total={totals.sessions}
+                  note="First source observed per session · top 50"
+                />
+                <Breakdown
+                  title="Top pages"
+                  label="Page"
+                  rows={report.pages.map((row) => ({ name: row.path, count: row.views }))}
+                  total={totals.pageViews}
+                  note="Page views · top 50"
+                />
+              </div>
+            </TabsContent>
+            <TabsContent value="audience" className="space-y-5">
+              <section className={`${panel} overflow-hidden`}>
+                <div className="border-b p-5">
+                  <h2 className="font-semibold">Where visitors come from</h2>
+                  <p className="mt-1 text-xs text-neutral-500">
+                    Approximate country at the first known location in each session. Older or
+                    unavailable locations appear as Unknown.
+                  </p>
+                </div>
+                <div className="grid lg:grid-cols-[1.2fr_1fr]">
+                  <div className="flex min-w-0 flex-col justify-center p-5">
+                    <CountryMap
+                      countries={report.countries || []}
+                      onSelect={(code) => setCountrySearch(countryName(code))}
+                    />
+                    <p className="mt-3 text-center text-xs text-neutral-400">
+                      Select a country to filter the list
+                    </p>
+                  </div>
+                  <div className="min-w-0 border-t p-5 lg:border-l lg:border-t-0">
+                    <input
+                      aria-label="Search countries"
+                      placeholder="Search countries…"
+                      value={countrySearch}
+                      onChange={(e) => setCountrySearch(e.target.value)}
+                      className="mb-4 w-full rounded-lg border px-3 py-2 text-sm"
+                    />
+                    <div className="max-h-80 overflow-y-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead className="text-xs text-neutral-500">
+                          <tr>
+                            <th className="pb-3 font-normal">Country</th>
+                            <th className="pb-3 text-right font-normal">Sessions</th>
+                            <th className="pb-3 text-right font-normal">Share</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(report.countries || [])
+                            .filter((row) =>
+                              countryName(row.country)
+                                .toLowerCase()
+                                .includes(countrySearch.toLowerCase()),
+                            )
+                            .map((row) => (
+                              <tr
+                                key={row.country || "unknown"}
+                                className="border-t border-neutral-100"
+                              >
+                                <td className="py-3">
+                                  <span className="mr-2" aria-hidden="true">
+                                    {countryFlag(row.country) || "◌"}
+                                  </span>
+                                  {countryName(row.country)}
+                                </td>
+                                <td className="text-right tabular-nums">{row.sessions}</td>
+                                <td className="text-right tabular-nums text-neutral-500">
+                                  {conversionRate(row.sessions, totals.sessions)}
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                      {!(report.countries || []).some((row) =>
+                        countryName(row.country)
+                          .toLowerCase()
+                          .includes(countrySearch.toLowerCase()),
+                      ) && (
+                        <p className="py-8 text-center text-sm text-neutral-500">
+                          {countrySearch
+                            ? "No matching countries."
+                            : "Countries appear after a tracked visit."}
                         </p>
-                        <p className="mt-2 break-all text-xs text-[#a49aaa]">
-                          Submitted on {lead.path} · permission to follow up recorded
-                        </p>
-                        {lead.sessionId &&
-                          report.journeys.some((j) => j.sessionId === lead.sessionId) && (
-                            <button
-                              onClick={() => {
-                                setSelected(lead.sessionId!);
-                                document
-                                  .getElementById("visitor-journeys")
-                                  ?.scrollIntoView({ behavior: "smooth" });
-                              }}
-                              className="mt-3 text-xs font-medium text-[#8b6ab0]"
-                            >
-                              View visitor journey →
-                            </button>
-                          )}
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </section>
+              <div className="grid gap-5 lg:grid-cols-2">
+                <Breakdown
+                  title="Devices"
+                  label="Device"
+                  rows={(report.devices || []).map((row) => ({
+                    name: row.name,
+                    count: row.sessions,
+                  }))}
+                  total={totals.sessions}
+                />
+                <Breakdown
+                  title="Browsers"
+                  label="Browser"
+                  rows={(report.browsers || []).map((row) => ({
+                    name: row.name,
+                    count: row.sessions,
+                  }))}
+                  total={totals.sessions}
+                />
+              </div>
+            </TabsContent>
+            <TabsContent value="conversions" className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Metric label="Contact requests" value={String(totals.contacts)} />
+                <Metric
+                  label="Qualified"
+                  value={String(totals.qualified)}
+                  detail="Includes won requests"
+                />
+                <Metric label="Won" value={String(totals.won)} />
+              </div>
+              <section className={`${panel} p-5`}>
+                <h2 className="font-semibold">Conversation funnel</h2>
+                <div className="mt-5 grid gap-4 sm:grid-cols-3">
+                  {funnel.map((stage, index) => (
+                    <div key={stage.label} className="rounded-xl bg-neutral-50 p-4">
+                      <p className="text-xs text-neutral-500">
+                        {index + 1}. {stage.label}
+                      </p>
+                      <div className="my-3 flex items-baseline gap-2">
+                        <strong className="text-2xl">{stage.count}</strong>
+                        <span className="text-xs text-neutral-500">
+                          {conversionRate(stage.count, totals.sessions)}
+                        </span>
                       </div>
-                      <label className="text-xs text-[#958d9e]">
-                        Outcome
-                        <select
-                          aria-label={`Outcome for ${lead.name}`}
-                          value={lead.status}
-                          disabled={updating === lead.id}
-                          onChange={(e) =>
-                            void changeStatus(lead.id, e.target.value as CapturedLead["status"])
-                          }
-                          className="mt-1 block rounded-lg border border-[#e3dfea] bg-white p-2 text-sm text-[#58446f]"
-                        >
-                          <option value="new">New request</option>
-                          <option value="qualified">Qualified</option>
-                          <option value="won">Won</option>
-                          <option value="closed">Closed</option>
-                        </select>
-                      </label>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-neutral-200">
+                        <div
+                          className="h-full rounded-full bg-[#ff557c]"
+                          style={{ width: conversionRate(stage.count, totals.sessions) }}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
-              )}
-            </section>
-            <section id="visitor-journeys" className={`${panel} p-6`}>
-              <h2 className="font-semibold text-[#25212d]">The story behind the visit.</h2>
-              <p className="mt-1 text-xs text-[#958d9e]">
-                Latest 30 sessions · up to 40 events per session · anonymous until details are
-                shared
-              </p>
-              <div className="mt-5 grid gap-6 md:grid-cols-[240px_1fr]">
-                <div className="max-h-80 space-y-2 overflow-y-auto">
-                  {report.journeys.map((item) => (
-                    <button
-                      key={item.sessionId}
-                      onClick={() => setSelected(item.sessionId)}
-                      className={`w-full rounded-xl p-3 text-left text-sm ${journey?.sessionId === item.sessionId ? "bg-[#eee6f7] text-[#67518a]" : "bg-[#faf9fc] text-[#8e8498]"}`}
-                    >
-                      <span className="block truncate font-medium">{item.source}</span>
-                      <span className="mt-1 block text-xs opacity-70">
-                        {relativeTime(item.startedAt)} · {item.sessionId.slice(0, 6)}
-                      </span>
-                    </button>
-                  ))}
+                <p className="mt-4 text-xs leading-5 text-neutral-500">
+                  Sessions → conversations → contact requests. Requests without tracked sessions are
+                  excluded. Association does not measure additional sales caused by Obseri.
+                </p>
+              </section>
+              <section className={`${panel} overflow-hidden`}>
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#eeeeee] p-6">
+                  <div>
+                    <h2 className="font-semibold text-[#262626]">Contact requests</h2>
+                    <p className="mt-1 text-xs text-[#737373]">
+                      Latest 100 submitted requests · qualified includes won · reply from your email
+                    </p>
+                  </div>
+                  <button
+                    disabled={!report.leads.length}
+                    onClick={exportLeads}
+                    className="flex items-center gap-2 rounded-xl border border-[#e5e5e5] px-3 py-2 text-xs disabled:opacity-40"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Export CSV
+                  </button>
                 </div>
-                <ol className="space-y-4 border-l border-[#e6dfed] pl-5">
-                  {journey?.events.map((event, i) => (
-                    <li key={i} className="relative">
-                      <span className="absolute -left-[25px] top-1.5 h-2 w-2 rounded-full bg-[#b39acb]" />
-                      <p className="text-sm font-medium text-[#67518a]">
-                        {eventLabels[event.name] || event.name}
-                      </p>
-                      <p className="mt-1 break-all text-xs text-[#958d9e]">
-                        {event.path} ·{" "}
-                        {new Date(event.createdAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
-                    </li>
-                  ))}
-                  {journey &&
-                    report.leads
-                      .filter((lead) => lead.sessionId === journey.sessionId)
-                      .map((lead) => (
-                        <li
-                          key={lead.id}
-                          className="rounded-xl bg-[#eef6f1] p-3 text-sm text-[#4e7b60]"
-                        >
-                          Contact request received from {lead.name}
-                        </li>
-                      ))}
-                  {!journey && (
-                    <li className="py-8 text-sm text-[#a49aaa]">
-                      Your visitor journeys will appear here.
-                    </li>
-                  )}
-                </ol>
-              </div>
-            </section>
-          </>
+                {!report.leads.length ? (
+                  <p className="p-10 text-center text-sm text-[#737373]">
+                    When a visitor asks for a follow-up, their request will appear here.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-[#eeeeee]">
+                    {report.leads.map((lead) => (
+                      <div
+                        key={lead.id}
+                        className="flex flex-wrap items-start justify-between gap-5 p-6"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <strong className="text-sm text-[#262626]">{lead.name}</strong>
+                            <span className="text-xs text-[#737373]">
+                              {relativeTime(lead.createdAt)}
+                            </span>
+                          </div>
+                          <a
+                            href={`mailto:${encodeURIComponent(lead.email)}?subject=${encodeURIComponent("Your website enquiry")}`}
+                            className="mt-1 inline-block break-all text-sm text-[#ce3d62] hover:underline"
+                          >
+                            {lead.email}
+                          </a>
+                          <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-[#525252]">
+                            {lead.message}
+                          </p>
+                          <p className="mt-2 break-all text-xs text-[#737373]">
+                            Submitted on {lead.path} · permission to follow up recorded
+                          </p>
+                          {lead.sessionId &&
+                            report.journeys.some((j) => j.sessionId === lead.sessionId) && (
+                              <button
+                                onClick={() => {
+                                  setSelected(lead.sessionId!);
+                                  setTab("journeys");
+                                }}
+                                className="mt-3 text-xs font-medium text-[#ce3d62]"
+                              >
+                                View visitor journey →
+                              </button>
+                            )}
+                        </div>
+                        <label className="text-xs text-[#737373]">
+                          Outcome
+                          <select
+                            aria-label={`Outcome for ${lead.name}`}
+                            value={lead.status}
+                            disabled={updating === lead.id}
+                            onChange={(e) =>
+                              void changeStatus(lead.id, e.target.value as CapturedLead["status"])
+                            }
+                            className="mt-1 block rounded-lg border border-[#e5e5e5] bg-white p-2 text-sm text-[#404040]"
+                          >
+                            <option value="new">New request</option>
+                            <option value="qualified">Qualified</option>
+                            <option value="won">Won</option>
+                            <option value="closed">Closed</option>
+                          </select>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </TabsContent>
+            <TabsContent value="journeys" className="space-y-5">
+              <section id="visitor-journeys" className={`${panel} p-6`}>
+                <h2 className="font-semibold text-[#262626]">Visitor journeys</h2>
+                <p className="mt-1 text-xs text-[#737373]">
+                  Latest 30 sessions · up to 40 events per session · anonymous until details are
+                  shared
+                </p>
+                <div className="mt-5 grid gap-6 md:grid-cols-[240px_1fr]">
+                  <div className="max-h-80 space-y-2 overflow-y-auto">
+                    {report.journeys.map((item) => (
+                      <button
+                        key={item.sessionId}
+                        onClick={() => setSelected(item.sessionId)}
+                        className={`w-full rounded-xl p-3 text-left text-sm ${journey?.sessionId === item.sessionId ? "bg-[#fff0f4] text-[#9f2549]" : "bg-[#fafafa] text-[#737373]"}`}
+                      >
+                        <span className="block truncate font-medium">
+                          {countryFlag(item.country)} {countryName(item.country)}
+                        </span>
+                        <span className="mt-1 block truncate text-xs">
+                          {item.source} · {item.device || "Unknown"} · {item.browser || "Unknown"}
+                        </span>
+                        <span className="mt-1 block text-xs opacity-70">
+                          {relativeTime(item.startedAt)} · {item.sessionId.slice(0, 6)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <ol className="space-y-4 border-l border-[#e5e5e5] pl-5">
+                    {journey?.events.map((event, i) => (
+                      <li key={i} className="relative">
+                        <span className="absolute -left-[25px] top-1.5 h-2 w-2 rounded-full bg-[#ff557c]" />
+                        <p className="text-sm font-medium text-[#9f2549]">
+                          {eventLabels[event.name] || event.name}
+                        </p>
+                        <p className="mt-1 break-all text-xs text-[#737373]">
+                          {event.path} ·{" "}
+                          {new Date(event.createdAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </li>
+                    ))}
+                    {journey &&
+                      report.leads
+                        .filter((lead) => lead.sessionId === journey.sessionId)
+                        .map((lead) => (
+                          <li
+                            key={lead.id}
+                            className="rounded-xl bg-[#eef6f1] p-3 text-sm text-[#4e7b60]"
+                          >
+                            Contact request received from {lead.name}
+                          </li>
+                        ))}
+                    {!journey && (
+                      <li className="py-8 text-sm text-[#737373]">
+                        Your visitor journeys will appear here.
+                      </li>
+                    )}
+                  </ol>
+                </div>
+              </section>
+            </TabsContent>
+            <p className="text-xs text-neutral-400">
+              Last {days} calendar days · UTC · Tracking respects your widget’s consent settings.
+            </p>
+          </Tabs>
         )}
       </div>
     </div>
   );
 }
 
-function SourceRow({
-  source,
-  sessions,
-  contacts,
-}: {
-  source: string;
-  sessions: number;
-  contacts: number;
-}) {
+function Metric({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
-    <>
-      <span className="truncate text-[#756a80]">{source}</span>
-      <span className="text-right text-[#756a80]">{sessions}</span>
-      <span className="text-right font-medium text-[#8b6ab0]">{contacts}</span>
-    </>
+    <div className={`${panel} p-5`}>
+      <p className="text-sm text-neutral-500">{label}</p>
+      <p className="mt-3 text-3xl font-semibold tracking-tight tabular-nums">{value}</p>
+      {detail && <p className="mt-1 text-xs text-neutral-400">{detail}</p>}
+    </div>
+  );
+}
+function Breakdown({
+  title,
+  label,
+  rows,
+  total,
+  note,
+}: {
+  title: string;
+  label: string;
+  rows: Array<{ name: string; count: number }>;
+  total: number;
+  note?: string;
+}) {
+  const [search, setSearch] = useState("");
+  const filtered = rows.filter((row) => row.name.toLowerCase().includes(search.toLowerCase()));
+  return (
+    <section className={`${panel} min-w-0 p-5`}>
+      <h2 className="font-semibold">{title}</h2>
+      {note && <p className="mt-1 text-xs text-neutral-500">{note}</p>}
+      <input
+        aria-label={`Search ${title.toLowerCase()}`}
+        placeholder={`Search ${title.toLowerCase()}…`}
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="my-4 w-full rounded-lg border px-3 py-2 text-sm"
+      />
+      <div className="max-h-80 overflow-y-auto">
+        <table className="w-full table-fixed text-sm">
+          <thead className="text-xs text-neutral-500">
+            <tr>
+              <th className="w-3/5 pb-3 text-left font-normal">{label}</th>
+              <th className="pb-3 text-right font-normal">Count</th>
+              <th className="pb-3 text-right font-normal">Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((row) => (
+              <tr key={row.name} className="border-t border-neutral-100">
+                <td className="relative py-3 pr-3">
+                  <div
+                    className="absolute inset-y-2 left-0 rounded bg-neutral-50"
+                    style={{ width: `${total ? (row.count / total) * 100 : 0}%` }}
+                  />
+                  <span className="relative block truncate" title={row.name}>
+                    {row.name}
+                  </span>
+                </td>
+                <td className="text-right tabular-nums">{row.count}</td>
+                <td className="text-right tabular-nums text-neutral-500">
+                  {conversionRate(row.count, total)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!filtered.length && (
+          <p className="py-8 text-center text-sm text-neutral-500">
+            {search ? "No matching results." : "No activity in this period."}
+          </p>
+        )}
+      </div>
+    </section>
   );
 }

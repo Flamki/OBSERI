@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { visitorContext } from "@/lib/visitor-context";
 import { requireUser } from "@/lib/user-auth";
 import { trackingSchema } from "@/lib/analytics";
 import { analyticsReport, recordAnalytics, requireAnalyticsOwner } from "@/lib/analytics-store";
@@ -58,7 +59,12 @@ export const Route = createFileRoute("/api/souls/$soulId/analytics")({
             throw new IntegrationStoreError("Too many events.", 429);
           if (!(await consumeRateLimit(`tracking:${params.soulId}:${session.origin}`, 3000, 60)))
             throw new IntegrationStoreError("Too many events.", 429);
-          await recordAnalytics(params.soulId, parsed.data.sessionId, parsed.data.events);
+          await recordAnalytics(
+            params.soulId,
+            parsed.data.sessionId,
+            parsed.data.events,
+            visitorContext(request, process.env.VERCEL === "1"),
+          );
           return Response.json({ accepted: true }, { headers: headers(request) });
         } catch (error) {
           return fail(error, request);
