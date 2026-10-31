@@ -69,6 +69,7 @@ test("owner creates an email-bound invitation link and can revoke it", async ({ 
       expect(route.request().headers()["x-obseri-workspace-owner"]).toBe("actor");
       if (body.action === "invite") {
         expect(body.email).toBe("editor@example.com");
+        expect(body.permissions).toEqual({ ...permissionPreset("read"), voice: "none" });
         invitations = [{ id: "invite-id", email: body.email, expiresAt: "2099-01-01" }];
         return route.fulfill({ json: { token: "a".repeat(43) } });
       }
@@ -78,12 +79,35 @@ test("owner creates an email-bound invitation link and can revoke it", async ({ 
     }
     return route.fulfill({ json: { members: [], invitations, seatLimit: 5, plan: "Growth" } });
   });
-  await page.goto("/app?view=profile");
+  await page.goto("/app?view=team");
   await page.getByRole("textbox", { name: "Teammate email" }).fill("editor@example.com");
   await page.getByRole("button", { name: "Create invite link" }).click();
+  const dialog = page.getByRole("dialog", { name: "Choose invitation access" });
+  await expect(dialog).toBeVisible();
+  expect(invitations).toHaveLength(0);
+  await dialog.getByRole("combobox", { name: "Permission preset" }).selectOption("viewer");
+  await dialog.getByRole("combobox", { name: "Voice access", exact: true }).selectOption("none");
+  await dialog.getByRole("button", { name: "Confirm & create link" }).click();
   await expect(page.getByRole("textbox", { name: "Invitation link" })).toHaveValue(
     /\/app#invite=a{43}$/,
   );
+  await page.evaluate(() =>
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async (text: string) => {
+          (window as Window & { __copiedLink?: string }).__copiedLink = text;
+        },
+      },
+    }),
+  );
+  await page.getByRole("button", { name: "Copy link", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Copied", exact: true })).toBeVisible();
+  expect(
+    await page.evaluate(() => (window as Window & { __copiedLink?: string }).__copiedLink),
+  ).toMatch(/\/app#invite=a{43}$/);
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByText("2 / 5 seats · Growth")).toBeVisible();
   await page.getByRole("button", { name: "Revoke", exact: true }).click();
   await expect(page.getByText("1 / 5 seats · Growth")).toBeVisible();
@@ -94,7 +118,7 @@ test("editor uses the selected workspace and cannot see billing or invitation co
 }) => {
   await setup(page, true);
   const request = page.waitForRequest((req) => req.url().endsWith("/api/workspace"));
-  await page.goto("/app?view=profile");
+  await page.goto("/app?view=team");
   expect((await request).headers()["x-obseri-workspace-owner"]).toBe("company");
   await expect(page.getByRole("combobox", { name: "Switch workspace" })).toHaveValue("company");
   await expect(page.getByText("Your owner controls access.", { exact: false })).toBeVisible();
@@ -144,7 +168,7 @@ test("full Free workspace explains the limit before submitting and opens team pl
     if (route.request().method() === "POST") posts++;
     return route.fulfill({ json: { members: [], invitations: [], seatLimit: 1, plan: "Free" } });
   });
-  await page.goto("/app?view=profile");
+  await page.goto("/app?view=team");
   await expect(page.getByText("Your plan includes only your seat.")).toBeVisible();
   await page.getByRole("textbox", { name: "Teammate email" }).fill("editor@example.com");
   await expect(page.getByRole("button", { name: "Create invite link" })).toBeDisabled();
@@ -176,10 +200,9 @@ test("complimentary Growth is current without implying a paid subscription", asy
   await page.route("**/api/team", (route) =>
     route.fulfill({ json: { members: [], invitations: [], seatLimit: 5, plan: "Growth" } }),
   );
-  await page.goto("/app?view=profile");
+  await page.goto("/app?view=team");
   await expect(page.getByText("1 / 5 seats · Growth")).toBeVisible();
-  await expect(page.getByText("Complimentary access · No subscription charge")).toBeVisible();
-  await page.getByRole("button", { name: "Plans and billing", exact: true }).click();
+  await page.goto("/app?view=billing");
   await expect(
     page.getByText("Complimentary Growth access. No subscription charge or automatic renewal."),
   ).toBeVisible();
@@ -231,7 +254,7 @@ test("owner sets section access and reads the audit log", async ({ page }) => {
       },
     }),
   );
-  await page.goto("/app?view=profile");
+  await page.goto("/app?view=team");
   await page.getByRole("button", { name: "Edit access" }).click();
   const dialog = page.getByRole("dialog");
   await dialog
@@ -277,7 +300,7 @@ test("remote workspace edits arrive without a reload", async ({ page }) => {
   await page.route("**/api/team", (route) =>
     route.fulfill({ json: { members: [], invitations: [], seatLimit: 5, plan: "Growth" } }),
   );
-  await page.goto("/app?view=profile");
+  await page.goto("/app?view=team");
   await expect(page.locator('input[value="Company"]')).toHaveCount(1);
   workspace = { ...workspace, name: "Updated by teammate", revision: 2 };
   await expect(page.locator('input[value="Updated by teammate"]')).toBeVisible({ timeout: 8000 });
@@ -301,8 +324,68 @@ test("a conflicting save preserves local edits and offers an export", async ({ p
   await page.route("**/api/team", (route) =>
     route.fulfill({ json: { members: [], invitations: [], seatLimit: 5, plan: "Growth" } }),
   );
-  await page.goto("/app?view=profile");
+  await page.goto("/app?view=team");
   await page.locator('input[value="Company"]').fill("My unsaved name");
   await expect(page.getByRole("button", { name: "Download local edits" })).toBeVisible();
   await expect(page.locator('input[value="My unsaved name"]')).toBeVisible();
+});
+
+test("Profile is separate from workspace and team settings", async ({ page }) => {
+  await setup(page);
+  await page.route("**/api/team", (route) =>
+    route.fulfill({ json: { members: [], invitations: [], seatLimit: 5, plan: "Growth" } }),
+  );
+  await page.goto("/app?view=profile");
+  await expect(page.locator('input[value="tester@example.com"]')).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Team access" })).toHaveCount(0);
+  await expect(page.getByText("Workspace name", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Knowledge health" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Manage team", exact: true }).click();
+  await expect(page).toHaveURL(/view=team/);
+  await expect(page.getByRole("heading", { name: "Team access" })).toBeVisible();
+});
+
+test("invitation can be cancelled, retried after failure, and copied manually", async ({
+  page,
+}) => {
+  await setup(page);
+  let attempts = 0;
+  await page.route("**/api/team", (route) => {
+    if (route.request().method() === "POST") {
+      attempts++;
+      return attempts === 1
+        ? route.fulfill({ status: 503, json: { error: { message: "Please try again shortly." } } })
+        : route.fulfill({ json: { token: "b".repeat(43) } });
+    }
+    return route.fulfill({ json: { members: [], invitations: [], seatLimit: 5, plan: "Growth" } });
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/app?view=team");
+  await page.getByRole("textbox", { name: "Teammate email" }).fill("person@example.com");
+  await page.getByRole("button", { name: "Create invite link" }).click();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  expect(attempts).toBe(0);
+  await expect(page.getByRole("textbox", { name: "Teammate email" })).toBeFocused();
+  await page.getByRole("button", { name: "Create invite link" }).click();
+  await page.getByRole("button", { name: "Confirm & create link" }).click();
+  await expect(page.getByRole("alert")).toContainText("Please try again shortly.");
+  await expect(page.getByRole("textbox", { name: "Invitation link" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Confirm & create link" }).click();
+  await expect(page.getByRole("textbox", { name: "Invitation link" })).toHaveValue(/invite=b{43}$/);
+  await page.evaluate(() =>
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async () => {
+          throw new Error("Blocked");
+        },
+      },
+    }),
+  );
+  await page.getByRole("button", { name: "Copy link", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("copy it manually");
+  await expect(page.getByRole("button", { name: "Copied", exact: true })).toHaveCount(0);
+  const bounds = await page.getByRole("dialog").boundingBox();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
 });

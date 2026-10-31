@@ -198,6 +198,10 @@ export function TeamSettings({ onViewPlans }: { onViewPlans: () => void }) {
   const [editing, setEditing] = useState<Details["members"][number] | null>(null);
   const [tab, setTab] = useState<"members" | "activity">("members");
   const [link, setLink] = useState("");
+  const [inviteEmail, setInviteEmail] = useState<string | null>(null);
+  const [inviteNotice, setInviteNotice] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [copying, setCopying] = useState(false);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const owner = !team || team.current.role === "owner";
@@ -216,23 +220,57 @@ export function TeamSettings({ onViewPlans }: { onViewPlans: () => void }) {
   async function act(action: Record<string, unknown>) {
     setBusy(true);
     setNotice("");
-    setLink("");
     try {
-      const data = await authFetch("/api/team", {
+      await authFetch("/api/team", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(action),
       }).then(result);
-      if (data.token) {
-        setLink(`${window.location.origin}/app#invite=${encodeURIComponent(data.token)}`);
-        setEmail("");
-      }
       await load();
       setEditing(null);
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "Please try again.");
     } finally {
       setBusy(false);
+    }
+  }
+  async function createInvitation() {
+    if (busy || !inviteEmail || link) return;
+    setBusy(true);
+    setInviteNotice("");
+    try {
+      const data = await authFetch("/api/team", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "invite", email: inviteEmail, permissions }),
+      }).then(result);
+      if (!data.token) throw new Error("The invitation link was not returned. Please try again.");
+      setLink(`${window.location.origin}/app#invite=${encodeURIComponent(data.token)}`);
+      setEmail("");
+      // Keep the generated link available even if refreshing the team list fails.
+      await load().catch(() =>
+        setInviteNotice("Your link is ready. Refresh Team later to update the people list."),
+      );
+    } catch (error) {
+      setInviteNotice(
+        error instanceof Error
+          ? error.message
+          : "Could not create the invitation. Please try again.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function copyInvitation() {
+    setCopying(true);
+    setInviteNotice("");
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+    } catch {
+      setInviteNotice("Copy was blocked by your browser. Select the link and copy it manually.");
+    } finally {
+      setCopying(false);
     }
   }
   return (
@@ -294,20 +332,21 @@ export function TeamSettings({ onViewPlans }: { onViewPlans: () => void }) {
               </button>
             </div>
           )}
-          <details className="mt-5 rounded-2xl border p-4">
-            <summary className="cursor-pointer text-sm font-medium">
-              New invitation access · {accessRole(permissions)}
-            </summary>
-            <PermissionEditor value={permissions} onChange={setPermissions} disabled={busy} />
-          </details>
           <form
             className="mt-5 flex flex-wrap gap-2"
             onSubmit={(e) => {
               e.preventDefault();
-              if (!busy && canInvite) void act({ action: "invite", email, permissions });
+              if (!busy && canInvite) {
+                setInviteEmail(email.trim().toLowerCase());
+                setPermissions(permissionPreset("write"));
+                setLink("");
+                setCopied(false);
+                setInviteNotice("");
+              }
             }}
           >
             <input
+              id="team-invite-email"
               aria-label="Teammate email"
               type="email"
               required
@@ -328,33 +367,6 @@ export function TeamSettings({ onViewPlans }: { onViewPlans: () => void }) {
             No email is sent. Copy and share the invitation link with your teammate. It expires in 7
             days and works only for this email.
           </p>
-          {link && (
-            <div className="mt-4 rounded-xl bg-stone-100 p-4">
-              <p role="status" className="mb-3 text-sm">
-                Invitation link ready. No email was sent—share the link below with your teammate.
-              </p>
-              <label className="text-xs font-medium">
-                Invitation link
-                <input
-                  readOnly
-                  value={link}
-                  onFocus={(e) => e.target.select()}
-                  className="clean-input mt-2 w-full"
-                />
-              </label>
-              <button
-                className="mt-2 text-sm underline"
-                onClick={() =>
-                  void navigator.clipboard
-                    .writeText(link)
-                    .then(() => setNotice("Link copied."))
-                    .catch(() => setNotice("Select and copy the link above."))
-                }
-              >
-                Copy link
-              </button>
-            </div>
-          )}
           <div className="mt-5 divide-y divide-stone-100">
             <p className="py-3 text-sm">
               You <span className="float-right text-stone-500">Owner</span>
@@ -409,6 +421,96 @@ export function TeamSettings({ onViewPlans }: { onViewPlans: () => void }) {
           </div>
         </>
       )}
+      <Dialog
+        open={inviteEmail !== null}
+        onOpenChange={(open) => {
+          if (!open && !busy && !copying) setInviteEmail(null);
+        }}
+      >
+        <DialogContent
+          className="z-[90] max-h-[90dvh] w-[calc(100%-2rem)] overflow-y-auto rounded-3xl bg-white p-6 sm:max-w-xl"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            document.getElementById("team-invite-email")?.focus();
+          }}
+        >
+          <DialogTitle>{link ? "Invitation ready" : "Choose invitation access"}</DialogTitle>
+          <DialogDescription className="break-all">{inviteEmail}</DialogDescription>
+          {link ? (
+            <>
+              <p role="status" className="text-sm text-stone-600">
+                Link created with {accessRole(permissions)} access. Share it with your teammate to
+                join.
+              </p>
+              <label className="text-sm font-medium">
+                Invitation link
+                <input
+                  readOnly
+                  value={link}
+                  onFocus={(event) => event.target.select()}
+                  className="clean-input mt-2 w-full"
+                />
+              </label>
+              <p className="text-xs leading-5 text-stone-500">
+                Only {inviteEmail} can accept this invitation. It expires in 7 days. No email is
+                sent automatically.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  disabled={busy || copying}
+                  onClick={() => setInviteEmail(null)}
+                  className="rounded-full border px-5 py-2.5 text-sm"
+                >
+                  Done
+                </button>
+                <button
+                  disabled={copying}
+                  onClick={() => void copyInvitation()}
+                  className="rounded-full bg-black px-5 py-2.5 text-sm text-white"
+                  aria-live="polite"
+                >
+                  {copying ? "Copying…" : copied ? "Copied" : "Copy link"}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <PermissionEditor value={permissions} onChange={setPermissions} disabled={busy} />
+              <p className="text-xs leading-5 text-stone-500">
+                Access applies to every website in this workspace. Only you can manage billing and
+                the team. You can change permissions later.
+              </p>
+              {replacesPending && (
+                <p className="text-sm text-amber-800">
+                  Confirming will replace the existing invitation for this email. The previous link
+                  will stop working.
+                </p>
+              )}
+              <div className="flex justify-end gap-3">
+                <button
+                  disabled={busy}
+                  onClick={() => setInviteEmail(null)}
+                  className="rounded-full border px-5 py-2.5 text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={() => void createInvitation()}
+                  className="rounded-full bg-black px-5 py-2.5 text-sm text-white disabled:opacity-50"
+                >
+                  {busy ? "Creating link…" : "Confirm & create link"}
+                </button>
+              </div>
+            </>
+          )}
+          {inviteNotice && (
+            <p role="alert" className="text-sm text-stone-700">
+              {inviteNotice}
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={Boolean(editing)}
         onOpenChange={(open) => {

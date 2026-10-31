@@ -70,6 +70,7 @@ import {
   Trash2,
   Upload,
   UserRound,
+  Users,
   WandSparkles,
   Webhook,
   X,
@@ -155,6 +156,7 @@ type StudioView =
   | "conversations"
   | "billing"
   | "profile"
+  | "team"
   | "settings"
   | "help";
 
@@ -183,7 +185,8 @@ const PAGE_META: Record<StudioView, { title: string; description: string }> = {
     description: "Understand what visitors are asking for.",
   },
   billing: { title: "Plans and billing", description: "Choose and manage your plan." },
-  profile: { title: "Profile and workspace", description: "Manage your account and workspace." },
+  profile: { title: "Profile", description: "Your personal account details." },
+  team: { title: "Team", description: "Manage your workspace, people, and access." },
   settings: { title: "Settings", description: "Manage the selected website and its data." },
   help: { title: "Help", description: "Get support and find the right next step." },
 };
@@ -907,7 +910,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
 
         <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
           <WorkspaceSwitcher
-            onTeam={() => navigate("profile")}
+            onTeam={() => navigate("team")}
             beforeSwitch={async () => {
               if (saveConflict.current) {
                 setNotice(
@@ -1048,25 +1051,35 @@ function SoulStudio({ user }: { user: StudioUser }) {
                   onInstall={() => navigate("deploy")}
                 />
               ) : view === "billing" ? (
-                <ProfileWorkspaceView
-                  workspace={workspace}
-                  onWorkspaceNameChange={(name) =>
-                    setWorkspace((current) => ({ ...current, name }))
-                  }
-                  billingOnly
-                  onViewPlans={() => navigate("billing")}
-                  onPlanChange={setActivePlan}
-                  onClose={() => navigate("playground")}
-                />
+                <BillingView onPlanChange={setActivePlan} onClose={() => navigate("playground")} />
               ) : view === "profile" ? (
-                <ProfileWorkspaceView
-                  workspace={workspace}
-                  onWorkspaceNameChange={(name) =>
-                    setWorkspace((current) => ({ ...current, name }))
-                  }
-                  onPlanChange={setActivePlan}
-                  onViewPlans={() => navigate("billing")}
-                />
+                <ProfileView />
+              ) : view === "team" ? (
+                <Page
+                  title="Team"
+                  description="Your workspace, people, and permissions."
+                  hideHeader
+                >
+                  <div className="mx-auto w-full max-w-4xl py-6 sm:py-10">
+                    <Card>
+                      <SectionHeading
+                        title="Workspace"
+                        description="The shared home for your team’s websites."
+                      />
+                      <Field label="Workspace name" className="mt-5">
+                        <input
+                          className="clean-input"
+                          value={workspace.name}
+                          readOnly={!isOwner}
+                          onChange={(event) =>
+                            setWorkspace((current) => ({ ...current, name: event.target.value }))
+                          }
+                        />
+                      </Field>
+                    </Card>
+                    <TeamSettings onViewPlans={() => navigate("billing")} />
+                  </div>
+                </Page>
               ) : view === "settings" ? (
                 <SettingsView
                   soul={soul}
@@ -1746,11 +1759,8 @@ function ProfileMenu({
         </p>
       </div>
       <div className="my-2 h-px bg-[#ecebe9]" />
-      <MenuRow
-        icon={<UserRound />}
-        label="Profile and workspace"
-        onClick={() => onNavigate("profile")}
-      />
+      <MenuRow icon={<UserRound />} label="Profile" onClick={() => onNavigate("profile")} />
+      <MenuRow icon={<Users />} label="Team" onClick={() => onNavigate("team")} />
       <MenuRow
         icon={<CreditCard />}
         label="Plans and billing"
@@ -2124,6 +2134,7 @@ function KnowledgeView({
           }}
         />
       )}
+      <OperationHealth />
     </Page>
   );
 }
@@ -4421,36 +4432,49 @@ function HelpView() {
   );
 }
 
-function ProfileWorkspaceView({
-  workspace,
-  onWorkspaceNameChange,
-  billingOnly = false,
-  onViewPlans,
+function ProfileView() {
+  const { data } = authClient.useSession();
+  const user = data?.user;
+  const displayName = user?.name || user?.email?.split("@")[0] || "Obseri user";
+  return (
+    <Page title="Profile" description="Your personal account details." hideHeader>
+      <div className="mx-auto w-full max-w-3xl py-6 sm:py-10">
+        <Card>
+          <SectionHeading title="Profile" description="Your signed-in account." />
+          <div className="mt-6 flex items-center gap-4">
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#212120] font-semibold text-white">
+              {userInitials(user) || "O"}
+            </span>
+            <div>
+              <p className="font-semibold">{displayName}</p>
+              <p className="mt-1 text-sm text-stone-500">
+                Personal details from your sign-in account.
+              </p>
+            </div>
+          </div>
+          <div className="mt-6 grid gap-5 sm:grid-cols-2">
+            <Field label="Display name">
+              <input value={displayName} readOnly className="clean-input" />
+            </Field>
+            <Field label="Email">
+              <input value={user?.email ?? ""} readOnly className="clean-input" />
+            </Field>
+          </div>
+        </Card>
+      </div>
+    </Page>
+  );
+}
+
+function BillingView({
   onPlanChange,
   onClose,
 }: {
-  workspace: SoulWorkspace;
-  onWorkspaceNameChange: (name: string) => void;
-  billingOnly?: boolean;
-  onViewPlans: () => void;
   onPlanChange?: (plan: BillingPlan) => void;
   onClose?: () => void;
 }) {
-  const session = authClient.useSession();
-  const user = session.data?.user;
-  const profileTeam = useTeamWorkspace();
-  const isOwner = !profileTeam || profileTeam.current.role === "owner";
-  const displayName = user?.name || user?.email?.split("@")[0] || "Obseri user";
-  const initials = displayName
-    .split(/\s+/)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-  const learnedPages = workspace.souls.reduce(
-    (total, workspaceSoul) => total + workspaceSoul.knowledge.pages.length,
-    0,
-  );
+  const team = useTeamWorkspace();
+  const isOwner = !team || team.current.role === "owner";
   const [billing, setBilling] = useState<BillingSummaryResponse | null>(null);
   const [cycle, setCycle] = useState<"monthly" | "annual">("monthly");
   const [billingBusy, setBillingBusy] = useState<BillingPlanId | "cancel" | null>(null);
@@ -4597,7 +4621,7 @@ function ProfileWorkspaceView({
     }
   }
 
-  if (!isOwner && billingOnly)
+  if (!isOwner)
     return (
       <Page title="Workspace plan" description="Billing is managed by the workspace owner.">
         <Card>
@@ -4612,310 +4636,126 @@ function ProfileWorkspaceView({
         </Card>
       </Page>
     );
-  if (billingOnly) {
-    return (
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="billing-title"
-        className="obs-app fixed inset-0 z-[100] overflow-y-auto bg-[#fafaf9] text-[#0b0b0c]"
+  return (
+    <section
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="billing-title"
+      className="obs-app fixed inset-0 z-[100] overflow-y-auto bg-[#fafaf9] text-[#0b0b0c]"
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close plans"
+        className="fixed right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-[#e2e2df] bg-white text-[#5f5e5a] shadow-[0_1px_2px_rgba(0,0,0,.05)] transition hover:bg-[#f5f5f3] hover:text-[#0b0b0c] sm:right-6 sm:top-6"
       >
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close plans"
-          className="fixed right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-[#e2e2df] bg-white text-[#5f5e5a] shadow-[0_1px_2px_rgba(0,0,0,.05)] transition hover:bg-[#f5f5f3] hover:text-[#0b0b0c] sm:right-6 sm:top-6"
-        >
-          <X className="h-5 w-5" />
-        </button>
+        <X className="h-5 w-5" />
+      </button>
 
-        <div className="mx-auto flex min-h-full max-w-[1320px] flex-col px-4 pb-10 pt-16 sm:px-6 sm:pt-14">
-          <header className="shrink-0 text-center">
-            <h1
-              id="billing-title"
-              className="text-[clamp(2rem,4vw,3rem)] font-semibold leading-[1.02] tracking-[-0.05em]"
-            >
-              Choose the plan that fits your traffic
-            </h1>
-            <p className="mx-auto mt-3 max-w-lg text-[15px] leading-6 text-[#6f6e69]">
-              Start free, then upgrade when your agent is bringing in conversations. Change or
-              cancel any time.
-            </p>
-            <div
-              className="mx-auto mt-7 grid w-full max-w-[380px] grid-cols-2 rounded-full border border-[#e7e7e4] bg-white p-1"
-              aria-label="Billing interval"
-            >
-              {(["monthly", "annual"] as const).map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  aria-pressed={cycle === value}
-                  onClick={() => setCycle(value)}
-                  className={`h-11 rounded-full text-sm font-semibold transition-all ${
-                    cycle === value
-                      ? "bg-[#0b0b0c] text-white shadow-sm"
-                      : "text-[#5f5e5a] hover:text-[#0b0b0c]"
-                  }`}
-                >
-                  {value === "annual" ? "Annual · Save 15%" : "Monthly"}
-                </button>
-              ))}
-            </div>
-          </header>
-
-          {billingNotice && (
-            <p className="mx-auto mt-5 max-w-3xl rounded-xl border border-[#ffd0d9] bg-[#fff1f4] px-4 py-3 text-center text-sm text-[#b3263f]">
-              {billingNotice}
-            </p>
-          )}
-
-          {billing?.complimentary && (
-            <p className="mx-auto mt-6 rounded-xl bg-stone-100 px-5 py-3 text-sm">
-              Complimentary {billing.plan.name} access. No subscription charge or automatic renewal.
-            </p>
-          )}
-          <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {SELF_SERVE_PLAN_IDS.map((planId) => (
-              <PlanCard
-                key={planId}
-                plan={BILLING_PLANS[planId]}
-                cycle={cycle}
-                current={
-                  billing?.plan.id === planId &&
-                  (planId === "free" ||
-                    !!billing.complimentary ||
-                    billing.subscription?.cycle === cycle)
-                }
-                busy={billingBusy === planId}
-                onChoose={() => void beginCheckout(planId)}
-              />
+      <div className="mx-auto flex min-h-full max-w-[1320px] flex-col px-4 pb-10 pt-16 sm:px-6 sm:pt-14">
+        <header className="shrink-0 text-center">
+          <h1
+            id="billing-title"
+            className="text-[clamp(2rem,4vw,3rem)] font-semibold leading-[1.02] tracking-[-0.05em]"
+          >
+            Choose the plan that fits your traffic
+          </h1>
+          <p className="mx-auto mt-3 max-w-lg text-[15px] leading-6 text-[#6f6e69]">
+            Start free, then upgrade when your agent is bringing in conversations. Change or cancel
+            any time.
+          </p>
+          <div
+            className="mx-auto mt-7 grid w-full max-w-[380px] grid-cols-2 rounded-full border border-[#e7e7e4] bg-white p-1"
+            aria-label="Billing interval"
+          >
+            {(["monthly", "annual"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={cycle === value}
+                onClick={() => setCycle(value)}
+                className={`h-11 rounded-full text-sm font-semibold transition-all ${
+                  cycle === value
+                    ? "bg-[#0b0b0c] text-white shadow-sm"
+                    : "text-[#5f5e5a] hover:text-[#0b0b0c]"
+                }`}
+              >
+                {value === "annual" ? "Annual · Save 15%" : "Monthly"}
+              </button>
             ))}
           </div>
+        </header>
 
-          <footer className="mt-8 flex shrink-0 flex-col items-center justify-center gap-2 text-center text-sm text-[#6f6e69] sm:flex-row">
-            <span>Need custom capacity, SSO, or a private deployment?</span>
-            <a
-              href="mailto:flamki@obseri.com?subject=Obseri%20Enterprise"
-              className="font-semibold text-[#0b0b0c] underline decoration-black/25 underline-offset-4 transition hover:decoration-black"
-            >
-              Talk to enterprise sales
-            </a>
-          </footer>
-
-          {billing?.subscription && !billing.complimentary && (
-            <div className="mx-auto mt-4 flex w-full max-w-3xl flex-wrap items-center justify-center gap-x-3 gap-y-2 text-center text-xs text-[#8a8984]">
-              <div>
-                <span className="font-semibold">{billing.plan.name}</span>
-                <span className="ml-2">
-                  {billing.subscription.currentPeriodEnd
-                    ? `${billing.subscription.cancelAtPeriodEnd ? "Ends" : "Renews"} ${new Date(
-                        billing.subscription.currentPeriodEnd,
-                      ).toLocaleDateString("en-IN", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}`
-                    : "Active subscription"}
-                </span>
-              </div>
-              {billing.subscription.status === "active" &&
-                !billing.subscription.cancelAtPeriodEnd && (
-                  <button
-                    type="button"
-                    onClick={() => void cancelSubscription()}
-                    disabled={billingBusy !== null}
-                    className="text-xs font-semibold text-[#5f5e5a] underline underline-offset-4 transition hover:text-[#0b0b0c] disabled:opacity-50"
-                  >
-                    {billingBusy === "cancel" ? "Scheduling…" : "Cancel at period end"}
-                  </button>
-                )}
-            </div>
-          )}
-        </div>
-      </section>
-    );
-  }
-
-  return (
-    <Page
-      title={billingOnly ? "Plans and billing" : "Profile and workspace"}
-      description={
-        billingOnly
-          ? "Manage capacity, usage, invoices, and your subscription."
-          : "Manage your account and workspace."
-      }
-      hideHeader
-    >
-      <div
-        className={
-          billingOnly
-            ? "mx-auto max-w-6xl px-5 py-8 sm:px-8 lg:px-10"
-            : "grid min-h-[calc(100vh-64px)] lg:grid-cols-[minmax(0,1fr)_380px]"
-        }
-      >
-        {!billingOnly && (
-          <div className="min-w-0 lg:border-r lg:border-[#e5e5e3]">
-            <Card>
-              <SectionHeading title="Profile" description="Your signed-in account." />
-              <div className="mt-6 flex items-center gap-4">
-                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#212120] font-semibold text-white">
-                  {initials || "O"}
-                </span>
-                <div>
-                  <p className="font-semibold">{displayName}</p>
-                  <p className="mt-1 text-sm text-[#7b7974]">
-                    {isOwner ? "Workspace owner" : "Workspace editor"}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-6 grid gap-5 sm:grid-cols-2">
-                <Field label="Display name">
-                  <input value={displayName} readOnly className="clean-input" />
-                </Field>
-                <Field label="Email">
-                  <input value={user?.email ?? ""} readOnly className="clean-input" />
-                </Field>
-              </div>
-            </Card>
-            <Card>
-              <SectionHeading title="Workspace" description="The shared home for your websites." />
-              <Field label="Workspace name" className="mt-5">
-                <input
-                  value={workspace.name}
-                  onChange={(event) => onWorkspaceNameChange(event.target.value)}
-                  className="clean-input"
-                />
-              </Field>
-            </Card>
-            <TeamSettings onViewPlans={onViewPlans} />
-            <OperationHealth />
-          </div>
+        {billingNotice && (
+          <p className="mx-auto mt-5 max-w-3xl rounded-xl border border-[#ffd0d9] bg-[#fff1f4] px-4 py-3 text-center text-sm text-[#b3263f]">
+            {billingNotice}
+          </p>
         )}
-        <div className={billingOnly ? "min-w-0" : "min-w-0 bg-[#f9f9f9]"}>
-          <Card>
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h3 className="font-semibold">{billing?.plan.name ?? "Free"} plan</h3>
-                <p className="mt-1 text-sm text-[#777671]">
-                  {billing?.complimentary
-                    ? "Complimentary access · No subscription charge"
-                    : billing?.subscription?.currentPeriodEnd
-                      ? `${billing.subscription.cancelAtPeriodEnd ? "Ends" : "Renews"} ${new Date(billing.subscription.currentPeriodEnd).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`
-                      : "No payment method required"}
-                </p>
-              </div>
-              <span className="rounded-lg bg-[#212120] px-3 py-1.5 text-xs font-semibold text-white">
-                {billing?.complimentary
-                  ? "Complimentary"
-                  : billing?.subscription?.status === "active"
-                    ? "Active"
-                    : "Free"}
+
+        {billing?.complimentary && (
+          <p className="mx-auto mt-6 rounded-xl bg-stone-100 px-5 py-3 text-sm">
+            Complimentary {billing.plan.name} access. No subscription charge or automatic renewal.
+          </p>
+        )}
+        <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {SELF_SERVE_PLAN_IDS.map((planId) => (
+            <PlanCard
+              key={planId}
+              plan={BILLING_PLANS[planId]}
+              cycle={cycle}
+              current={
+                billing?.plan.id === planId &&
+                (planId === "free" ||
+                  !!billing.complimentary ||
+                  billing.subscription?.cycle === cycle)
+              }
+              busy={billingBusy === planId}
+              onChoose={() => void beginCheckout(planId)}
+            />
+          ))}
+        </div>
+
+        <footer className="mt-8 flex shrink-0 flex-col items-center justify-center gap-2 text-center text-sm text-[#6f6e69] sm:flex-row">
+          <span>Need custom capacity, SSO, or a private deployment?</span>
+          <a
+            href="mailto:flamki@obseri.com?subject=Obseri%20Enterprise"
+            className="font-semibold text-[#0b0b0c] underline decoration-black/25 underline-offset-4 transition hover:decoration-black"
+          >
+            Talk to enterprise sales
+          </a>
+        </footer>
+
+        {billing?.subscription && !billing.complimentary && (
+          <div className="mx-auto mt-4 flex w-full max-w-3xl flex-wrap items-center justify-center gap-x-3 gap-y-2 text-center text-xs text-[#8a8984]">
+            <div>
+              <span className="font-semibold">{billing.plan.name}</span>
+              <span className="ml-2">
+                {billing.subscription.currentPeriodEnd
+                  ? `${billing.subscription.cancelAtPeriodEnd ? "Ends" : "Renews"} ${new Date(
+                      billing.subscription.currentPeriodEnd,
+                    ).toLocaleDateString("en-IN", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}`
+                  : "Active subscription"}
               </span>
             </div>
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <div className="rounded-xl bg-[#f3f3f2] p-4">
-                <p className="text-2xl font-semibold">{workspace.souls.length}</p>
-                <p className="mt-1 text-xs text-[#7b7974]">Websites</p>
-              </div>
-              <div className="rounded-xl bg-[#f3f3f2] p-4">
-                <p className="text-2xl font-semibold">{learnedPages}</p>
-                <p className="mt-1 text-xs text-[#7b7974]">Pages learned</p>
-              </div>
-            </div>
-            <UsageBar
-              label="Text responses"
-              value={billing?.usage.textResponses ?? 0}
-              limit={billing?.plan.limits.textResponsesPerMonth ?? null}
-            />
-            <UsageBar
-              label="Voice minutes"
-              value={Math.ceil((billing?.usage.voiceSeconds ?? 0) / 60)}
-              limit={billing?.plan.limits.voiceMinutesPerMonth ?? null}
-            />
-            {isOwner &&
-              billing?.subscription?.status === "active" &&
+            {billing.subscription.status === "active" &&
               !billing.subscription.cancelAtPeriodEnd && (
                 <button
                   type="button"
                   onClick={() => void cancelSubscription()}
                   disabled={billingBusy !== null}
-                  className="mt-5 text-xs font-medium text-[#7b7974] underline underline-offset-4 hover:text-[#212120] disabled:opacity-50"
+                  className="text-xs font-semibold text-[#5f5e5a] underline underline-offset-4 transition hover:text-[#0b0b0c] disabled:opacity-50"
                 >
                   {billingBusy === "cancel" ? "Scheduling…" : "Cancel at period end"}
                 </button>
               )}
-          </Card>
-        </div>
-      </div>
-      {billingOnly && (
-        <div className="border-t border-[#e5e5e3] bg-[#f9f9f9] px-5 py-8 sm:px-8 lg:px-10">
-          <div className="mx-auto max-w-6xl">
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#c23d58]">
-                  Plans
-                </p>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight">
-                  Pay for the capacity you need.
-                </h2>
-                <p className="mt-2 text-sm text-[#777671]">
-                  Final checkout prices with hard limits—no surprise usage bill.
-                </p>
-              </div>
-              <div className="flex rounded-full border border-[#e0dfdd] bg-white p-1 text-sm">
-                {(["monthly", "annual"] as const).map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setCycle(value)}
-                    className={`rounded-full px-4 py-2 font-medium capitalize ${cycle === value ? "bg-[#212120] text-white" : "text-[#74736e]"}`}
-                  >
-                    {value}
-                    {value === "annual" ? " · save 15%" : ""}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {billingNotice && (
-              <p className="mt-5 rounded-xl bg-[#fff1f4] px-4 py-3 text-sm text-[#8d2f44]">
-                {billingNotice}
-              </p>
-            )}
-            <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {SELF_SERVE_PLAN_IDS.map((planId) => (
-                <PlanCard
-                  key={planId}
-                  plan={BILLING_PLANS[planId]}
-                  cycle={cycle}
-                  current={
-                    billing?.plan.id === planId &&
-                    (planId === "free" ||
-                      !!billing.complimentary ||
-                      billing.subscription?.cycle === cycle)
-                  }
-                  busy={billingBusy === planId}
-                  onChoose={() => void beginCheckout(planId)}
-                />
-              ))}
-            </div>
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#212120] px-5 py-4 text-white">
-              <div>
-                <p className="font-semibold">Enterprise</p>
-                <p className="mt-0.5 text-sm text-white/60">
-                  Committed capacity, SSO, private deployments, and an SLA.
-                </p>
-              </div>
-              <a
-                href="mailto:flamki@obseri.com?subject=Obseri%20Enterprise"
-                className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#212120]"
-              >
-                Contact sales
-              </a>
-            </div>
           </div>
-        </div>
-      )}
-    </Page>
+        )}
+      </div>
+    </section>
   );
 }
 
