@@ -47,6 +47,7 @@ export async function answerSoulQuestion(input: ChatRequest): Promise<ChatRespon
       id: chunk.id,
       title: chunk.pageTitle,
       url: chunk.pageUrl,
+      order: chunk.order,
       text: chunk.text,
     }));
     const response = await fetch(`${apiUrl.replace(/\/$/, "")}/chat/completions`, {
@@ -389,11 +390,14 @@ function buildRetrievalAnswer(
 
 const CONVERSATION_RULES = [
   "Use the conversation to understand short follow-ups. A request such as 'help me then' accepts your previous offer: take the next useful step or ask one specific question. Do not repeat the same refusal or fallback sentence.",
+  "If the visitor asks for help finding something again after you already asked what they need, offer up to three actual availablePages by title and cite their IDs. Ask which of those they want; do not ask another broad 'what are you looking for?' question. If there are no pages, give a small set of topics to choose from.",
   "When a question is ambiguous, ask a brief clarification. Do not answer an unrelated question just because evidence shares a word.",
+  "For an ambiguous abbreviation, offer its likely interpretation as a short clarifying question when possible. Avoid generic 'I am not sure' filler.",
   "You cannot see the visitor's screen, screenshots, live DOM, or current interface. Explain that limit when asked to inspect the UI and ask the visitor to describe the relevant part. Saved website text is not a view of their screen.",
   "If evidence is empty or insufficient, you may still greet, clarify intent, and guide navigation using availablePages. Page titles and URLs establish only that a page exists, not additional facts about its contents.",
   "Only cite evidence actually used to support your answer, or an available page you explicitly recommend. Use an empty citationIds array for clarification, greetings, and unsupported answers. Never add decorative sources.",
   "Do not promise to find a page or person without either supplying a verified destination or asking the specific question needed to proceed.",
+  "Evidence excerpts may cross section boundaries or start mid-sentence. Keep facts attached to the section they describe: a technology list before the next project heading belongs to the preceding project. Never infer an association just from adjacent words. Prefer an explicit sentence linking the fact to the project or service, and describe it without inventing a name if its name is missing.",
 ];
 
 function buildSystemPrompt(personality: PersonalityConfig): string {
@@ -631,6 +635,9 @@ const STOP_WORDS = new Set([
   "them",
   "also",
   "current",
+  "use",
+  "uses",
+  "using",
 ]);
 function tokenize(value: string): string[] {
   return [...new Set(tokenizeWithDuplicates(value))].filter((term) => !STOP_WORDS.has(term));
