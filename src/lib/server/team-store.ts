@@ -1,3 +1,4 @@
+import { normalizeActivityChanges } from "../team-activity";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { integrationDatabase } from "../integration-store";
 import { billingSummary } from "../billing-store";
@@ -119,9 +120,9 @@ export async function inviteEditor(
         402,
       );
     await tx`insert into obseri_workspace_invitations (id, owner_user_id, email, token_hash, permissions, expires_at)
-      values (${randomUUID()}, ${owner}, ${email}, ${digest(token)}, ${JSON.stringify(permissions)}::jsonb, now() + interval '7 days')`;
+      values (${randomUUID()}, ${owner}, ${email}, ${digest(token)}, ${tx.json(permissions)}::jsonb, now() + interval '7 days')`;
     await tx`insert into obseri_team_activity (owner_user_id, actor_user_id, action, changes)
-      values (${owner}, ${owner}, 'invitation.created', ${JSON.stringify([{ email, permissions }])}::jsonb)`;
+      values (${owner}, ${owner}, 'invitation.created', ${tx.json([{ email, permissions }])}::jsonb)`;
   });
   return token;
 }
@@ -163,7 +164,7 @@ export async function acceptInvitation(actor: AuthenticatedUser, token: string) 
         "This workspace has no available team seats. Contact its owner.",
         402,
       );
-    await tx`insert into obseri_workspace_members (owner_user_id, user_id, email, permissions) values (${owner}, ${actor.id}, ${invite.email}, ${JSON.stringify(normalizePermissions(invite.permissions))}::jsonb) on conflict do nothing`;
+    await tx`insert into obseri_workspace_members (owner_user_id, user_id, email, permissions) values (${owner}, ${actor.id}, ${invite.email}, ${tx.json(normalizePermissions(invite.permissions))}::jsonb) on conflict do nothing`;
     await tx`update obseri_workspace_invitations set accepted_at = now() where id = ${invite.id}`;
     await tx`insert into obseri_team_activity (owner_user_id, actor_user_id, actor_email, action)
       values (${owner}, ${actor.id}, ${invite.email}, 'member.joined')`;
@@ -183,7 +184,7 @@ export async function revokeAccess(
     if (target.invitationId)
       await tx`update obseri_workspace_invitations set revoked_at = now() where owner_user_id = ${owner} and id = ${target.invitationId}`;
     await tx`insert into obseri_team_activity (owner_user_id, actor_user_id, action, changes)
-      values (${owner}, ${owner}, ${target.userId ? "member.removed" : "invitation.revoked"}, ${JSON.stringify([target])}::jsonb)`;
+      values (${owner}, ${owner}, ${target.userId ? "member.removed" : "invitation.revoked"}, ${tx.json([target])}::jsonb)`;
   });
 }
 
@@ -198,9 +199,9 @@ export async function updateMemberAccess(
     const [before] =
       await tx`select email, permissions from obseri_workspace_members where owner_user_id = ${owner} and user_id = ${userId} for update`;
     if (!before) throw new UserAuthError("This teammate no longer belongs to the workspace.", 404);
-    await tx`update obseri_workspace_members set permissions = ${JSON.stringify(permissions)}::jsonb where owner_user_id = ${owner} and user_id = ${userId}`;
+    await tx`update obseri_workspace_members set permissions = ${tx.json(permissions)}::jsonb where owner_user_id = ${owner} and user_id = ${userId}`;
     await tx`insert into obseri_team_activity (owner_user_id, actor_user_id, action, changes)
-      values (${owner}, ${owner}, 'member.permissions', ${JSON.stringify([{ email: before.email, before: normalizePermissions(before.permissions), after: permissions }])}::jsonb)`;
+      values (${owner}, ${owner}, 'member.permissions', ${tx.json([{ email: before.email, before: normalizePermissions(before.permissions), after: permissions }])}::jsonb)`;
   });
 }
 
@@ -209,16 +210,29 @@ export async function recordTeamActivity(
   action: string,
   changes: unknown[] = [],
 ) {
-  await integrationDatabase()`insert into obseri_team_activity (owner_user_id, actor_user_id, actor_email, action, changes)
-    values (${user.id}, ${user.actorUserId}, ${user.email || ""}, ${action}, ${JSON.stringify(changes)}::jsonb)`;
+  const sql = integrationDatabase();
+  await sql`insert into obseri_team_activity (owner_user_id, actor_user_id, actor_email, action, changes)
+    values (${user.id}, ${user.actorUserId}, ${user.email || ""}, ${action}, ${sql.json(changes as never)}::jsonb)`;
 }
 export async function teamActivity(owner: string, before = "9223372036854775807") {
   if (!/^\d{1,19}$/.test(before) || BigInt(before) > 9223372036854775807n)
     throw new UserAuthError("Invalid activity cursor.", 400);
-  const events =
-    await integrationDatabase()`select id::text, actor_user_id as "actorId", actor_email as "actorEmail", action, changes, revision, created_at as "createdAt"
+  const events = await integrationDatabase()<
+    Array<{
+      id: string;
+      actorId: string;
+      actorEmail: string;
+      action: string;
+      changes: unknown;
+      revision: string | number | null;
+      createdAt: Date;
+    }>
+  >`select id::text, actor_user_id as "actorId", actor_email as "actorEmail", action, changes, revision, created_at as "createdAt"
     from obseri_team_activity where owner_user_id = ${owner} and id < ${before}::bigint order by id desc limit 50`;
-  return { events, nextCursor: events.length === 50 ? String(events.at(-1)!.id) : null };
+  return {
+    events: events.map((event) => ({ ...event, ...normalizeActivityChanges(event.changes) })),
+    nextCursor: events.length === 50 ? String(events.at(-1)!.id) : null,
+  };
 }
 /** Restricted sections never leave the server, including cached workspace reads. */
 export function visibleWorkspace(

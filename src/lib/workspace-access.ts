@@ -20,6 +20,15 @@ export function permissionPreset(level: AccessLevel): WorkspacePermissions {
 export function normalizePermissions(value: unknown): WorkspacePermissions {
   // Null is the legacy editor policy. Malformed explicit policies fail closed.
   if (value == null) return permissionPreset("write");
+  // Early collaboration writes accidentally encoded JSON objects as JSON strings.
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return permissionPreset("none");
+    }
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) return permissionPreset("none");
   const input = value as Record<string, unknown>;
   return Object.fromEntries(
     Object.keys(ACCESS_SECTIONS).map((key) => [

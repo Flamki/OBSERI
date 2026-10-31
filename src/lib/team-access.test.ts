@@ -25,7 +25,7 @@ import {
   visibleWorkspace,
   teamActivity,
 } from "./server/team-store";
-import { permissionPreset } from "./workspace-access";
+import { normalizePermissions, permissionPreset } from "./workspace-access";
 import { createSoul } from "./soul";
 import {
   reserveEmbeddingCharacters,
@@ -36,6 +36,7 @@ import {
 const pg = new PGlite();
 type TestSql = {
   (strings: TemplateStringsArray, ...values: unknown[]): Promise<unknown[]>;
+  json: (value: unknown) => { jsonValue: unknown };
   begin: (fn: (tx: TestSql) => Promise<unknown>) => Promise<unknown>;
 };
 function adapter(db: Pick<PGlite, "query">): TestSql {
@@ -43,9 +44,17 @@ function adapter(db: Pick<PGlite, "query">): TestSql {
     db
       .query(
         strings.reduce((s, t, i) => s + (i ? `$${i}` : "") + t, ""),
-        values,
+        // Match postgres.js: inferred JSON parameters are serialized by the driver.
+        values.map((value, index) =>
+          value && typeof value === "object" && "jsonValue" in value
+            ? JSON.stringify(value.jsonValue)
+            : strings[index + 1].startsWith("::jsonb")
+              ? JSON.stringify(value)
+              : value,
+        ),
       )
       .then((r) => r.rows);
+  sql.json = (value: unknown) => ({ jsonValue: value });
   sql.begin = (fn: (tx: TestSql) => Promise<unknown>) => pg.transaction((tx) => fn(adapter(tx)));
   return sql;
 }
@@ -74,6 +83,63 @@ beforeEach(async () => {
   state.actor = { id: "owner", email: "owner@example.com", emailVerified: true };
 });
 afterAll(() => pg.close());
+it("repairs legacy JSON encoding without losing history or widening permissions", async () => {
+  const permissions = { ...permissionPreset("none"), voice: "read" as const };
+  const token = await inviteEditor("owner", "editor@example.com", permissions);
+  // Reproduce the values persisted by the original postgres.js writes.
+  await pg.query("update obseri_workspace_invitations set permissions = $1::jsonb", [
+    JSON.stringify(JSON.stringify(permissions)),
+  ]);
+  await pg.query("update obseri_team_activity set changes = $1::jsonb", [
+    JSON.stringify(JSON.stringify([{ email: "editor@example.com", permissions }])),
+  ]);
+  const before = await teamActivity("owner");
+  expect(before.events[0].changes[0].permissions).toEqual(permissions);
+  expect(before.events[0].detailsUnavailable).toBe(false);
+  await acceptInvitation({ id: "editor", email: "editor@example.com", emailVerified: true }, token);
+  await pg.query("update obseri_workspace_members set permissions = $1::jsonb", [
+    JSON.stringify(JSON.stringify(permissions)),
+  ]);
+  const migration = await readFile("db/migrations/010_team_json_encoding.sql", "utf8");
+  await pg.exec(migration);
+  await pg.exec(migration);
+  const repaired = await pg.query(
+    "select jsonb_typeof(changes) as shape from obseri_team_activity",
+  );
+  expect(repaired.rows).toEqual([{ shape: "array" }, { shape: "array" }]);
+  expect((await teamActivity("owner")).events.at(-1)).toEqual(before.events[0]);
+  expect((await teamDetails("owner")).members[0].permissions).toEqual(permissions);
+  state.actor = { id: "editor", email: "editor@example.com", emailVerified: true };
+  await expect(requireWorkspaceUser(request(), { section: "voice" })).resolves.toBeDefined();
+  await expect(
+    requireWorkspaceUser(request(), { section: "voice", write: true }),
+  ).rejects.toMatchObject({ status: 403 });
+  await expect(requireWorkspaceUser(request(), { section: "knowledge" })).rejects.toMatchObject({
+    status: 403,
+  });
+});
+
+it("keeps malformed explicit permission policies closed", () => {
+  for (const value of ["broken", "null", "[]", "42", "true", JSON.stringify({ voice: "admin" })]) {
+    expect(normalizePermissions(value)).toEqual(permissionPreset("none"));
+  }
+  expect(normalizePermissions(null)).toEqual(permissionPreset("write"));
+});
+
+it("stores new invitation and access audit data as structured JSON", async () => {
+  const token = await inviteEditor("owner", "editor@example.com", permissionPreset("read"));
+  await acceptInvitation({ id: "editor", email: "editor@example.com", emailVerified: true }, token);
+  await updateMemberAccess("owner", "editor", permissionPreset("none"));
+  await revokeAccess("owner", { userId: "editor" });
+  expect(
+    (await pg.query("select distinct jsonb_typeof(changes) as shape from obseri_team_activity"))
+      .rows,
+  ).toEqual([{ shape: "array" }]);
+  expect(
+    (await pg.query("select jsonb_typeof(permissions) as shape from obseri_workspace_invitations"))
+      .rows,
+  ).toEqual([{ shape: "object" }]);
+});
 const member = { id: "editor", email: "editor@example.com", emailVerified: true };
 const request = (owner = "owner") =>
   new Request("https://obseri.com/api/workspace", {
@@ -226,7 +292,7 @@ it("enforces invited section permissions and immediate owner changes", async () 
     "member.joined",
     "invitation.created",
   ]);
-  expect(log.events[0].changes[0].after.voice).toBe("read");
+  expect(log.events[0].changes[0].after?.voice).toBe("read");
   expect((await teamActivity("other")).events).toEqual([]);
   expect((await teamActivity("owner", log.events[1].id)).events.map((e) => e.action)).toEqual([
     "invitation.created",

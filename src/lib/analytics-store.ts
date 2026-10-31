@@ -97,7 +97,7 @@ export async function updateLeadStatus(
     await tx`update obseri_leads set status = ${status} where soul_id = ${soulId} and id = ${id}`;
     if (actor)
       await tx`insert into obseri_team_activity (owner_user_id, actor_user_id, actor_email, action, changes)
-      values (${actor.id}, ${actor.actorUserId}, ${actor.email || ""}, 'lead.status', ${JSON.stringify([{ section: "conversations", field: "Lead status", soulId, leadId: id, operation: `${existing[0].status} → ${status}` }])}::jsonb)`;
+      values (${actor.id}, ${actor.actorUserId}, ${actor.email || ""}, 'lead.status', ${tx.json([{ section: "conversations", field: "Lead status", soulId, leadId: id, operation: `${existing[0].status} → ${status}` }])}::jsonb)`;
   });
 }
 

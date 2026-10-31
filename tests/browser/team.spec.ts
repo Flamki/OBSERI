@@ -246,7 +246,7 @@ test("owner sets section access and reads the audit log", async ({ page }) => {
                 operation: "updated",
               },
             ],
-            revision: 2,
+            revision: "2",
             createdAt: new Date().toISOString(),
           },
         ],
@@ -270,6 +270,64 @@ test("owner sets section access and reads the audit log", async ({ page }) => {
   await page.getByRole("tab", { name: "Activity log" }).click();
   await expect(page.getByText("Revision 2")).toBeVisible();
   await expect(page.getByText("merchant.example · Voice · speed · updated")).toBeVisible();
+});
+
+test("activity handles legacy JSON text and damaged entries without crashing", async ({ page }) => {
+  await setup(page);
+  const crashes: string[] = [];
+  page.on("pageerror", (error) => crashes.push(error.message));
+  await page.route("**/api/team", (route) =>
+    route.fulfill({ json: { members: [], invitations: [], seatLimit: 5, plan: "Growth" } }),
+  );
+  let brokenResponse = false;
+  await page.route("**/api/team?view=activity", (route) =>
+    route.fulfill({
+      json: brokenResponse
+        ? { events: null }
+        : {
+            events: [
+              {
+                id: "1",
+                actorEmail: "",
+                action: "invitation.created",
+                changes: JSON.stringify([
+                  { email: "teammate@example.com", permissions: permissionPreset("read") },
+                ]),
+                createdAt: new Date().toISOString(),
+              },
+              {
+                id: "2",
+                actorEmail: "",
+                action: "workspace.updated",
+                changes: [null],
+                createdAt: new Date().toISOString(),
+              },
+              {
+                id: "3",
+                actorEmail: "",
+                action: "member.joined",
+                changes: [],
+                createdAt: new Date().toISOString(),
+              },
+            ],
+            nextCursor: null,
+          },
+    }),
+  );
+  await page.goto("/app?view=team");
+  await page.getByRole("tab", { name: "Activity log" }).click();
+  await expect(page.getByText("teammate@example.com")).toBeVisible();
+  await expect(page.getByText("viewer access", { exact: true })).toBeVisible();
+  await expect(page.getByText("Details for this entry are unavailable.")).toBeVisible();
+  await expect(page.getByText("· Joined workspace", { exact: true })).toBeVisible();
+  brokenResponse = true;
+  await page.getByRole("button", { name: "Refresh log" }).click();
+  await expect(page.getByRole("alert")).toContainText("Could not load activity");
+  await expect(page.getByText("teammate@example.com")).toBeVisible();
+  brokenResponse = false;
+  await page.getByRole("button", { name: "Refresh log" }).click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  expect(crashes).toEqual([]);
 });
 
 test("restricted teammate sees only allowed sections and read-only knowledge", async ({ page }) => {

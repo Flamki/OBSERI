@@ -140,7 +140,7 @@ export async function publishSoul(input: {
     `;
     if (input.audit)
       await transaction`insert into obseri_team_activity (owner_user_id, actor_user_id, actor_email, action, changes)
-      values (${input.ownerUserId}, ${input.audit.actorId}, ${input.audit.email}, 'assistant.published', ${JSON.stringify([{ website: source.name, soulId: source.id }])}::jsonb)`;
+      values (${input.ownerUserId}, ${input.audit.actorId}, ${input.audit.email}, 'assistant.published', ${transaction.json([{ website: source.name, soulId: source.id }])}::jsonb)`;
   });
 
   return {

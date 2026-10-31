@@ -57,7 +57,7 @@ export async function saveUserWorkspace(
     returning user_id
     ), logged as (
       insert into obseri_team_activity (owner_user_id, actor_user_id, actor_email, action, changes, revision)
-      select user_id, ${audit?.actorId || userId}, ${audit?.email || ""}, 'workspace.updated', ${JSON.stringify(audit?.changes || [])}::jsonb, ${normalized.revision}
+      select user_id, ${audit?.actorId || userId}, ${audit?.email || ""}, 'workspace.updated', ${db().json((audit?.changes || []) as never)}::jsonb, ${normalized.revision}
       from saved returning id
     ) select user_id from saved
   `

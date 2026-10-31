@@ -1,3 +1,4 @@
+import { parseActivityPage, type ActivityEvent } from "@/lib/team-activity";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   ACCESS_SECTIONS,
@@ -695,24 +696,6 @@ function PermissionEditor({
     </div>
   );
 }
-type ActivityEvent = {
-  id: string;
-  actorId: string;
-  actorEmail: string;
-  action: string;
-  changes: Array<{
-    section?: string;
-    field?: string;
-    website?: string;
-    email?: string;
-    operation?: string;
-    before?: WorkspacePermissions;
-    after?: WorkspacePermissions;
-    permissions?: WorkspacePermissions;
-  }>;
-  revision?: number;
-  createdAt: string;
-};
 function TeamActivity() {
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -721,9 +704,9 @@ function TeamActivity() {
   async function load(before?: string) {
     setBusy(true);
     try {
-      const data = await authFetch(
-        `/api/team?view=activity${before ? `&before=${before}` : ""}`,
-      ).then(result);
+      const data = parseActivityPage(
+        await authFetch(`/api/team?view=activity${before ? `&before=${before}` : ""}`).then(result),
+      );
       setEvents((old) => (before ? [...old, ...data.events] : data.events));
       setCursor(data.nextCursor);
       setError("");
@@ -780,6 +763,9 @@ function TeamActivity() {
                 {new Date(event.createdAt).toLocaleString()}
               </time>
             </div>
+            {event.detailsUnavailable && (
+              <p className="mt-2 text-xs text-stone-500">Details for this entry are unavailable.</p>
+            )}
             <ul className="mt-2 space-y-1 text-xs text-stone-600">
               {event.changes.map((change, index) => (
                 <li key={index}>
