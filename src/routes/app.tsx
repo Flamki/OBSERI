@@ -662,7 +662,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
   }
 
   return (
-    <div className="obs-app h-screen overflow-hidden bg-[#fafaf9] text-[#0b0b0c]">
+    <div className="obs-app h-dvh overflow-hidden bg-[#fafaf9] text-[#0b0b0c]">
       <div className="flex h-full">
         <Sidebar
           workspace={workspace}
@@ -678,7 +678,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
           onSoulChange={(id) => setWorkspace((current) => ({ ...current, activeSoulId: id }))}
         />
 
-        <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
           <Topbar
             workspace={workspace}
             soul={soul}
@@ -695,7 +695,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
 
           <main
             className={`mx-auto min-h-0 w-full flex-1 ${
-              view === "playground"
+              view === "playground" || view === "conversations"
                 ? "max-w-none overflow-hidden p-0"
                 : "max-w-none overflow-y-auto bg-white p-0"
             }`}
@@ -3623,9 +3623,13 @@ function ConversationsView({
   const [filter, setFilter] = useState<ConversationFilter>("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(focusId ?? conversations[0]?.id ?? "");
+  const [mobileDetail, setMobileDetail] = useState(Boolean(focusId));
 
   useEffect(() => {
-    if (focusId) setSelected(focusId);
+    if (focusId) {
+      setSelected(focusId);
+      setMobileDetail(true);
+    }
   }, [focusId]);
 
   const counts: Record<ConversationFilter, number> = {
@@ -3660,8 +3664,8 @@ function ConversationsView({
 
   if (!conversations.length) {
     return (
-      <div className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-[#fafaf9] p-6">
-        <div className="max-w-md text-center">
+      <div className="flex h-full overflow-y-auto bg-[#fafaf9] p-6">
+        <div className="m-auto max-w-md text-center">
           <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-[#5f5e5a] shadow-[0_1px_2px_rgba(0,0,0,.05)]">
             <MessageCircle className="h-6 w-6" />
           </span>
@@ -3692,9 +3696,12 @@ function ConversationsView({
   }
 
   return (
-    <div className="grid min-h-[calc(100vh-64px)] bg-white lg:grid-cols-[380px_1fr]">
-      <aside className="flex min-h-0 flex-col border-b border-[#ececea] lg:border-b-0 lg:border-r">
-        <div className="space-y-3 border-b border-[#ececea] p-4">
+    <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)] overflow-hidden bg-white lg:grid-cols-[380px_minmax(0,1fr)]">
+      <aside
+        aria-label="Conversation inbox"
+        className={`${mobileDetail && conversation ? "hidden" : "flex"} min-h-0 min-w-0 flex-col overflow-hidden border-[#ececea] lg:flex lg:border-r`}
+      >
+        <div className="shrink-0 space-y-3 border-b border-[#ececea] p-4">
           <div className="flex items-center justify-between">
             <h1 className="text-[17px] font-semibold tracking-[-0.02em]">Conversations</h1>
             <button
@@ -3742,13 +3749,22 @@ function ConversationsView({
             ))}
           </div>
         </div>
-        <div className="max-h-[42vh] min-h-0 flex-1 overflow-y-auto lg:max-h-none">
+        <div
+          role="region"
+          aria-label="Conversation list"
+          tabIndex={0}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        >
           {visible.length ? (
             visible.map((item) => (
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setSelected(item.id)}
+                onClick={() => {
+                  setSelected(item.id);
+                  setMobileDetail(true);
+                }}
+                aria-current={conversation?.id === item.id ? "true" : undefined}
                 className={`w-full border-b border-[#f1f1ef] px-4 py-3.5 text-left transition ${conversation?.id === item.id ? "bg-[#f5f5f3]" : "hover:bg-[#fafaf9]"}`}
               >
                 <div className="flex items-center gap-2">
@@ -3776,9 +3792,19 @@ function ConversationsView({
       </aside>
 
       {conversation ? (
-        <section className="flex min-h-0 flex-col">
-          <header className="flex flex-col gap-4 border-b border-[#ececea] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+        <section
+          aria-label="Selected conversation"
+          className={`${mobileDetail ? "flex" : "hidden"} min-h-0 min-w-0 flex-col overflow-hidden lg:flex`}
+        >
+          <header className="flex shrink-0 flex-col gap-4 border-b border-[#ececea] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
             <div className="min-w-0">
+              <button
+                type="button"
+                onClick={() => setMobileDetail(false)}
+                className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-[#5f5e5a] hover:text-black lg:hidden"
+              >
+                <ChevronLeft className="h-4 w-4" /> Back to conversations
+              </button>
               <div className="flex items-center gap-2">
                 <h2 className="truncate text-[17px] font-semibold tracking-[-0.02em]">
                   {visitorName(conversation)}
@@ -3813,7 +3839,13 @@ function ConversationsView({
               </div>
             )}
           </header>
-          <div className="flex-1 overflow-y-auto bg-[#fafaf9] px-5 py-6 sm:px-8">
+          <div
+            key={conversation.id}
+            role="region"
+            aria-label="Conversation messages"
+            tabIndex={0}
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain break-words bg-[#fafaf9] px-5 py-6 sm:px-8"
+          >
             <div className="mx-auto max-w-2xl space-y-4">
               {conversation.messages.map((message) => (
                 <div
@@ -3858,7 +3890,7 @@ function ConversationsView({
           </div>
         </section>
       ) : (
-        <div className="flex items-center justify-center p-8 text-sm text-[#8a8984]">
+        <div className="hidden items-center justify-center p-8 text-sm text-[#8a8984] lg:flex">
           Select a conversation.
         </div>
       )}
