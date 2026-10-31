@@ -1,5 +1,6 @@
 /** Shared policy vocabulary. The server is authoritative; UI uses it for navigation. */
 export const ACCESS_SECTIONS = {
+  dashboard: "Dashboard",
   knowledge: "Knowledge",
   personality: "Personality",
   voice: "Voice",
@@ -14,7 +15,10 @@ export type AccessLevel = "none" | "read" | "write";
 export type WorkspacePermissions = Record<AccessSection, AccessLevel>;
 export function permissionPreset(level: AccessLevel): WorkspacePermissions {
   return Object.fromEntries(
-    Object.keys(ACCESS_SECTIONS).map((key) => [key, level]),
+    Object.keys(ACCESS_SECTIONS).map((key) => [
+      key,
+      key === "dashboard" && level === "write" ? "read" : level,
+    ]),
   ) as WorkspacePermissions;
 }
 export function normalizePermissions(value: unknown): WorkspacePermissions {
@@ -33,7 +37,11 @@ export function normalizePermissions(value: unknown): WorkspacePermissions {
   return Object.fromEntries(
     Object.keys(ACCESS_SECTIONS).map((key) => [
       key,
-      input[key] === "write" || input[key] === "read" ? input[key] : "none",
+      input[key] === "write" || input[key] === "read"
+        ? key === "dashboard"
+          ? "read"
+          : input[key]
+        : "none",
     ]),
   ) as WorkspacePermissions;
 }
@@ -46,14 +54,17 @@ export function canAccess(
   return write ? level === "write" : level !== "none";
 }
 export function accessRole(permissions: WorkspacePermissions) {
-  const levels = Object.values(permissions);
-  return levels.every((level) => level === "write")
+  const levels = Object.entries(permissions)
+    .filter(([key]) => key !== "dashboard")
+    .map(([, level]) => level);
+  return permissions.dashboard === "read" && levels.every((level) => level === "write")
     ? "editor"
-    : levels.every((level) => level === "read")
+    : permissions.dashboard === "read" && levels.every((level) => level === "read")
       ? "viewer"
       : "custom";
 }
 export const VIEW_SECTION: Record<string, AccessSection> = {
+  overview: "dashboard",
   knowledge: "knowledge",
   personality: "personality",
   voice: "voice",

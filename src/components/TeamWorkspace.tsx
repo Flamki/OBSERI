@@ -9,8 +9,16 @@ import {
   type WorkspacePermissions,
   type AccessSection,
 } from "@/lib/workspace-access";
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { authFetch, setActiveWorkspaceOwner } from "@/lib/auth-client";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { authFetch, setActiveWorkspaceOwner, suspendWorkspaceAccess } from "@/lib/auth-client";
 
 type Workspace = {
   ownerId: string;
@@ -22,6 +30,7 @@ const Context = createContext<{
   current: Workspace;
   workspaces: Workspace[];
   switchTo: (id: string) => void;
+  invalidateAccess: (reason: "revoked" | "changed") => void;
 } | null>(null);
 export const useTeamWorkspace = () => useContext(Context);
 const storageKey = (id: string) => `obseri-active-workspace:${id}`;
@@ -36,6 +45,68 @@ export function TeamWorkspaceGate({ userId, children }: { userId: string; childr
   const [invite, setInvite] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [accessNotice, setAccessNotice] = useState<"revoked" | "changed" | null>(null);
+  const blocked = useRef(false);
+  const invalidateAccess = useCallback(
+    (reason: "revoked" | "changed") => {
+      if (!current || current.role === "owner" || blocked.current) return;
+      blocked.current = true;
+      suspendWorkspaceAccess(current.ownerId);
+      localStorage.removeItem(`obseri.soul-studio.v1:${userId}:${current.ownerId}`);
+      // Remove the pre-team cache too; shared data must not survive access changes.
+      localStorage.removeItem(`obseri.soul-studio.v1:${userId}`);
+      setAccessNotice(reason);
+    },
+    [current, userId],
+  );
+  useEffect(() => {
+    if (!current || current.role === "owner" || accessNotice) return;
+    let active = true;
+    let checking = false;
+    const controller = new AbortController();
+    async function check() {
+      if (checking || document.hidden) return;
+      checking = true;
+      try {
+        const response = await authFetch("/api/team?view=access", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!active) return;
+        if (response.status === 401 || response.status === 403) {
+          invalidateAccess("revoked");
+          return;
+        }
+        if (!response.ok) return; // A temporary outage is not a revocation.
+        const { access } = await response.json();
+        if (
+          active &&
+          access &&
+          (access.role !== current!.role ||
+            JSON.stringify(normalizePermissions(access.permissions)) !==
+              JSON.stringify(normalizePermissions(current!.permissions)))
+        )
+          invalidateAccess("changed");
+      } catch {
+        /* Retry transient connectivity failures on the next check. */
+      } finally {
+        checking = false;
+      }
+    }
+    void check();
+    const interval = window.setInterval(check, 3000);
+    window.addEventListener("focus", check);
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener("obseri-access-check", check);
+    return () => {
+      active = false;
+      controller.abort();
+      clearInterval(interval);
+      window.removeEventListener("focus", check);
+      document.removeEventListener("visibilitychange", check);
+      window.removeEventListener("obseri-access-check", check);
+    };
+  }, [current, accessNotice, invalidateAccess]);
   useEffect(() => {
     let active = true;
     setActiveWorkspaceOwner("");
@@ -88,9 +159,50 @@ export function TeamWorkspaceGate({ userId, children }: { userId: string; childr
       setBusy(false);
     }
   }
+  if (accessNotice)
+    return (
+      <main className="obs-app flex min-h-dvh items-center justify-center bg-white p-6 text-[#171717]">
+        <section
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="access-notice-title"
+          aria-describedby="access-notice-description"
+          className="w-full max-w-md rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm"
+        >
+          <h1 id="access-notice-title" className="text-2xl font-semibold">
+            {accessNotice === "revoked"
+              ? "Your workspace access was revoked"
+              : "Your access has changed"}
+          </h1>
+          <p id="access-notice-description" className="mt-3 text-sm leading-6 text-stone-600">
+            {accessNotice === "revoked"
+              ? "You can no longer view or edit this workspace. Contact the workspace owner if you need access again."
+              : "The owner updated the sections you can access. Continue to load your current permissions, or contact the owner for help."}
+          </p>
+          <div className="mt-6 flex flex-col gap-3">
+            {accessNotice === "changed" && (
+              <button
+                autoFocus
+                onClick={() => window.location.reload()}
+                className="rounded-full bg-black px-5 py-3 text-sm text-white"
+              >
+                Continue with updated access
+              </button>
+            )}
+            <button
+              autoFocus={accessNotice === "revoked"}
+              onClick={() => switchTo(userId)}
+              className="rounded-full border border-stone-300 px-5 py-3 text-sm"
+            >
+              Open my workspace
+            </button>
+          </div>
+        </section>
+      </main>
+    );
   if (invite || !current || !workspaces)
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#fafaf9] p-6">
+      <div className="flex min-h-dvh items-center justify-center bg-[#fafaf9] p-6 text-[#171717]">
         <div className="w-full max-w-md rounded-3xl border bg-white p-8 shadow-sm">
           <h1 className="text-2xl font-semibold">
             {invite ? "Join your team" : "Opening your workspace"}
@@ -134,7 +246,11 @@ export function TeamWorkspaceGate({ userId, children }: { userId: string; childr
         </div>
       </div>
     );
-  return <Context.Provider value={{ current, workspaces, switchTo }}>{children}</Context.Provider>;
+  return (
+    <Context.Provider value={{ current, workspaces, switchTo, invalidateAccess }}>
+      {children}
+    </Context.Provider>
+  );
 }
 export function WorkspaceSwitcher({
   beforeSwitch,
@@ -429,7 +545,7 @@ export function TeamSettings({ onViewPlans }: { onViewPlans: () => void }) {
         }}
       >
         <DialogContent
-          className="z-[90] max-h-[90dvh] w-[calc(100%-2rem)] overflow-y-auto rounded-3xl bg-white p-6 sm:max-w-xl"
+          className="obs-app obs-dialog z-[90] w-[calc(100%-2rem)] max-h-[90dvh] overflow-y-auto rounded-3xl bg-white p-6 sm:max-w-xl"
           onCloseAutoFocus={(event) => {
             event.preventDefault();
             document.getElementById("team-invite-email")?.focus();
@@ -519,7 +635,7 @@ export function TeamSettings({ onViewPlans }: { onViewPlans: () => void }) {
         }}
       >
         {editing && (
-          <DialogContent className="z-[90] max-h-[90dvh] overflow-y-auto rounded-3xl bg-white p-6 sm:max-w-xl">
+          <DialogContent className="obs-app obs-dialog z-[90] w-[calc(100%-2rem)] max-h-[90dvh] overflow-y-auto rounded-3xl bg-white p-6 sm:max-w-xl">
             <DialogTitle>Edit teammate access</DialogTitle>
             <DialogDescription>{editing.email}</DialogDescription>
             <PermissionEditor
@@ -528,7 +644,8 @@ export function TeamSettings({ onViewPlans }: { onViewPlans: () => void }) {
               disabled={busy}
             />
             <p className="mt-3 text-xs text-stone-500">
-              Applies to all websites in this workspace. Changes take effect on their next request.
+              Applies to all websites in this workspace. Access updates automatically while
+              teammates are online.
             </p>
             <div className="mt-5 flex justify-end gap-3">
               <button disabled={busy} onClick={() => setEditing(null)}>
@@ -684,14 +801,14 @@ function PermissionEditor({
             >
               <option value="none">No access</option>
               <option value="read">Can view</option>
-              <option value="write">Can edit</option>
+              {key !== "dashboard" && <option value="write">Can edit</option>}
             </select>
           </label>
         ))}
       </div>
       <p className="mt-3 text-xs leading-5 text-stone-500">
         Can edit includes viewing. Publishing can release the saved assistant, including changes
-        made by other teammates.
+        made by other teammates. Dashboard only shows summaries from sections they can view.
       </p>
     </div>
   );

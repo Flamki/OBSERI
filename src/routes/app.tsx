@@ -343,7 +343,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
   useEffect(() => {
     if (!hydrated || loadError || needsOnboarding || saving.current) return;
     if (!workspaceChanges(lastPersistedWorkspace.current, workspace).length) return;
-    localStorage.setItem(workspaceCacheKey, JSON.stringify(workspace));
+    if (isOwner) localStorage.setItem(workspaceCacheKey, JSON.stringify(workspace));
     const timer = window.setTimeout(() => {
       if (saveConflict.current) return;
       void persistWorkspace(workspace, true)
@@ -379,6 +379,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
         const response = await authFetch("/api/workspace", { cache: "no-store" });
         if (!active) return;
         if (response.status === 403 || response.status === 401) {
+          team?.invalidateAccess("revoked");
           saveConflict.current = true;
           localStorage.removeItem(workspaceCacheKey);
           setWorkspace(EMPTY_WORKSPACE);
@@ -399,6 +400,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
           saveConflict.current = true;
           localStorage.removeItem(workspaceCacheKey);
           setWorkspace(EMPTY_WORKSPACE);
+          team?.invalidateAccess("changed");
           setLoadError("Your permissions changed. Reload to see your updated access.");
           return;
         }
@@ -643,7 +645,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
     const savedWorkspace = normalizeWorkspace(payload.workspace);
     lastPersistedWorkspace.current = savedWorkspace;
     setWorkspace(savedWorkspace);
-    localStorage.setItem(`${STORAGE_KEY}:${user.id}`, JSON.stringify(savedWorkspace));
+    if (isOwner) localStorage.setItem(workspaceCacheKey, JSON.stringify(savedWorkspace));
     setCreateOpen(false);
     setQuickStartUrl("");
     return savedWorkspace;
@@ -3734,7 +3736,13 @@ function OverviewView({
   onOpenConversation: (id: string) => void;
   onRefresh: () => void;
 }) {
-  const steps = getSetupSteps(soul);
+  const team = useTeamWorkspace();
+  const permitted = (view: StudioView, write = false) =>
+    !team ||
+    team.current.role === "owner" ||
+    (Boolean(VIEW_SECTION[view]) &&
+      canAccess(normalizePermissions(team.current.permissions), VIEW_SECTION[view]!, write));
+  const steps = getSetupSteps(soul).filter((step) => permitted(step.view));
   const complete = steps.filter((step) => step.done).length;
   const nextStep = steps.find((step) => !step.done);
   const visitorConversations = conversations.filter((item) => item.channel !== "playground");
@@ -3806,28 +3814,32 @@ function OverviewView({
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => onNavigate("playground")}
-              className="inline-flex h-11 items-center gap-2 rounded-full border border-[#e2e2df] bg-white px-5 text-sm font-medium transition hover:bg-[#f5f5f3]"
-            >
-              <Play className="h-4 w-4" /> Preview agent
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigate(soul.status === "live" ? "conversations" : "deploy")}
-              className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b0b0c] px-5 text-sm font-medium text-white transition hover:bg-[#2a2a2e]"
-            >
-              {soul.status === "live" ? (
-                <>
-                  <MessageCircle className="h-4 w-4" /> View conversations
-                </>
-              ) : (
-                <>
-                  <Code2 className="h-4 w-4" /> Install on website
-                </>
-              )}
-            </button>
+            {permitted("playground") && (
+              <button
+                type="button"
+                onClick={() => onNavigate("playground")}
+                className="inline-flex h-11 items-center gap-2 rounded-full border border-[#e2e2df] bg-white px-5 text-sm font-medium transition hover:bg-[#f5f5f3]"
+              >
+                <Play className="h-4 w-4" /> Preview agent
+              </button>
+            )}
+            {permitted(soul.status === "live" ? "conversations" : "deploy") && (
+              <button
+                type="button"
+                onClick={() => onNavigate(soul.status === "live" ? "conversations" : "deploy")}
+                className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b0b0c] px-5 text-sm font-medium text-white transition hover:bg-[#2a2a2e]"
+              >
+                {soul.status === "live" ? (
+                  <>
+                    <MessageCircle className="h-4 w-4" /> View conversations
+                  </>
+                ) : (
+                  <>
+                    <Code2 className="h-4 w-4" /> Install on website
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
 
@@ -3881,163 +3893,177 @@ function OverviewView({
           </section>
         )}
 
+        {!stats.some((stat) => permitted(stat.view)) && (
+          <p className="mt-6 rounded-2xl border border-stone-200 bg-white p-6 text-sm text-stone-600">
+            No dashboard summaries are shared with you yet. Ask the owner for access to the sections
+            you need.
+          </p>
+        )}
         <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {stats.map((stat) => (
-            <button
-              key={stat.label}
-              type="button"
-              onClick={() => onNavigate(stat.view)}
-              className="group rounded-[20px] border border-[#ebebe8] bg-white p-5 text-left transition hover:border-[#dcdcd8] hover:shadow-[0_8px_24px_-12px_rgba(0,0,0,.12)]"
-            >
-              <p className="flex items-center justify-between text-[13px] text-[#7a7974]">
-                {stat.label}
-                <ArrowUpRight className="h-4 w-4 text-[#b4b3ae] transition group-hover:text-[#0b0b0c]" />
-              </p>
-              <p className="mt-3 truncate text-[26px] font-semibold leading-none tracking-[-0.04em] sm:text-[30px]">
-                {stat.value}
-              </p>
-              <p className="mt-2 truncate text-xs text-[#8a8984]">{stat.detail}</p>
-            </button>
-          ))}
+          {stats
+            .filter((stat) => permitted(stat.view))
+            .map((stat) => (
+              <button
+                key={stat.label}
+                type="button"
+                onClick={() => onNavigate(stat.view)}
+                className="group rounded-[20px] border border-[#ebebe8] bg-white p-5 text-left transition hover:border-[#dcdcd8] hover:shadow-[0_8px_24px_-12px_rgba(0,0,0,.12)]"
+              >
+                <p className="flex items-center justify-between text-[13px] text-[#7a7974]">
+                  {stat.label}
+                  <ArrowUpRight className="h-4 w-4 text-[#b4b3ae] transition group-hover:text-[#0b0b0c]" />
+                </p>
+                <p className="mt-3 truncate text-[26px] font-semibold leading-none tracking-[-0.04em] sm:text-[30px]">
+                  {stat.value}
+                </p>
+                <p className="mt-2 truncate text-xs text-[#8a8984]">{stat.detail}</p>
+              </button>
+            ))}
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-          <section className="rounded-[24px] border border-[#ebebe8] bg-white">
-            <div className="flex items-center justify-between border-b border-[#f0f0ee] px-5 py-4 sm:px-6">
-              <div>
-                <h2 className="text-[15px] font-semibold">Contacts in conversations</h2>
-                <p className="mt-0.5 text-xs text-[#8a8984]">
-                  Real visitors who shared contact details in chat
-                </p>
-              </div>
-              {leads.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => onNavigate("conversations")}
-                  className="text-sm font-medium text-[#0b0b0c] hover:underline"
-                >
-                  View all
-                </button>
-              )}
-            </div>
-            {leads.length ? (
-              <ul className="divide-y divide-[#f0f0ee]">
-                {leads.slice(0, 5).map((lead) => (
-                  <li key={lead.id}>
-                    <button
-                      type="button"
-                      onClick={() => onOpenConversation(lead.id)}
-                      className="flex w-full items-center gap-4 px-5 py-4 text-left transition hover:bg-[#fafaf9] sm:px-6"
-                    >
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f3f3f1] text-xs font-semibold text-[#5f5e5a]">
-                        {visitorName(lead).slice(0, 1).toUpperCase()}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center gap-2">
-                          <span className="truncate text-sm font-semibold">
-                            {visitorName(lead)}
-                          </span>
-                          <IntentBadge intent={lead.leadIntent} />
-                        </span>
-                        <span className="mt-0.5 block truncate text-[13px] text-[#7a7974]">
-                          “{firstQuestion(lead)}”
-                        </span>
-                      </span>
-                      <span className="shrink-0 text-xs text-[#9a9994]">
-                        {relativeTime(lead.updatedAt)}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="flex flex-col items-center px-6 py-12 text-center">
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f3f3f1] text-[#7a7974]">
-                  <UserRound className="h-5 w-5" />
-                </span>
-                <p className="mt-4 text-sm font-semibold">No leads yet</p>
-                <p className="mt-1 max-w-xs text-[13px] leading-5 text-[#8a8984]">
-                  {soul.status === "live"
-                    ? "When a visitor shows buying intent or shares their details, they’ll appear here."
-                    : "Install the widget on your website and leads will start arriving here."}
-                </p>
-                {soul.status !== "live" && (
+          {permitted("conversations") && (
+            <section className="rounded-[24px] border border-[#ebebe8] bg-white">
+              <div className="flex items-center justify-between border-b border-[#f0f0ee] px-5 py-4 sm:px-6">
+                <div>
+                  <h2 className="text-[15px] font-semibold">Contacts in conversations</h2>
+                  <p className="mt-0.5 text-xs text-[#8a8984]">
+                    Real visitors who shared contact details in chat
+                  </p>
+                </div>
+                {leads.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => onNavigate("deploy")}
-                    className="mt-4 inline-flex h-9 items-center gap-2 rounded-full border border-[#e2e2df] px-4 text-sm font-medium hover:bg-[#f5f5f3]"
+                    onClick={() => onNavigate("conversations")}
+                    className="text-sm font-medium text-[#0b0b0c] hover:underline"
                   >
-                    Install widget <ArrowRight className="h-3.5 w-3.5" />
+                    View all
                   </button>
                 )}
               </div>
-            )}
-          </section>
-
-          <div className="grid gap-4">
-            <section className="rounded-[24px] border border-[#ebebe8] bg-white p-5 sm:p-6">
-              <h2 className="text-[15px] font-semibold">What visitors ask</h2>
-              {questions.length ? (
-                <ol className="mt-4 space-y-2.5">
-                  {questions.map((item, index) => (
-                    <li key={item.question} className="flex items-start gap-3 text-sm">
-                      <span className="obs-mono mt-0.5 w-4 shrink-0 text-xs text-[#a3a29d]">
-                        {index + 1}
-                      </span>
-                      <span className="min-w-0 flex-1 leading-5 text-[#3d3d3a]">
-                        {item.question}
-                      </span>
-                      {item.count > 1 && (
-                        <span className="shrink-0 rounded-full bg-[#f3f3f1] px-2 py-0.5 text-[11px] font-medium text-[#6f6e69]">
-                          ×{item.count}
+              {leads.length ? (
+                <ul className="divide-y divide-[#f0f0ee]">
+                  {leads.slice(0, 5).map((lead) => (
+                    <li key={lead.id}>
+                      <button
+                        type="button"
+                        onClick={() => onOpenConversation(lead.id)}
+                        className="flex w-full items-center gap-4 px-5 py-4 text-left transition hover:bg-[#fafaf9] sm:px-6"
+                      >
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f3f3f1] text-xs font-semibold text-[#5f5e5a]">
+                          {visitorName(lead).slice(0, 1).toUpperCase()}
                         </span>
-                      )}
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-2">
+                            <span className="truncate text-sm font-semibold">
+                              {visitorName(lead)}
+                            </span>
+                            <IntentBadge intent={lead.leadIntent} />
+                          </span>
+                          <span className="mt-0.5 block truncate text-[13px] text-[#7a7974]">
+                            “{firstQuestion(lead)}”
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-xs text-[#9a9994]">
+                          {relativeTime(lead.updatedAt)}
+                        </span>
+                      </button>
                     </li>
                   ))}
-                </ol>
+                </ul>
               ) : (
-                <p className="mt-3 text-[13px] leading-5 text-[#8a8984]">
-                  Visitor questions will show up here, so you can see what your website isn’t
-                  answering on its own.
-                </p>
+                <div className="flex flex-col items-center px-6 py-12 text-center">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f3f3f1] text-[#7a7974]">
+                    <UserRound className="h-5 w-5" />
+                  </span>
+                  <p className="mt-4 text-sm font-semibold">No leads yet</p>
+                  <p className="mt-1 max-w-xs text-[13px] leading-5 text-[#8a8984]">
+                    {soul.status === "live"
+                      ? "When a visitor shows buying intent or shares their details, they’ll appear here."
+                      : "Install the widget on your website and leads will start arriving here."}
+                  </p>
+                  {soul.status !== "live" && permitted("deploy") && (
+                    <button
+                      type="button"
+                      onClick={() => onNavigate("deploy")}
+                      className="mt-4 inline-flex h-9 items-center gap-2 rounded-full border border-[#e2e2df] px-4 text-sm font-medium hover:bg-[#f5f5f3]"
+                    >
+                      Install widget <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
               )}
             </section>
+          )}
 
-            <section className="rounded-[24px] border border-[#ebebe8] bg-white p-5 sm:p-6">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-[15px] font-semibold">Knowledge</h2>
-                  <p className="mt-1 text-[13px] text-[#8a8984]">
-                    {crawling
-                      ? "Learning your website now…"
-                      : soul.knowledge.lastCrawledAt
-                        ? `Last refreshed ${relativeTime(soul.knowledge.lastCrawledAt)}`
-                        : "Not learned yet"}
+          <div className="grid gap-4">
+            {permitted("conversations") && (
+              <section className="rounded-[24px] border border-[#ebebe8] bg-white p-5 sm:p-6">
+                <h2 className="text-[15px] font-semibold">What visitors ask</h2>
+                {questions.length ? (
+                  <ol className="mt-4 space-y-2.5">
+                    {questions.map((item, index) => (
+                      <li key={item.question} className="flex items-start gap-3 text-sm">
+                        <span className="obs-mono mt-0.5 w-4 shrink-0 text-xs text-[#a3a29d]">
+                          {index + 1}
+                        </span>
+                        <span className="min-w-0 flex-1 leading-5 text-[#3d3d3a]">
+                          {item.question}
+                        </span>
+                        {item.count > 1 && (
+                          <span className="shrink-0 rounded-full bg-[#f3f3f1] px-2 py-0.5 text-[11px] font-medium text-[#6f6e69]">
+                            ×{item.count}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="mt-3 text-[13px] leading-5 text-[#8a8984]">
+                    Visitor questions will show up here, so you can see what your website isn’t
+                    answering on its own.
                   </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={onRefresh}
-                  disabled={crawling}
-                  className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full border border-[#e2e2df] px-3.5 text-[13px] font-medium transition hover:bg-[#f5f5f3] disabled:opacity-50"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${crawling ? "animate-spin" : ""}`} />
-                  Refresh
-                </button>
-              </div>
-              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                {[
-                  ["Pages", pages],
-                  ["Sources", soul.knowledge.sources?.length || (pages ? 1 : 0)],
-                  ["Issues", soul.knowledge.errors.length],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-2xl bg-[#f7f7f5] px-2 py-3">
-                    <p className="text-lg font-semibold tracking-[-0.03em]">{value}</p>
-                    <p className="text-[11px] text-[#8a8984]">{label}</p>
+                )}
+              </section>
+            )}
+
+            {permitted("knowledge") && (
+              <section className="rounded-[24px] border border-[#ebebe8] bg-white p-5 sm:p-6">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-[15px] font-semibold">Knowledge</h2>
+                    <p className="mt-1 text-[13px] text-[#8a8984]">
+                      {crawling
+                        ? "Learning your website now…"
+                        : soul.knowledge.lastCrawledAt
+                          ? `Last refreshed ${relativeTime(soul.knowledge.lastCrawledAt)}`
+                          : "Not learned yet"}
+                    </p>
                   </div>
-                ))}
-              </div>
-            </section>
+                  <button
+                    type="button"
+                    onClick={onRefresh}
+                    disabled={crawling || !permitted("knowledge", true)}
+                    className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full border border-[#e2e2df] px-3.5 text-[13px] font-medium transition hover:bg-[#f5f5f3] disabled:opacity-50"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${crawling ? "animate-spin" : ""}`} />
+                    Refresh
+                  </button>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                  {[
+                    ["Pages", pages],
+                    ["Sources", soul.knowledge.sources?.length || (pages ? 1 : 0)],
+                    ["Issues", soul.knowledge.errors.length],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-2xl bg-[#f7f7f5] px-2 py-3">
+                      <p className="text-lg font-semibold tracking-[-0.03em]">{value}</p>
+                      <p className="text-[11px] text-[#8a8984]">{label}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         </div>
       </div>

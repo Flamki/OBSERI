@@ -16,6 +16,7 @@ import {
 
 const permissionsSchema = z
   .object({
+    dashboard: z.enum(["none", "read"]).default("none"),
     knowledge: z.enum(["none", "read", "write"]),
     personality: z.enum(["none", "read", "write"]),
     voice: z.enum(["none", "read", "write"]),
@@ -63,6 +64,10 @@ export const Route = createFileRoute("/api/team")({
         try {
           if (new URL(request.url).searchParams.get("view") === "workspaces")
             return json({ workspaces: await listWorkspaces(await requireUser(request)) });
+          if (new URL(request.url).searchParams.get("view") === "access") {
+            const user = await requireWorkspaceUser(request);
+            return json({ access: { role: user.role, permissions: user.permissions } });
+          }
           const owner = await requireWorkspaceUser(request, true);
           if (new URL(request.url).searchParams.get("view") === "activity")
             return json(

@@ -690,3 +690,21 @@ html.obseri-embed body {
     transform: none;
   }
 }
+
+/* Radix dialogs render outside the studio root, so carry the light studio theme. */
+.obs-dialog {
+  --background: #ffffff;
+  --foreground: #171717;
+  --muted-foreground: #57534e;
+  --border: #e7e5e4;
+  --input: #d6d3d1;
+  --ring: #78716c;
+  --color-background: #ffffff;
+  --color-foreground: #171717;
+  --color-muted-foreground: #57534e;
+  --color-border: #e7e5e4;
+  --color-input: #d6d3d1;
+  --color-ring: #78716c;
+  color: #171717;
+  color-scheme: light;
+}

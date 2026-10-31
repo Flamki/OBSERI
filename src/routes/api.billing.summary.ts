@@ -13,8 +13,6 @@ export const Route = createFileRoute("/api/billing/summary")({
             user.role !== "owner"
               ? {
                   plan: summary.plan,
-                  usage: summary.usage,
-                  period: summary.period,
                   subscription: null,
                 }
               : summary,

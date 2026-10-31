@@ -126,6 +126,42 @@ it("keeps malformed explicit permission policies closed", () => {
   expect(normalizePermissions(null)).toEqual(permissionPreset("write"));
 });
 
+it("requires an explicit Dashboard grant on existing section policies", () => {
+  expect(normalizePermissions({ voice: "write" }).dashboard).toBe("none");
+  expect(normalizePermissions({ dashboard: "write" }).dashboard).toBe("read");
+});
+
+it("Dashboard permission never grants access to protected section data", async () => {
+  const permissions = { ...permissionPreset("none"), dashboard: "read" as const };
+  await acceptInvitation(member, await inviteEditor("owner", member.email, permissions));
+  state.actor = member;
+  const user = await requireWorkspaceUser(request(), { section: "dashboard" });
+  for (const section of [
+    "knowledge",
+    "voice",
+    "personality",
+    "conversations",
+    "analytics",
+    "deploy",
+    "settings",
+  ] as const) {
+    await expect(requireWorkspaceUser(request(), { section })).rejects.toMatchObject({
+      status: 403,
+    });
+  }
+  const soul = createSoul("https://example.com");
+  soul.knowledge.keywords = ["confidential knowledge"];
+  soul.personality.name = "Private assistant name";
+  const workspace = { id: "test", name: "Shared", souls: [soul], activeSoulId: soul.id };
+  const visible = JSON.stringify(visibleWorkspace(workspace, user));
+  expect(visible).not.toContain("confidential knowledge");
+  expect(visible).not.toContain("Private assistant name");
+  await updateMemberAccess("owner", member.id, permissionPreset("none"));
+  await expect(requireWorkspaceUser(request(), { section: "dashboard" })).rejects.toMatchObject({
+    status: 403,
+  });
+});
+
 it("stores new invitation and access audit data as structured JSON", async () => {
   const token = await inviteEditor("owner", "editor@example.com", permissionPreset("read"));
   await acceptInvitation({ id: "editor", email: "editor@example.com", emailVerified: true }, token);

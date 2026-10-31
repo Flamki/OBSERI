@@ -40,6 +40,9 @@ async function setup(page: Page, shared = false) {
       },
     }),
   );
+  await page.route("**/api/team?view=access", (route) =>
+    route.fulfill({ json: { access: { role: "editor", permissions: permissionPreset("write") } } }),
+  );
   await page.route("**/api/workspace", (route) => route.fulfill({ json: { workspace } }));
   await page.route("**/api/billing/summary", (route) =>
     route.fulfill({
@@ -84,6 +87,23 @@ test("owner creates an email-bound invitation link and can revoke it", async ({ 
   await page.getByRole("button", { name: "Create invite link" }).click();
   const dialog = page.getByRole("dialog", { name: "Choose invitation access" });
   await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("heading")).toHaveCSS("color", "rgb(23, 23, 23)");
+  await expect(dialog.getByRole("combobox", { name: "Dashboard access", exact: true })).toHaveCSS(
+    "color",
+    "rgb(23, 23, 23)",
+  );
+  await expect(
+    dialog.getByRole("combobox", { name: "Dashboard access", exact: true }).locator("option"),
+  ).toHaveText(["No access", "Can view"]);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const bounds = await dialog.boundingBox();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
+  await dialog.getByRole("button", { name: "Confirm & create link" }).scrollIntoViewIfNeeded();
+  await expect(dialog.getByRole("button", { name: "Confirm & create link" })).toBeInViewport();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await dialog.getByRole("heading").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "/tmp/obseri-team-access-dialog.png" });
   expect(invitations).toHaveLength(0);
   await dialog.getByRole("combobox", { name: "Permission preset" }).selectOption("viewer");
   await dialog.getByRole("combobox", { name: "Voice access", exact: true }).selectOption("none");
@@ -131,12 +151,13 @@ test("editor uses the selected workspace and cannot see billing or invitation co
 
 test("revoked workspace fails closed without showing cached customer data", async ({ page }) => {
   await setup(page, true);
+  await page.route("**/api/team?view=access", (route) => route.fulfill({ status: 403, json: {} }));
   await page.route("**/api/workspace", (route) =>
     route.fulfill({ status: 403, json: { error: { message: "Access revoked" } } }),
   );
   await page.goto("/app?view=conversations");
-  await expect(page.getByRole("alert")).toContainText("Your access may have changed");
-  await expect(page.getByRole("button", { name: "Reload workspace" })).toBeVisible();
+  await expect(page.getByRole("alertdialog")).toContainText("Your workspace access was revoked");
+  await expect(page.getByRole("button", { name: "Open my workspace" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Conversation messages" })).toHaveCount(0);
 });
 
@@ -341,6 +362,9 @@ test("restricted teammate sees only allowed sections and read-only knowledge", a
   await page.route("**/api/workspace", (route) =>
     route.fulfill({ json: { workspace, access: { role: "custom", permissions } } }),
   );
+  await page.route("**/api/team?view=access", (route) =>
+    route.fulfill({ json: { access: { role: "custom", permissions } } }),
+  );
   await page.goto("/app?view=knowledge");
   await expect(page.getByRole("button", { name: "Personality", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Voice", exact: true })).toBeVisible();
@@ -362,6 +386,103 @@ test("remote workspace edits arrive without a reload", async ({ page }) => {
   await expect(page.locator('input[value="Company"]')).toHaveCount(1);
   workspace = { ...workspace, name: "Updated by teammate", revision: 2 };
   await expect(page.locator('input[value="Updated by teammate"]')).toBeVisible({ timeout: 8000 });
+});
+
+test("Dashboard access does not expose summaries or actions for unshared sections", async ({
+  page,
+}) => {
+  const workspace = await setup(page, true);
+  const permissions = { ...permissionPreset("none"), dashboard: "read" };
+  await page.route("**/api/team?view=workspaces", (route) =>
+    route.fulfill({
+      json: {
+        workspaces: [{ ownerId: "company", name: "Company", role: "custom", permissions }],
+      },
+    }),
+  );
+  await page.route("**/api/team?view=access", (route) =>
+    route.fulfill({ json: { access: { role: "custom", permissions } } }),
+  );
+  await page.route("**/api/workspace", (route) =>
+    route.fulfill({ json: { workspace, access: { role: "custom", permissions } } }),
+  );
+  await page.goto("/app?view=overview");
+  await expect(
+    page.getByText("No dashboard summaries are shared with you yet.", { exact: false }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "View conversations", exact: true })).toHaveCount(
+    0,
+  );
+  await expect(page.getByRole("button", { name: "Preview", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Knowledge", exact: true })).toHaveCount(0);
+  await page.goto("/app?view=knowledge");
+  await expect(
+    page.getByRole("heading", { name: "This section is not shared with you" }),
+  ).toBeVisible();
+});
+
+test("revoking an active teammate removes the workspace and its cached data", async ({ page }) => {
+  await setup(page, true);
+  let revoked = false;
+  await page.route("**/api/team?view=access", (route) =>
+    revoked
+      ? route.fulfill({ status: 403, json: {} })
+      : route.fulfill({
+          json: { access: { role: "editor", permissions: permissionPreset("write") } },
+        }),
+  );
+  await page.goto("/app?view=knowledge");
+  await expect(page.getByRole("button", { name: "Knowledge", exact: true })).toBeVisible();
+  await page.evaluate(() =>
+    localStorage.setItem("obseri.soul-studio.v1:actor:company", "private cached content"),
+  );
+  revoked = true;
+  const notice = page.getByRole("alertdialog");
+  await expect(notice).toContainText("Your workspace access was revoked", { timeout: 8000 });
+  await expect(page.getByRole("button", { name: "Knowledge", exact: true })).toHaveCount(0);
+  await expect(notice.getByRole("heading")).toHaveCSS("color", "rgb(23, 23, 23)");
+  expect(
+    await page.evaluate(() => localStorage.getItem("obseri.soul-studio.v1:actor:company")),
+  ).toBeNull();
+  await page.getByRole("button", { name: "Open my workspace" }).click();
+  await expect(page.getByRole("combobox", { name: "Switch workspace" })).toHaveValue("actor");
+});
+
+test("permission changes interrupt a conflicted editor while outages do not revoke access", async ({
+  page,
+}) => {
+  const workspace = await setup(page, true);
+  let status = 200;
+  let permissions = permissionPreset("write");
+  let checks = 0;
+  await page.route("**/api/team?view=access", (route) => {
+    checks++;
+    return route.fulfill({ status, json: { access: { role: "editor", permissions } } });
+  });
+  await page.route("**/api/workspace", (route) =>
+    route.request().method() === "PUT"
+      ? route.fulfill({
+          status: 409,
+          json: { error: { message: "A teammate changed the same field." } },
+        })
+      : route.fulfill({ json: { workspace: { ...workspace, revision: 1 } } }),
+  );
+  await page.goto("/app?view=personality");
+  // Create an unsaved edit and conflict, which pauses the regular content sync.
+  const input = page.locator("input").filter({ visible: true }).first();
+  await input.fill("Unsaved assistant name");
+  await expect(page.getByRole("button", { name: "Download local edits" })).toBeVisible();
+  status = 503;
+  const previousChecks = checks;
+  await expect.poll(() => checks, { timeout: 8000 }).toBeGreaterThan(previousChecks);
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  status = 200;
+  permissions = permissionPreset("none");
+  await expect(page.getByRole("alertdialog")).toContainText("Your access has changed", {
+    timeout: 8000,
+  });
+  await expect(page.getByRole("button", { name: "Download local edits" })).toHaveCount(0);
+  await expect(page.locator('input[value="Unsaved assistant name"]')).toHaveCount(0);
 });
 
 test("a conflicting save preserves local edits and offers an export", async ({ page }) => {

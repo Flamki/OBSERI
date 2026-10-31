@@ -16,7 +16,13 @@ const neonAuth = createInternalNeonAuth(NEON_AUTH_URL, {
 export const authClient = neonAuth.adapter as unknown as ReactBetterAuthClient;
 
 let workspaceOwner = "";
+let workspaceRequests = new AbortController();
+export function suspendWorkspaceAccess(owner: string) {
+  if (owner === workspaceOwner) workspaceRequests.abort();
+}
 export function setActiveWorkspaceOwner(owner: string) {
+  workspaceRequests.abort();
+  workspaceRequests = new AbortController();
   workspaceOwner = owner;
 }
 export function getActiveWorkspaceOwner() {
@@ -33,12 +39,29 @@ export async function authFetch(
   );
   if (target.origin !== window.location.origin)
     throw new Error("Authenticated requests must stay on this site.");
+  // Capture the workspace before awaiting authentication; never send an old
+  // workspace's write to a newly selected workspace.
+  const owner = workspaceOwner;
+  const signal = AbortSignal.any([
+    workspaceRequests.signal,
+    ...(init.signal ? [init.signal] : []),
+    ...(input instanceof Request ? [input.signal] : []),
+  ]);
+  signal.throwIfAborted();
   const headers = new Headers(init.headers);
-  if (workspaceOwner) headers.set("x-obseri-workspace-owner", workspaceOwner);
+  if (owner) headers.set("x-obseri-workspace-owner", owner);
   if (!headers.has("Authorization")) {
     const token = await neonAuth.getJWTToken();
     if (token) headers.set("Authorization", `Bearer ${token}`);
   }
 
-  return fetch(input, { ...init, headers });
+  signal.throwIfAborted();
+  const response = await fetch(input, { ...init, headers, signal });
+  if (
+    (response.status === 401 || response.status === 403) &&
+    !(target.pathname === "/api/team" && target.searchParams.get("view") === "access")
+  ) {
+    window.dispatchEvent(new Event("obseri-access-check"));
+  }
+  return response;
 }
