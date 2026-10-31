@@ -55,6 +55,7 @@ export const Route = createFileRoute("/api/ingest")({
             );
           const knowledge = await ingestWebsite({
             ...parsed.data,
+            signal: request.signal,
             maxPages: Math.min(parsed.data.maxPages, allowance),
           });
           return Response.json(

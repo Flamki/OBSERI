@@ -38,7 +38,9 @@ export default defineConfig(({ command }) => ({
       // Route the bundled server through the application's SSR error wrapper.
       server: { entry: "server" },
     }),
-    ...(command === "build" ? [nitro({ defaultPreset: "vercel" })] : []),
+    ...(command === "build"
+      ? [nitro({ defaultPreset: "vercel", vercel: { functions: { maxDuration: 300 } } })]
+      : []),
     react(),
   ],
 }));

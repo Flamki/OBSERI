@@ -190,6 +190,7 @@ export type Soul = {
 };
 
 export type SoulWorkspace = {
+  revision?: number;
   id: string;
   name: string;
   souls: Soul[];
@@ -400,36 +401,50 @@ export function mergeSourceCrawl(
     return {
       ...page,
       sourceId: requestedSource.id,
+      enabled: previous?.enabled ?? page.enabled,
       revision: previous ? (changed ? (previous.revision ?? 1) + 1 : (previous.revision ?? 1)) : 1,
       changeType: previous ? (changed ? "changed" : "unchanged") : "new",
       chunks: page.chunks.map((chunk) => ({ ...chunk, sourceId: requestedSource.id })),
     } satisfies KnowledgePage;
   });
-  const retainedMissing = requestedSource.autoRemoveMissing
-    ? []
-    : previousPages
-        .filter((page) => !incomingUrls.has(page.url))
-        .map((page) => ({ ...page, status: "warning" as const }));
+  // Absence from a bounded crawl is not evidence of deletion. Only explicit 404/410
+  // responses may remove a page, and an owner's manual override always survives.
+  const confirmedMissing = new Set(
+    crawled.errors.filter((error) => /\b(404|410)\b/.test(error.message)).map((error) => error.url),
+  );
+  const retainedMissing = previousPages
+    .filter((page) => !incomingUrls.has(page.url))
+    .filter(
+      (page) =>
+        !requestedSource.autoRemoveMissing ||
+        page.manualOverride ||
+        !confirmedMissing.has(page.url),
+    )
+    .map((page) => ({ ...page, status: "warning" as const }));
+  const mergedPages = [
+    ...current.pages.filter((page) => page.sourceId !== requestedSource.id),
+    ...incoming,
+    ...unchangedPages,
+    ...retainedMissing,
+  ];
   const changedPages = incoming.filter(
     (page) => page.changeType === "new" || page.changeType === "changed",
   );
   const latestSource = crawled.sources?.[0];
   const source: KnowledgeSource = {
     ...requestedSource,
-    status: latestSource?.status ?? (incoming.length ? "ready" : "error"),
+    status:
+      requestedSource.status === "paused"
+        ? "paused"
+        : (latestSource?.status ?? (incoming.length || unchangedPages.length ? "ready" : "error")),
     lastCrawledAt: now,
     lastError: latestSource?.lastError,
   };
   return {
     ...current,
     schemaVersion: 2,
-    status: incoming.length || retainedMissing.length ? "ready" : "error",
-    pages: [
-      ...current.pages.filter((page) => page.sourceId !== requestedSource.id),
-      ...incoming,
-      ...unchangedPages,
-      ...retainedMissing,
-    ],
+    status: mergedPages.length ? "ready" : "error",
+    pages: mergedPages,
     sources: [
       ...(current.sources ?? []).filter((candidate) => candidate.id !== requestedSource.id),
       source,

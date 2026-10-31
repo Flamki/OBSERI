@@ -39,15 +39,25 @@ export async function saveUserWorkspace(userId: string, value: unknown): Promise
     normalized.activeSoulId = normalized.souls[0]?.id ?? null;
   }
 
+  const expectedRevision =
+    Number.isSafeInteger(value.revision) && (value.revision ?? 0) >= 0 ? (value.revision ?? 0) : 0;
+  normalized.revision = expectedRevision + 1;
   const now = new Date().toISOString();
-  await db()`
+  const saved = await db()`
     insert into obseri_user_workspaces (user_id, workspace_id, workspace, created_at, updated_at)
     values (${userId}, ${workspaceId}, ${db().json(normalized)}, ${now}, ${now})
     on conflict (user_id) do update set
       workspace_id = excluded.workspace_id,
       workspace = excluded.workspace,
       updated_at = excluded.updated_at
+    where coalesce((obseri_user_workspaces.workspace->>'revision')::bigint, 0) = ${expectedRevision}
+    returning user_id
   `;
+  if (!saved.length)
+    throw new WorkspaceStoreError(
+      "This workspace changed in another tab or a scheduled refresh. Download your local edits before reloading to avoid losing them.",
+      409,
+    );
   return normalized;
 }
 
@@ -75,4 +85,31 @@ export class WorkspaceStoreError extends Error {
     super(message);
     this.name = "WorkspaceStoreError";
   }
+}
+
+export async function scheduledWorkspaces(): Promise<
+  Array<{ user_id: string; workspace: SoulWorkspace }>
+> {
+  const rows = await db()<Array<{ user_id: string; workspace: SoulWorkspace }>>`
+    select user_id, workspace from obseri_user_workspaces w
+    where updated_at < now() - interval '5 minutes' and exists (
+      select 1 from jsonb_array_elements(w.workspace->'souls') soul,
+      jsonb_array_elements(coalesce(soul->'knowledge'->'sources', '[]'::jsonb)) source
+      where source->>'cadence' in ('daily', 'weekly', 'monthly')
+        and source->>'status' <> 'paused'
+    ) order by updated_at asc limit 100
+  `;
+  return rows.map((row) => ({ ...row, workspace: normalizeWorkspace(row.workspace) }));
+}
+
+export async function refreshPublishedKnowledge(
+  userId: string,
+  before: import("./soul").Soul,
+  after: import("./soul").Soul,
+) {
+  // Refresh only the exact published knowledge that was crawled. Never publish draft settings.
+  await db()`update obseri_published_souls
+    set soul = jsonb_set(soul, '{knowledge}', ${db().json(after.knowledge)}), updated_at = now()
+    where owner_user_id = ${userId} and soul_id = ${before.id}
+      and soul->'knowledge' = ${db().json(before.knowledge)}`;
 }

@@ -1,3 +1,4 @@
+import { splitKnowledgeText } from "@/lib/knowledge-content";
 import { assertPublicHttpUrl, fetchPublicText, scanPublicPage } from "@/lib/scanner";
 import {
   createWebsiteSource,
@@ -8,6 +9,8 @@ import {
 } from "@/lib/soul";
 
 export type IngestOptions = {
+  signal?: AbortSignal;
+  timeoutMs?: number;
   url: string;
   maxPages: number;
   maxDepth: number;
@@ -79,6 +82,10 @@ export async function ingestWebsite(
   reporter?: CrawlReporter,
 ): Promise<KnowledgeBase> {
   const startedAt = Date.now();
+  const deadline = AbortSignal.timeout(
+    Math.min(120_000, Math.max(5_000, options.timeoutMs ?? 90_000)),
+  );
+  const signal = options.signal ? AbortSignal.any([options.signal, deadline]) : deadline;
   const rootUrl = assertPublicHttpUrl(options.url);
   const root = new URL(rootUrl);
   const maxPages = Math.max(1, Math.min(50, options.maxPages));
@@ -107,7 +114,6 @@ export async function ingestWebsite(
   const frontier: FrontierItem[] = [{ url: rootUrl, depth: 0, source: "seed", score: 10_000 }];
   const queued = new Set([canonicalizeUrl(rootUrl)]);
   const contentHashes = new Set<string>();
-  const similarityHashes: bigint[] = [];
 
   const emit = async (
     type: CrawlProgressEvent["type"],
@@ -134,7 +140,7 @@ export async function ingestWebsite(
 
   await emit("progress", "starting", `Preparing ${root.hostname}`, 2, rootUrl);
   await emit("progress", "policy", "Checking robots.txt crawl rules", 5, rootUrl);
-  const robots = await loadRobotsPolicy(root).catch(async (error) => {
+  const robots = await loadRobotsPolicy(root, signal).catch(async (error) => {
     errors.push({
       url: new URL("/robots.txt", root).toString(),
       message: error instanceof Error ? error.message : "Crawl rules could not be read.",
@@ -173,6 +179,7 @@ export async function ingestWebsite(
     robots.sitemapUrls,
     maxPages * 12,
     emit,
+    signal,
   );
   for (const entry of sitemapEntries) {
     if (
@@ -219,10 +226,18 @@ export async function ingestWebsite(
     16,
   );
 
-  while (frontier.length && pages.length < maxPages && stats.fetched < fetchBudget) {
+  while (
+    !signal.aborted &&
+    frontier.length &&
+    pages.length + unchangedUrls.length < maxPages &&
+    stats.fetched < fetchBudget
+  ) {
     frontier.sort((a, b) => b.score - a.score || a.depth - b.depth);
     const concurrency = robots.crawlDelayMs > 0 ? 1 : 3;
-    const batch = frontier.splice(0, Math.min(concurrency, maxPages - pages.length));
+    const batch = frontier.splice(
+      0,
+      Math.min(concurrency, maxPages - pages.length - unchangedUrls.length),
+    );
     stats.queued = frontier.length;
 
     const results = await Promise.allSettled(
@@ -241,6 +256,7 @@ export async function ingestWebsite(
           result: await scanPublicPage({
             url: item.url,
             analyze: false,
+            signal,
             validators: validators.get(canonicalizeUrl(item.url)),
           }),
         };
@@ -303,77 +319,53 @@ export async function ingestWebsite(
           crawlProgress(stats.fetched, maxPages),
           snapshot.finalUrl,
         );
-      } else if (snapshot.wordCount < 60 && item.depth > 0) {
-        stats.skipped += 1;
+      } else {
+        if (snapshot.truncated)
+          errors.push({
+            url: canonical,
+            message:
+              "Only the first 120,000 characters were indexed. Split this source into smaller pages to include the remaining content.",
+          });
+        contentHashes.add(snapshot.hash);
+        const chunks = chunkPage(snapshot.normalizedText, canonical, snapshot.title, snapshot.hash);
+        pages.push({
+          id: snapshot.hash.slice(0, 16),
+          sourceId,
+          url: canonical,
+          title: snapshot.title,
+          description: snapshot.description,
+          hash: snapshot.hash,
+          wordCount: snapshot.wordCount,
+          capturedAt: snapshot.capturedAt,
+          status: snapshot.truncated || snapshot.wordCount < 120 ? "warning" : "ready",
+          content: snapshot.normalizedText,
+          contentType: snapshot.contentType,
+          httpStatus: snapshot.statusCode,
+          language: snapshot.language,
+          structuredDataTypes: snapshot.structuredDataTypes,
+          etag: snapshot.etag,
+          lastModified: snapshot.lastModified,
+          sizeBytes: snapshot.sizeBytes,
+          updatedAt: snapshot.capturedAt,
+          revision: 1,
+          enabled: true,
+          changeType: "new",
+          chunks: chunks.map((chunk) => ({ ...chunk, sourceId })),
+        });
+        stats.indexed = pages.length;
         await emit(
           "page",
-          "crawling",
-          `Skipped a thin page: ${displayPath(snapshot.finalUrl)}`,
+          "indexing",
+          `Learned ${snapshot.title || displayPath(snapshot.finalUrl)}`,
           crawlProgress(stats.fetched, maxPages),
-          snapshot.finalUrl,
+          canonical,
+          {
+            depth: item.depth,
+            source: item.source,
+            words: snapshot.wordCount,
+            chunks: chunks.length,
+          },
         );
-      } else {
-        const fingerprint = simHash(snapshot.normalizedText);
-        const nearDuplicate = similarityHashes.some(
-          (value) => hammingDistance(value, fingerprint) <= 3,
-        );
-        if (nearDuplicate) {
-          stats.duplicates += 1;
-          await emit(
-            "page",
-            "deduplication",
-            `Merged a near-duplicate: ${displayPath(snapshot.finalUrl)}`,
-            crawlProgress(stats.fetched, maxPages),
-            snapshot.finalUrl,
-          );
-        } else {
-          contentHashes.add(snapshot.hash);
-          similarityHashes.push(fingerprint);
-          const chunks = chunkPage(
-            snapshot.normalizedText,
-            canonical,
-            snapshot.title,
-            snapshot.hash,
-          );
-          pages.push({
-            id: snapshot.hash.slice(0, 16),
-            sourceId,
-            url: canonical,
-            title: snapshot.title,
-            description: snapshot.description,
-            hash: snapshot.hash,
-            wordCount: snapshot.wordCount,
-            capturedAt: snapshot.capturedAt,
-            status: snapshot.wordCount < 120 ? "warning" : "ready",
-            content: snapshot.normalizedText,
-            contentType: snapshot.contentType,
-            httpStatus: snapshot.statusCode,
-            language: snapshot.language,
-            structuredDataTypes: snapshot.structuredDataTypes,
-            etag: snapshot.etag,
-            lastModified: snapshot.lastModified,
-            sizeBytes: snapshot.sizeBytes,
-            updatedAt: snapshot.capturedAt,
-            revision: 1,
-            enabled: true,
-            changeType: "new",
-            chunks: chunks.map((chunk) => ({ ...chunk, sourceId })),
-          });
-          stats.indexed = pages.length;
-          await emit(
-            "page",
-            "indexing",
-            `Learned ${snapshot.title || displayPath(snapshot.finalUrl)}`,
-            crawlProgress(stats.fetched, maxPages),
-            canonical,
-            {
-              depth: item.depth,
-              source: item.source,
-              words: snapshot.wordCount,
-              chunks: chunks.length,
-            },
-          );
-        }
       }
 
       if (item.depth >= maxDepth) continue;
@@ -406,6 +398,14 @@ export async function ingestWebsite(
   }
 
   await emit("progress", "indexing", "Building clean, searchable knowledge blocks", 96);
+  if (signal.aborted) {
+    errors.push({
+      url: rootUrl,
+      message:
+        "Refresh time limit reached. Previously saved pages were retained; refresh again to continue.",
+    });
+    stats.errors += 1;
+  }
   const knowledge = makeKnowledge(
     rootUrl,
     pages,
@@ -514,9 +514,13 @@ function makeKnowledge(
   };
 }
 
-async function loadRobotsPolicy(root: URL): Promise<RobotsPolicy> {
+async function loadRobotsPolicy(root: URL, signal?: AbortSignal): Promise<RobotsPolicy> {
   const robotsUrl = new URL("/robots.txt", root).toString();
-  const response = await fetchPublicText(robotsUrl, { maxBytes: 500_000, timeoutMs: 10_000 });
+  const response = await fetchPublicText(robotsUrl, {
+    maxBytes: 500_000,
+    timeoutMs: 10_000,
+    signal,
+  });
   if (response.status === 401 || response.status === 403) {
     return { allowed: () => false, sitemapUrls: [], crawlDelayMs: 0 };
   }
@@ -625,6 +629,7 @@ async function discoverSitemapEntries(
     progress: number,
     url?: string,
   ) => Promise<void>,
+  signal?: AbortSignal,
 ): Promise<Array<{ url: string; lastModified?: string }>> {
   const queue = [
     ...declared,
@@ -634,7 +639,12 @@ async function discoverSitemapEntries(
   const seenDocuments = new Set<string>();
   const entries = new Map<string, { url: string; lastModified?: string }>();
 
-  while (queue.length && seenDocuments.size < MAX_SITEMAP_DOCUMENTS && entries.size < limit) {
+  while (
+    !signal?.aborted &&
+    queue.length &&
+    seenDocuments.size < MAX_SITEMAP_DOCUMENTS &&
+    entries.size < limit
+  ) {
     const candidate = queue.shift()!;
     let canonical: string;
     try {
@@ -644,6 +654,7 @@ async function discoverSitemapEntries(
       await emit("progress", "discovery", `Inspecting ${displayPath(candidate)}`, 12, candidate);
       const response = await fetchPublicText(candidate, {
         maxBytes: 2_500_000,
+        signal,
         timeoutMs: 12_000,
         accept: "application/xml,text/xml,text/plain,*/*;q=0.2",
       });
@@ -756,82 +767,14 @@ function chunkPage(
   pageTitle: string,
   hash: string,
 ): KnowledgeChunk[] {
-  const paragraphs = text
-    .split(/\n+/)
-    .map((value) => value.trim())
-    .filter((value) => value.length >= 20);
-  const chunks: KnowledgeChunk[] = [];
-  let buffer = "";
-
-  const push = (value: string) => {
-    const clean = value.trim();
-    if (clean.length < 20 || clean === chunks.at(-1)?.text) return;
-    const order = chunks.length;
-    chunks.push({
-      id: `${hash.slice(0, 12)}-${order}`,
-      pageUrl,
-      pageTitle,
-      text: clean,
-      order,
-      tokenEstimate: Math.ceil(clean.length / 4),
-    });
-  };
-
-  for (const paragraph of paragraphs) {
-    if (buffer && buffer.length + paragraph.length > 1_200) {
-      push(buffer);
-      buffer = sentenceOverlap(buffer, 180);
-    }
-    buffer = `${buffer}${buffer ? "\n" : ""}${paragraph}`;
-  }
-  push(buffer);
-  return chunks.slice(0, 40);
-}
-
-function sentenceOverlap(value: string, target: number): string {
-  const tail = value.slice(-target * 2);
-  const boundary = Math.max(tail.lastIndexOf(". "), tail.lastIndexOf("? "), tail.lastIndexOf("! "));
-  return (boundary >= 0 ? tail.slice(boundary + 2) : tail.slice(-target)).trim();
-}
-
-function simHash(text: string): bigint {
-  const words = text.toLowerCase().match(/[\p{L}\p{N}]{2,}/gu) ?? [];
-  const features = new Map<string, number>();
-  for (let index = 0; index < words.length; index += 1) {
-    const feature = words.slice(index, index + 3).join(" ");
-    features.set(feature, (features.get(feature) ?? 0) + 1);
-  }
-  const weights = new Array<number>(64).fill(0);
-  for (const [feature, frequency] of features) {
-    const hash = fnv1a64(feature);
-    const weight = 1 + Math.log2(frequency);
-    for (let bit = 0; bit < 64; bit += 1) {
-      weights[bit] += (hash & (1n << BigInt(bit))) !== 0n ? weight : -weight;
-    }
-  }
-  return weights.reduce(
-    (fingerprint, weight, bit) => (weight >= 0 ? fingerprint | (1n << BigInt(bit)) : fingerprint),
-    0n,
-  );
-}
-
-function fnv1a64(value: string): bigint {
-  let hash = 0xcbf29ce484222325n;
-  for (const byte of new TextEncoder().encode(value)) {
-    hash ^= BigInt(byte);
-    hash = BigInt.asUintN(64, hash * 0x100000001b3n);
-  }
-  return hash;
-}
-
-function hammingDistance(left: bigint, right: bigint): number {
-  let value = left ^ right;
-  let count = 0;
-  while (value) {
-    value &= value - 1n;
-    count += 1;
-  }
-  return count;
+  return splitKnowledgeText(text).map((text, order) => ({
+    id: `${hash.slice(0, 12)}-${order}`,
+    pageUrl,
+    pageTitle,
+    text,
+    order,
+    tokenEstimate: Math.ceil(text.length / 4),
+  }));
 }
 
 function extractKeywords(pages: KnowledgePage[]): string[] {

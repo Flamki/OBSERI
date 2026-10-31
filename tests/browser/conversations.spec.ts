@@ -154,3 +154,45 @@ test("mobile opens a full-height transcript and returns to the inbox position", 
   await expect(page.getByText("Nothing matches this filter.")).toBeVisible();
   await expect(messages).toBeHidden();
 });
+
+test("owner can test and save an approved answer from a conversation", async ({ page }) => {
+  let tested = false;
+  let saved = false;
+  await page.route("**/api/chat", async (route) => {
+    const body = route.request().postDataJSON();
+    tested = body.chunks.some((chunk: { text: string }) =>
+      chunk.text.includes("Our service costs $29 per month."),
+    );
+    await route.fulfill({
+      json: {
+        answer: "Our service costs $29 per month.",
+        citations: [],
+        mode: "model",
+        leadIntent: "none",
+      },
+    });
+  });
+  await page.route("**/api/workspace", async (route) => {
+    if (route.request().method() !== "PUT") return route.fallback();
+    const workspace = route.request().postDataJSON();
+    saved = workspace.souls.some((soul: { knowledge: { pages: { content?: string }[] } }) =>
+      soul.knowledge.pages.some((p) =>
+        p.content?.includes("Approved answer: Our service costs $29 per month."),
+      ),
+    );
+    await route.fulfill({ json: { workspace: { ...workspace, revision: 1 } } });
+  });
+  await page.goto("/app?view=conversations");
+  await page.getByRole("button", { name: "Correct answer", exact: true }).first().click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Approved answer").fill("Our service costs $29 per month.");
+  await dialog.getByRole("button", { name: "Test answer", exact: true }).click();
+  await expect(
+    dialog.getByText("Our service costs $29 per month.", { exact: true }).last(),
+  ).toBeVisible();
+  await expect.poll(() => tested).toBe(true);
+  await expect(dialog.getByText(/AI answer/)).toBeVisible();
+  await dialog.getByRole("button", { name: "Save to knowledge" }).click();
+  await expect(dialog).toBeHidden();
+  await expect.poll(() => saved).toBe(true);
+});

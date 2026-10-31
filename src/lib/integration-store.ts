@@ -458,10 +458,7 @@ function createPublicSoul(source: Soul, allowedDomains: string[], now: string): 
   soul.channels.webhookSecret = "";
   soul.channels.publishKey = "";
   soul.channels.widgetToken = "";
-  soul.knowledge.pages = soul.knowledge.pages.slice(0, 50).map((page) => ({
-    ...page,
-    chunks: page.chunks.slice(0, 500),
-  }));
+  // Workspace/plan limits are enforced before publishing. Do not silently drop knowledge here.
   return soul;
 }
 

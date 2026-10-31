@@ -70,13 +70,18 @@ export const Route = createFileRoute("/api/ingest/stream")({
         input = { ...input, maxPages: Math.min(input.maxPages, allowance) };
 
         const encoder = new TextEncoder();
+        const abort = new AbortController();
+        let closed = false;
         const stream = new ReadableStream<Uint8Array>({
           start(controller) {
             const write = (event: CrawlProgressEvent) => {
-              controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+              if (!closed) controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
             };
 
-            void ingestWebsite(input, write)
+            void ingestWebsite(
+              { ...input, signal: AbortSignal.any([request.signal, abort.signal]) },
+              write,
+            )
               .catch((error) => {
                 const event: CrawlProgressEvent = {
                   type: "error",
@@ -102,7 +107,16 @@ export const Route = createFileRoute("/api/ingest/stream")({
                 write(event);
                 console.error("streaming_knowledge_ingestion_failed", error);
               })
-              .finally(() => controller.close());
+              .finally(() => {
+                if (!closed) {
+                  closed = true;
+                  controller.close();
+                }
+              });
+          },
+          cancel() {
+            closed = true;
+            abort.abort();
           },
         });
 

@@ -1,3 +1,4 @@
+import { activeKnowledgeChunks } from "@/lib/knowledge-content";
 import { launcherMode } from "@/lib/launcher";
 import { chatAppearance, glassSurface } from "@/lib/chat-appearance";
 import { findSpeechBoundary } from "@/lib/speech-segments";
@@ -19,8 +20,8 @@ import {
   X,
 } from "lucide-react";
 import { readChatResponse } from "@/lib/chat-stream";
-import { rankKnowledgeChunks, type ChatResponse } from "@/lib/conversation";
-import type { KnowledgeChunk, Soul, SoulMessage } from "@/lib/soul";
+import { selectRequestChunks, type ChatResponse } from "@/lib/conversation";
+import type { Soul, SoulMessage } from "@/lib/soul";
 import {
   fetchSupertonicAudio,
   playSupertonicAudio,
@@ -201,7 +202,7 @@ export default function SoulChat({
           personality: soul.personality,
           chunks: sessionToken
             ? []
-            : soul.knowledge.pages.flatMap((page) => page.chunks).slice(0, 250),
+            : selectRequestChunks(nextMessages, activeKnowledgeChunks(soul.knowledge)),
           messages: nextMessages.slice(-12).map((message) => ({
             role: message.role,
             content: message.content,
@@ -273,7 +274,9 @@ export default function SoulChat({
       body: JSON.stringify({
         soulId: soul.id,
         personality: soul.personality,
-        chunks: sessionToken ? [] : prepareVoiceChunks(nextMessages.at(-1)?.content ?? "", soul),
+        chunks: sessionToken
+          ? []
+          : selectRequestChunks(nextMessages, activeKnowledgeChunks(soul.knowledge)),
         messages: nextMessages.slice(-8).map((message) => ({
           role: message.role,
           content: message.content,
@@ -996,19 +999,6 @@ type SpeechRecognitionInstance = {
 };
 
 type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
-
-function prepareVoiceChunks(question: string, soul: Soul): KnowledgeChunk[] {
-  const chunks = soul.knowledge.pages.flatMap((page) => page.chunks);
-  const ranked = rankKnowledgeChunks(question, chunks);
-  return (ranked.length ? ranked.slice(0, 48) : chunks.slice(0, 48)).map((chunk) => ({
-    id: chunk.id,
-    pageUrl: chunk.pageUrl,
-    pageTitle: chunk.pageTitle,
-    text: chunk.text,
-    order: chunk.order,
-    tokenEstimate: chunk.tokenEstimate,
-  }));
-}
 
 function greetingMessage(soulId: string, greeting: string): SoulMessage {
   return {

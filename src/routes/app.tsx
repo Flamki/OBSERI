@@ -1,3 +1,7 @@
+import { CorrectAnswerDialog } from "@/components/CorrectAnswerDialog";
+import { KnowledgeAnswerTest } from "@/components/KnowledgeAnswerTest";
+import { addApprovedAnswer } from "@/lib/knowledge-corrections";
+import { activeKnowledgeChunks, splitKnowledgeText } from "@/lib/knowledge-content";
 import ChatLauncher from "@/components/ChatLauncher";
 import LauncherSettings from "@/components/LauncherSettings";
 import { launcherPanel, launcherMode } from "@/lib/launcher";
@@ -219,6 +223,8 @@ function SoulStudio({ user }: { user: StudioUser }) {
   >({});
   const [focusConversationId, setFocusConversationId] = useState<string | null>(null);
   const lastPersistedWorkspace = useRef<SoulWorkspace>(EMPTY_WORKSPACE);
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
+  const saveConflict = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -297,19 +303,14 @@ function SoulStudio({ user }: { user: StudioUser }) {
     const userStorageKey = `${STORAGE_KEY}:${user.id}`;
     localStorage.setItem(userStorageKey, JSON.stringify(workspace));
     const timer = window.setTimeout(() => {
-      void authFetch("/api/workspace", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(workspace),
-      })
+      if (saveConflict.current) return;
+      void persistWorkspace(workspace)
         .then(async (response) => {
-          if (response.ok) {
-            lastPersistedWorkspace.current = workspace;
-            return;
-          }
+          if (response.ok) return;
           const payload = (await response.json().catch(() => null)) as {
             error?: { message?: string };
           } | null;
+          if (response.status === 409) saveConflict.current = true;
           if (response.status === 402) setWorkspace(lastPersistedWorkspace.current);
           setNotice(payload?.error?.message || "The workspace could not be saved.");
         })
@@ -323,7 +324,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
   }, [hydrated, sidebarCollapsed]);
 
   useEffect(() => {
-    if (!notice) return;
+    if (!notice || saveConflict.current) return;
     const timer = window.setTimeout(() => setNotice(""), 3200);
     return () => window.clearTimeout(timer);
   }, [notice]);
@@ -413,6 +414,30 @@ function SoulStudio({ user }: { user: StudioUser }) {
     setCreateOpen(true);
   }
 
+  function persistWorkspace(value: SoulWorkspace): Promise<Response> {
+    const pending = saveQueue.current.then(async () => {
+      if (saveConflict.current) throw new Error("Reload the workspace before saving.");
+      const response = await authFetch("/api/workspace", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...value, revision: lastPersistedWorkspace.current.revision }),
+      });
+      if (response.ok) {
+        const saved = (await response.clone().json()) as { workspace?: SoulWorkspace };
+        lastPersistedWorkspace.current = saved.workspace ?? value;
+      } else if (response.status === 409) {
+        saveConflict.current = true;
+        setNotice("Workspace updated elsewhere. Download your local edits before reloading.");
+      }
+      return response;
+    });
+    saveQueue.current = pending.then(
+      () => undefined,
+      () => undefined,
+    );
+    return pending;
+  }
+
   async function saveOnboardingSoul(nextSoul: Soul) {
     const pendingWorkspace: SoulWorkspace = {
       id: EMPTY_WORKSPACE.id,
@@ -420,11 +445,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
       souls: [nextSoul],
       activeSoulId: nextSoul.id,
     };
-    const response = await authFetch("/api/workspace", {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(pendingWorkspace),
-    });
+    const response = await persistWorkspace(pendingWorkspace);
     if (!response.ok) {
       const payload = (await response.json().catch(() => null)) as {
         error?: { message?: string };
@@ -449,11 +470,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
       souls: [...workspace.souls, nextSoul],
       activeSoulId: nextSoul.id,
     };
-    const response = await authFetch("/api/workspace", {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(pendingWorkspace),
-    });
+    const response = await persistWorkspace(pendingWorkspace);
     const payload = (await response.json().catch(() => null)) as {
       workspace?: SoulWorkspace;
       error?: { message?: string };
@@ -595,7 +612,9 @@ function SoulStudio({ user }: { user: StudioUser }) {
         status: current.status === "live" ? "live" : "draft",
         knowledge: mergeSourceCrawl(current.knowledge, crawled, source),
       }));
-      setNotice(`Learned ${crawled.pages.length} pages from ${safeHost(source.rootUrl)}.`);
+      setNotice(
+        `Refreshed ${safeHost(source.rootUrl)}: ${crawled.pages.length} pages read, ${crawled.unchangedUrls?.length ?? 0} unchanged.`,
+      );
     } catch (error) {
       updateSoul((current) => {
         const knowledge = normalizeKnowledgeBase(current.knowledge, current.siteUrl);
@@ -765,6 +784,15 @@ function SoulStudio({ user }: { user: StudioUser }) {
                 soul={soul}
                 conversations={allConversations}
                 focusId={focusConversationId}
+                onCorrect={(question, answer) => {
+                  updateSoul((current) => ({
+                    ...current,
+                    knowledge: addApprovedAnswer(current.knowledge, question, answer),
+                  }));
+                  setNotice(
+                    "Approved answer saved to Knowledge. Publish to update your live assistant.",
+                  );
+                }}
                 onTest={() => navigate("playground")}
                 onInstall={() => navigate("deploy")}
               />
@@ -811,6 +839,28 @@ function SoulStudio({ user }: { user: StudioUser }) {
       {notice && (
         <div className="fixed bottom-5 left-1/2 z-[80] -translate-x-1/2 rounded-xl border border-black/10 bg-[#1a1a19] px-4 py-3 text-sm font-medium text-white shadow-xl">
           {notice}
+          {saveConflict.current && (
+            <div className="mt-2 flex gap-4">
+              <button
+                className="underline"
+                onClick={() => {
+                  const url = URL.createObjectURL(
+                    new Blob([JSON.stringify(workspace, null, 2)], { type: "application/json" }),
+                  );
+                  const link = document.createElement("a");
+                  link.href = url;
+                  link.download = "obseri-unsaved-workspace.json";
+                  link.click();
+                  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+                }}
+              >
+                Download local edits
+              </button>
+              <button className="underline" onClick={() => window.location.reload()}>
+                Reload latest
+              </button>
+            </div>
+          )}
         </div>
       )}
       {createOpen && (
@@ -1500,10 +1550,7 @@ function KnowledgeView({
   );
   const selectedPage = knowledge.pages.find((page) => page.id === selectedPageId) ?? null;
   const retrievalHits = testQuery.trim()
-    ? rankKnowledgeChunks(
-        testQuery,
-        knowledge.pages.filter((page) => page.enabled !== false).flatMap((page) => page.chunks),
-      ).slice(0, 5)
+    ? rankKnowledgeChunks(testQuery, activeKnowledgeChunks(knowledge)).slice(0, 5)
     : [];
 
   function addManualSource(name: string, content: string) {
@@ -1688,6 +1735,7 @@ function KnowledgeView({
                   className="clean-input pl-10"
                 />
               </div>
+              <KnowledgeAnswerTest soul={soul} question={testQuery} />
               {testQuery.trim() && (
                 <div className="mt-4 space-y-2">
                   {retrievalHits.length ? (
@@ -1723,8 +1771,8 @@ function KnowledgeView({
                     ))
                   ) : (
                     <p className="rounded-xl bg-[#f7f7f6] p-4 text-xs text-[#7c7a74]">
-                      No grounded evidence matched. The assistant will use the configured “I don’t
-                      know” response.
+                      No matching evidence yet. Add an approved answer or a relevant source, then
+                      test again.
                     </p>
                   )}
                 </div>
@@ -2234,30 +2282,15 @@ function buildManualKnowledgePage(
 }
 
 function chunkManualContent(content: string, sourceId: string, title: string, url: string) {
-  const paragraphs = content
-    .split(/\n{2,}/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-  const blocks: string[] = [];
-  let current = "";
-  for (const paragraph of paragraphs.length ? paragraphs : [content]) {
-    if (current && current.length + paragraph.length > 1_200) {
-      blocks.push(current);
-      current = paragraph;
-    } else current = current ? `${current}\n\n${paragraph}` : paragraph;
-  }
-  if (current) blocks.push(current);
-  return blocks
-    .flatMap((block) => (block.length <= 1_400 ? [block] : (block.match(/[\s\S]{1,1400}/g) ?? [])))
-    .map((text, order) => ({
-      id: `${stableContentHash(`${url}-${order}-${text}`).slice(0, 16)}-${order}`,
-      sourceId,
-      pageUrl: url,
-      pageTitle: title,
-      text,
-      order,
-      tokenEstimate: Math.ceil(text.length / 4),
-    }));
+  return splitKnowledgeText(content).map((text, order) => ({
+    id: `${stableContentHash(`${url}-${order}-${text}`).slice(0, 16)}-${order}`,
+    sourceId,
+    pageUrl: url,
+    pageTitle: title,
+    text,
+    order,
+    tokenEstimate: Math.ceil(text.length / 4),
+  }));
 }
 
 function updateKnowledgePage(
@@ -3603,12 +3636,14 @@ function ConversationsView({
   soul,
   conversations,
   focusId,
+  onCorrect,
   onTest,
   onInstall,
 }: {
   soul: Soul;
   conversations: StudioConversation[];
   focusId: string | null;
+  onCorrect: (question: string, answer: string) => void;
   onTest: () => void;
   onInstall: () => void;
 }) {
@@ -3616,6 +3651,7 @@ function ConversationsView({
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(focusId ?? conversations[0]?.id ?? "");
   const [mobileDetail, setMobileDetail] = useState(Boolean(focusId));
+  const [correctionQuestion, setCorrectionQuestion] = useState<string | null>(null);
 
   useEffect(() => {
     if (focusId) {
@@ -3839,7 +3875,7 @@ function ConversationsView({
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain break-words bg-[#fafaf9] px-5 py-6 sm:px-8"
           >
             <div className="mx-auto max-w-2xl space-y-4">
-              {conversation.messages.map((message) => (
+              {conversation.messages.map((message, messageIndex) => (
                 <div
                   key={message.id}
                   className={message.role === "visitor" ? "flex justify-end" : "flex"}
@@ -3875,6 +3911,18 @@ function ConversationsView({
                     >
                       {relativeTime(message.createdAt)}
                     </p>
+                    {message.role === "assistant" &&
+                      conversation.messages[messageIndex - 1]?.role === "visitor" && (
+                        <button
+                          type="button"
+                          className="mt-1 text-[11px] font-medium text-[#65625b] underline underline-offset-2"
+                          onClick={() =>
+                            setCorrectionQuestion(conversation.messages[messageIndex - 1].content)
+                          }
+                        >
+                          Correct answer
+                        </button>
+                      )}
                   </div>
                 </div>
               ))}
@@ -3885,6 +3933,14 @@ function ConversationsView({
         <div className="hidden items-center justify-center p-8 text-sm text-[#8a8984] lg:flex">
           Select a conversation.
         </div>
+      )}
+      {correctionQuestion && (
+        <CorrectAnswerDialog
+          soul={soul}
+          question={correctionQuestion}
+          onSave={onCorrect}
+          onClose={() => setCorrectionQuestion(null)}
+        />
       )}
     </div>
   );

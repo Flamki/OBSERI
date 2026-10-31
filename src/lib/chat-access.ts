@@ -1,3 +1,4 @@
+import { activeKnowledgeChunks } from "@/lib/knowledge-content";
 import type { ChatRequest } from "@/lib/conversation";
 import { consumeRateLimit, getPublishedSoul } from "@/lib/integration-store";
 import { readBearerToken, verifyWidgetSession } from "@/lib/integration-security";
@@ -20,7 +21,7 @@ export async function resolveChatRequest(
       input: {
         soulId: record.soul.id,
         personality: record.soul.personality,
-        chunks: record.soul.knowledge.pages.flatMap((page) => page.chunks).slice(0, 250),
+        chunks: activeKnowledgeChunks(record.soul.knowledge),
         messages: input.messages,
       },
     };

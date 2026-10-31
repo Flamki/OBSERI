@@ -1,6 +1,12 @@
 import { test, expect } from "@playwright/test";
 import { createSoul } from "../../src/lib/soul";
 
+type VoiceTestWindow = Window & {
+  testTranscript: (text: string) => void;
+  SpeechRecognition: unknown;
+  audioPlayCount: number;
+};
+
 function silentWav() {
   const frames = 4410;
   const wav = Buffer.alloc(44 + frames * 2);
@@ -34,7 +40,7 @@ test("voice calls synthesize whole sentences and ending a call cancels pending a
     class Recognition {
       onresult: ((event: unknown) => void) | null = null;
       start() {
-        (window as any).testTranscript = (text: string) =>
+        (window as unknown as VoiceTestWindow).testTranscript = (text: string) =>
           this.onresult?.({
             results: [Object.assign([{ transcript: text }], { isFinal: true })],
           });
@@ -42,10 +48,11 @@ test("voice calls synthesize whole sentences and ending a call cancels pending a
       stop() {}
       abort() {}
     }
-    (window as any).SpeechRecognition = Recognition;
+    (window as unknown as VoiceTestWindow).SpeechRecognition = Recognition;
     const originalPlay = HTMLMediaElement.prototype.play;
     HTMLMediaElement.prototype.play = function () {
-      (window as any).audioPlayCount = ((window as any).audioPlayCount || 0) + 1;
+      (window as unknown as VoiceTestWindow).audioPlayCount =
+        ((window as unknown as VoiceTestWindow).audioPlayCount || 0) + 1;
       return originalPlay.call(this);
     };
   });
@@ -76,7 +83,9 @@ test("voice calls synthesize whole sentences and ending a call cancels pending a
   await page.goto(`/widget/${soul.id}?mode=voice`);
   await page.getByRole("button", { name: "Start voice call", exact: true }).click();
   await expect(page.getByText("Listening...", { exact: true })).toBeVisible();
-  await page.evaluate(() => (window as any).testTranscript("What do you build?"));
+  await page.evaluate(() =>
+    (window as unknown as VoiceTestWindow).testTranscript("What do you build?"),
+  );
   await expect
     .poll(() => requests.filter((r) => r.text !== soul.personality.greeting).length)
     .toBe(2);
@@ -85,16 +94,18 @@ test("voice calls synthesize whole sentences and ending a call cancels pending a
     expect.objectContaining({ text: second, qualitySteps: 5 }),
   ]);
   await expect(page.getByText("Listening...", { exact: true })).toBeVisible();
-  const before = await page.evaluate(() => (window as any).audioPlayCount);
+  const before = await page.evaluate(() => (window as unknown as VoiceTestWindow).audioPlayCount);
   holdAudio = true;
   const count = requests.length;
-  await page.evaluate(() => (window as any).testTranscript("Tell me more."));
+  await page.evaluate(() => (window as unknown as VoiceTestWindow).testTranscript("Tell me more."));
   await expect.poll(() => requests.length).toBe(count + 1);
   await page.getByRole("button", { name: "End voice call", exact: true }).click();
   release();
   await expect(page.getByRole("button", { name: "Start voice call", exact: true })).toBeVisible();
   await page.waitForTimeout(400);
-  expect(await page.evaluate(() => (window as any).audioPlayCount)).toBe(before);
+  expect(await page.evaluate(() => (window as unknown as VoiceTestWindow).audioPlayCount)).toBe(
+    before,
+  );
   expect(requests.length).toBe(count + 1);
   await expect(page.getByText(/temporarily unavailable/)).toHaveCount(0);
 });

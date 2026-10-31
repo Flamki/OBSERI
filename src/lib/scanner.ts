@@ -8,6 +8,7 @@ export type PreviousSnapshot = {
 };
 
 export type ScanRequest = {
+  signal?: AbortSignal;
   url: string;
   category?: MonitorCategory;
   previous?: PreviousSnapshot;
@@ -24,6 +25,7 @@ export type PageSnapshot = {
   hash: string;
   normalizedText: string;
   excerpt: string;
+  truncated?: boolean;
   wordCount: number;
   statusCode: number;
   contentType: string;
@@ -84,7 +86,9 @@ export async function scanPublicPage(input: ScanRequest): Promise<ScanResult> {
           ? { "if-modified-since": input.validators.lastModified }
           : {}),
       },
-      signal: AbortSignal.timeout(18_000),
+      signal: input.signal
+        ? AbortSignal.any([input.signal, AbortSignal.timeout(18_000)])
+        : AbortSignal.timeout(18_000),
     });
 
     if (response.status === 304) {
@@ -135,7 +139,8 @@ export async function scanPublicPage(input: ScanRequest): Promise<ScanResult> {
   const body = await readLimitedBody(response, MAX_RESPONSE_BYTES);
   const title = extractTitle(body) || new URL(currentUrl).hostname;
   const description = extractMetaDescription(body);
-  const normalizedText = normalizeDocument(body, contentType).slice(0, MAX_NORMALIZED_CHARS);
+  const fullText = normalizeDocument(body, contentType);
+  const normalizedText = fullText.slice(0, MAX_NORMALIZED_CHARS);
   if (normalizedText.length < 40) {
     throw new ScanError(
       "The source did not expose enough readable content. It may require a browser crawler.",
@@ -155,6 +160,7 @@ export async function scanPublicPage(input: ScanRequest): Promise<ScanResult> {
     hash,
     normalizedText,
     excerpt: normalizedText.slice(0, 420),
+    truncated: fullText.length > MAX_NORMALIZED_CHARS,
     wordCount: normalizedText.split(/\s+/).filter(Boolean).length,
     statusCode: response.status,
     contentType,
@@ -184,7 +190,7 @@ export async function scanPublicPage(input: ScanRequest): Promise<ScanResult> {
 
 export async function fetchPublicText(
   inputUrl: string,
-  options: { maxBytes?: number; timeoutMs?: number; accept?: string } = {},
+  options: { maxBytes?: number; timeoutMs?: number; accept?: string; signal?: AbortSignal } = {},
 ): Promise<PublicTextResponse> {
   const maxBytes = Math.max(1_024, Math.min(5_000_000, options.maxBytes ?? 1_000_000));
   const timeoutMs = Math.max(1_000, Math.min(30_000, options.timeoutMs ?? 12_000));
@@ -199,7 +205,9 @@ export async function fetchPublicText(
         "user-agent":
           "ObseriBot/1.0 (+https://obseri.com; website knowledge crawler; contact flamki@obseri.com)",
       },
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: options.signal
+        ? AbortSignal.any([options.signal, AbortSignal.timeout(timeoutMs)])
+        : AbortSignal.timeout(timeoutMs),
     });
 
     if (response.status >= 300 && response.status < 400) {

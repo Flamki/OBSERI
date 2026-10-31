@@ -1,3 +1,4 @@
+import { refreshDueKnowledge } from "@/lib/knowledge-refresh-worker";
 import { createFileRoute } from "@tanstack/react-router";
 import { drainWebhookQueue } from "@/lib/integration-store";
 import { pruneConversionData } from "@/lib/analytics-store";
@@ -9,8 +10,9 @@ async function drain({ request }: { request: Request }) {
   }
   await pruneConversionData();
   const results = await drainWebhookQueue(25);
+  const knowledge = await refreshDueKnowledge();
   return Response.json(
-    { processed: results.length, results },
+    { processed: results.length, results, knowledge },
     {
       headers: { "cache-control": "no-store" },
     },
