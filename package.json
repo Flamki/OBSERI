@@ -8,7 +8,7 @@
     "billing:setup": "node scripts/setup-razorpay-plans.mjs",
     "db:migrate:production": "node scripts/migrate-production.mjs",
     "dev": "vite dev",
-    "build": "node scripts/check-production-readiness.mjs && vite build",
+    "build": "node scripts/check-production-readiness.mjs && vite build && node scripts/verify-server-bundle.mjs",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "test": "vitest run src/lib",

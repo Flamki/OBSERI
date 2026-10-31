@@ -1,5 +1,4 @@
 import { createHash, randomUUID } from "node:crypto";
-import { PDFParse } from "pdf-parse";
 import { splitKnowledgeText } from "../knowledge-content";
 import type { KnowledgeBase, KnowledgePage, KnowledgeSource } from "../soul";
 
@@ -42,6 +41,11 @@ export async function importPdf(
     createdAt: now,
     lastCrawledAt: now,
   };
+  // Load the PDF runtime only for imports; a native dependency failure must not
+  // prevent unrelated chat and widget routes from starting.
+  const { PDFParse } = await import("pdf-parse").catch(() => {
+    throw new PdfImportError("PDF imports are temporarily unavailable. Please try again shortly.", 503);
+  });
   const parser = new PDFParse({
     data,
     isEvalSupported: false,
