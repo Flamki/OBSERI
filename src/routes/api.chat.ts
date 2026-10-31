@@ -2,6 +2,7 @@ import { personalitySchema } from "@/lib/personality";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { answerSoulQuestion } from "@/lib/conversation";
+import type { ChatStreamEvent } from "@/lib/chat-stream";
 import type { ChatRequest } from "@/lib/conversation";
 import { ChatAccessError, resolveChatRequest } from "@/lib/chat-access";
 import { BillingStoreError, finalizeUsage, reserveUsage } from "@/lib/billing-store";
@@ -20,6 +21,7 @@ const chunkSchema = z.object({
 });
 
 const schema = z.object({
+  stream: z.boolean().optional(),
   soulId: z.string().min(1).max(100),
   personality: personalitySchema,
   chunks: z.array(chunkSchema).max(250),
@@ -42,6 +44,56 @@ export const Route = createFileRoute("/api/chat")({
           const reservation = access.ownerUserId
             ? await reserveUsage(access.ownerUserId, "text_responses", 1)
             : { reservationId: null };
+          if (parsed.data.stream) {
+            const abort = new AbortController();
+            const signal = AbortSignal.any([request.signal, abort.signal]);
+            const encoder = new TextEncoder();
+            const stream = new ReadableStream<Uint8Array>({
+              async start(controller) {
+                let committed = false;
+                const emit = (event: ChatStreamEvent) => {
+                  signal.throwIfAborted();
+                  controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+                };
+                try {
+                  const result = await answerSoulQuestion(access.input, {
+                    signal,
+                    onAnswer: (text) => emit({ type: "answer", text }),
+                  });
+                  signal.throwIfAborted();
+                  await finalizeUsage(reservation.reservationId, true);
+                  committed = true;
+                  emit({ type: "result", result });
+                } catch (error) {
+                  if (!signal.aborted) {
+                    console.error("soul_chat_stream_failed", error);
+                    emit({
+                      type: "error",
+                      message: "The answer was interrupted. Please try again.",
+                    });
+                  }
+                } finally {
+                  if (!committed) {
+                    await finalizeUsage(reservation.reservationId, false).catch((error) =>
+                      console.error("soul_chat_usage_release_failed", error),
+                    );
+                  }
+                  if (!signal.aborted) controller.close();
+                }
+              },
+              cancel() {
+                abort.abort();
+              },
+            });
+            return new Response(stream, {
+              headers: {
+                "content-type": "application/x-ndjson; charset=utf-8",
+                "cache-control": "no-store, no-transform",
+                "x-content-type-options": "nosniff",
+                "x-accel-buffering": "no",
+              },
+            });
+          }
           let committed = false;
           try {
             const result = await answerSoulQuestion(access.input);

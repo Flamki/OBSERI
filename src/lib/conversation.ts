@@ -1,3 +1,4 @@
+import { partialAnswer } from "./chat-stream";
 import { getRuntimeEnvironment } from "@/lib/runtime-env";
 import { conversationStyleInstructions, resolveConversationStyle } from "@/lib/personality";
 import type { KnowledgeChunk, PersonalityConfig, SoulMessage } from "@/lib/soul";
@@ -32,7 +33,10 @@ export type RankedChunk = KnowledgeChunk & {
   phraseMatch: boolean;
 };
 
-export async function answerSoulQuestion(input: ChatRequest): Promise<ChatResponse> {
+export async function answerSoulQuestion(
+  input: ChatRequest,
+  options: { onAnswer?: (answer: string) => void; signal?: AbortSignal } = {},
+): Promise<ChatResponse> {
   const question = input.messages.at(-1)?.content.trim() ?? "";
   const query = retrievalQuery(input.messages);
   const ranked = selectDiverseChunks(rankKnowledgeChunks(query, input.chunks), 6);
@@ -59,6 +63,7 @@ export async function answerSoulQuestion(input: ChatRequest): Promise<ChatRespon
       body: JSON.stringify({
         model,
         temperature: 0.35,
+        ...(options.onAnswer ? { stream: true } : {}),
         max_tokens: model.includes("gpt-oss") ? 2048 : 500,
         ...(isFireworks
           ? {
@@ -74,7 +79,7 @@ export async function answerSoulQuestion(input: ChatRequest): Promise<ChatRespon
           {
             role: "user",
             content: JSON.stringify({
-              task: "Respond to the latest visitor message in the context of the conversation. Use evidence for website facts, or ask a useful clarification when it is insufficient. Return strict JSON.",
+              task: "Respond to the latest visitor message in the context of the conversation. Use evidence for website facts, or ask a useful clarification when it is insufficient. Return strict JSON with answer as the first field.",
               evidence: context,
               availablePages: pages.map(({ id, pageTitle, pageUrl }) => ({
                 id,
@@ -92,22 +97,40 @@ export async function answerSoulQuestion(input: ChatRequest): Promise<ChatRespon
           },
         ],
       }),
-      signal: AbortSignal.timeout(22_000),
+      signal: options.signal
+        ? AbortSignal.any([options.signal, AbortSignal.timeout(22_000)])
+        : AbortSignal.timeout(22_000),
     });
     if (!response.ok) {
       console.warn("soul_chat_provider_rejected", { status: response.status });
       return fallback;
     }
-    const payload = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
-    };
-    const content = payload.choices?.[0]?.message?.content;
-    if (!content) {
-      console.warn("soul_chat_model_empty_answer", {
-        finishReason: payload.choices?.[0]?.finish_reason,
-      });
-      return fallback;
+    let content = "";
+    if (options.onAnswer && response.body) {
+      const reader = openAITextStream(response.body, "").getReader();
+      let previous = "";
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          content += value;
+          const answer = partialAnswer(content);
+          if (answer && answer !== previous) {
+            options.onAnswer(answer);
+            previous = answer;
+          }
+        }
+      } finally {
+        await reader.cancel().catch(() => undefined);
+        reader.releaseLock();
+      }
+    } else {
+      const payload = (await response.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+      content = payload.choices?.[0]?.message?.content ?? "";
     }
+    if (!content) return fallback;
     const parsed = parseModelResponse(content);
     if (!parsed) {
       console.warn("soul_chat_model_invalid_answer");
@@ -130,12 +153,16 @@ export async function answerSoulQuestion(input: ChatRequest): Promise<ChatRespon
       mode: "model",
     };
   } catch (error) {
+    options.signal?.throwIfAborted();
     console.warn("soul_chat_fallback", error instanceof Error ? error.message : error);
     return fallback;
   }
 }
 
-export async function streamSoulVoiceAnswer(input: ChatRequest): Promise<VoiceStreamResult> {
+export async function streamSoulVoiceAnswer(
+  input: ChatRequest,
+  signal?: AbortSignal,
+): Promise<VoiceStreamResult> {
   const question = input.messages.at(-1)?.content.trim() ?? "";
   const query = retrievalQuery(input.messages);
   const ranked = selectDiverseChunks(rankKnowledgeChunks(query, input.chunks), 4);
@@ -194,7 +221,9 @@ export async function streamSoulVoiceAnswer(input: ChatRequest): Promise<VoiceSt
           },
         ],
       }),
-      signal: AbortSignal.timeout(12_000),
+      signal: signal
+        ? AbortSignal.any([signal, AbortSignal.timeout(12_000)])
+        : AbortSignal.timeout(12_000),
     });
     if (!response.ok || !response.body) {
       console.warn("soul_voice_stream_model_failed", response.status);
@@ -208,6 +237,7 @@ export async function streamSoulVoiceAnswer(input: ChatRequest): Promise<VoiceSt
       mode: "model",
     };
   } catch (error) {
+    signal?.throwIfAborted();
     console.warn("soul_voice_stream_fallback", error instanceof Error ? error.message : error);
     return { stream: textStream(fallback.answer), ...metadata, mode: "retrieval" };
   }
@@ -539,6 +569,7 @@ function textStream(text: string) {
 
 function openAITextStream(source: ReadableStream<Uint8Array>, fallback: string) {
   let sourceReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+  let cancelled = false;
   return new ReadableStream<string>({
     async start(controller) {
       const reader = source.getReader();
@@ -559,6 +590,7 @@ function openAITextStream(source: ReadableStream<Uint8Array>, fallback: string) 
       try {
         while (!closed) {
           const { done, value } = await reader.read();
+          if (cancelled) return;
           buffer += decoder.decode(value, { stream: !done });
           const lines = buffer.split(/\r?\n/);
           buffer = done ? "" : (lines.pop() ?? "");
@@ -586,14 +618,16 @@ function openAITextStream(source: ReadableStream<Uint8Array>, fallback: string) 
           if (done) close();
         }
       } catch (error) {
-        if (!closed) controller.error(error);
+        if (!closed && !cancelled) controller.error(error);
       } finally {
         sourceReader = null;
+        await reader.cancel().catch(() => undefined);
         reader.releaseLock();
       }
     },
     cancel() {
-      void sourceReader?.cancel();
+      cancelled = true;
+      return sourceReader?.cancel();
     },
   });
 }

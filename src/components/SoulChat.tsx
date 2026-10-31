@@ -19,6 +19,7 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
+import { readChatResponse } from "@/lib/chat-stream";
 import { rankKnowledgeChunks, type ChatResponse } from "@/lib/conversation";
 import type { KnowledgeChunk, Soul, SoulMessage } from "@/lib/soul";
 import {
@@ -94,6 +95,7 @@ export default function SoulChat({
   const messagesRef = useRef(messages);
   const sendingRef = useRef(false);
   const voiceRequestRef = useRef<AbortController | null>(null);
+  const greetingAudioRef = useRef<Promise<Blob> | null>(null);
   const theme = soul.appearance.theme ?? "light";
   const isDark = theme === "dark";
   const isGlass = theme === "glass";
@@ -153,7 +155,7 @@ export default function SoulChat({
     // Generate the predictable opening line while the visitor is looking at
     // the call panel. Clicking Call can then begin with human speech instead
     // of a cold HTTP + inference pause.
-    void fetchSupertonicAudio(soul.personality.greeting, {
+    const audio = fetchSupertonicAudio(soul.personality.greeting, {
       voice: neuralVoice(soul.voice.provider === "supertonic" ? soul.voice.profileId : undefined)
         .id,
       language: callLanguage,
@@ -161,7 +163,14 @@ export default function SoulChat({
       qualitySteps: NEURAL_QUALITY_STEPS,
       soulId: soul.id,
       sessionToken,
-    }).catch(() => undefined);
+    });
+    greetingAudioRef.current = audio;
+    void audio.catch(() => {
+      if (greetingAudioRef.current === audio) greetingAudioRef.current = null;
+    });
+    return () => {
+      greetingAudioRef.current = null;
+    };
   }, [
     voiceMode,
     voicePanelView,
@@ -191,39 +200,56 @@ export default function SoulChat({
     sendingRef.current = true;
     setSending(true);
     if (continueVoiceCall) setVoiceStatus("thinking");
+    const requestController = new AbortController();
+    voiceRequestRef.current?.abort();
+    voiceRequestRef.current = requestController;
 
     try {
       if (continueVoiceCall) {
-        await streamVoiceMessage(nextMessages);
+        await streamVoiceMessage(nextMessages, requestController);
         return;
       }
+      const assistantId = crypto.randomUUID();
+      const createdAt = new Date().toISOString();
       const response = await authFetch("/api/chat", {
+        signal: requestController.signal,
         method: "POST",
         headers: {
           "content-type": "application/json",
           ...(sessionToken ? { authorization: `Bearer ${sessionToken}` } : {}),
         },
         body: JSON.stringify({
+          stream: true,
           soulId: soul.id,
           personality: soul.personality,
-          chunks: soul.knowledge.pages.flatMap((page) => page.chunks).slice(0, 250),
+          chunks: sessionToken
+            ? []
+            : soul.knowledge.pages.flatMap((page) => page.chunks).slice(0, 250),
           messages: nextMessages.slice(-12).map((message) => ({
             role: message.role,
             content: message.content,
           })),
         }),
       });
-      const data = (await response.json()) as ChatResponse | { error?: { message?: string } };
-      if (!response.ok || !("answer" in data)) {
-        throw new Error(
-          "error" in data ? data.error?.message : "The conversation was interrupted.",
-        );
-      }
+      const data = await readChatResponse(response, (answer) => {
+        requestController.signal.throwIfAborted();
+        setMessages([
+          ...nextMessages,
+          {
+            id: assistantId,
+            role: "assistant",
+            content: answer,
+            createdAt,
+            citations: [],
+          },
+        ]);
+      });
+      requestController.signal.throwIfAborted();
       const assistant: SoulMessage = {
-        id: crypto.randomUUID(),
+        id: assistantId,
         role: "assistant",
         content: data.answer,
-        createdAt: new Date().toISOString(),
+        createdAt,
         citations: data.citations,
       };
       const completed = [...nextMessages, assistant];
@@ -240,21 +266,27 @@ export default function SoulChat({
         }
       }
     } catch (cause) {
+      if (requestController.signal.aborted) return;
+      requestController.abort();
+      messagesRef.current = nextMessages;
+      setMessages(nextMessages);
       if (!(cause instanceof DOMException && cause.name === "AbortError")) {
         setError(cause instanceof Error ? cause.message : "The conversation was interrupted.");
       }
       if (continueVoiceCall) stopVoiceCall();
     } finally {
-      voiceRequestRef.current = null;
-      sendingRef.current = false;
-      setSending(false);
+      if (voiceRequestRef.current === requestController) {
+        voiceRequestRef.current = null;
+        sendingRef.current = false;
+        setSending(false);
+      }
     }
   }
 
-  async function streamVoiceMessage(nextMessages: SoulMessage[]) {
-    const requestController = new AbortController();
-    voiceRequestRef.current?.abort();
-    voiceRequestRef.current = requestController;
+  async function streamVoiceMessage(
+    nextMessages: SoulMessage[],
+    requestController: AbortController,
+  ) {
     const response = await authFetch("/api/chat/stream", {
       method: "POST",
       headers: {
@@ -264,7 +296,7 @@ export default function SoulChat({
       body: JSON.stringify({
         soulId: soul.id,
         personality: soul.personality,
-        chunks: prepareVoiceChunks(nextMessages.at(-1)?.content ?? "", soul),
+        chunks: sessionToken ? [] : prepareVoiceChunks(nextMessages.at(-1)?.content ?? "", soul),
         messages: nextMessages.slice(-8).map((message) => ({
           role: message.role,
           content: message.content,
@@ -285,6 +317,8 @@ export default function SoulChat({
     const decoder = new TextDecoder();
     let buffer = "";
     let answer = "";
+    let speechFinished: Promise<void> | undefined;
+    let textFinished = false;
     let citations: SoulMessage["citations"] = [];
     let leadIntent: ChatResponse["leadIntent"] = "none";
 
@@ -305,6 +339,7 @@ export default function SoulChat({
     try {
       while (true) {
         const { done, value: chunk } = await reader.read();
+        requestController.signal.throwIfAborted();
         buffer += decoder.decode(chunk, { stream: !done });
         const lines = buffer.split("\n");
         buffer = done ? "" : (lines.pop() ?? "");
@@ -314,11 +349,15 @@ export default function SoulChat({
           if (event.type === "meta") {
             citations = event.citations;
             leadIntent = event.leadIntent;
-          } else if (event.type === "delta" && event.text) {
-            if (!answer) setVoiceStatus("speaking");
+          } else if (event.type === "delta" && event.text && !textFinished) {
             answer += event.text;
             speaker.push(event.text);
             updateDraft();
+          } else if (event.type === "done" && !textFinished) {
+            textFinished = true;
+            // Flush the last sentence now, while the server settles usage.
+            speechFinished = speaker.finish();
+            void speechFinished.catch(() => undefined);
           } else if (event.type === "error") {
             throw new Error(event.message || "The voice stream was interrupted.");
           }
@@ -329,9 +368,16 @@ export default function SoulChat({
       if (!answer) throw new Error("The voice response was empty.");
       const completed = updateDraft();
       onMessagesChange?.(completed, leadIntent);
-      await speaker.finish();
-      if (voiceCallActiveRef.current) window.setTimeout(() => startListening(true), 60);
+      await (speechFinished ?? speaker.finish());
+      if (voiceCallActiveRef.current)
+        window.setTimeout(() => {
+          if (!requestController.signal.aborted) startListening(true);
+        }, 60);
+    } catch (error) {
+      if (!requestController.signal.aborted) stopSupertonic();
+      throw error;
     } finally {
+      await reader.cancel().catch(() => undefined);
       reader.releaseLock();
     }
   }
@@ -381,7 +427,7 @@ export default function SoulChat({
         if (signal.aborted || !voiceCallActiveRef.current) return;
         const blob = await audio;
         if (signal.aborted || !voiceCallActiveRef.current) return;
-        await playSupertonicAudio(blob);
+        await playSupertonicAudio(blob, () => setVoiceStatus("speaking"));
       });
       // Observe failures immediately while the text stream is still arriving.
       // finish() still propagates the original failure to the call UI.
@@ -513,8 +559,25 @@ export default function SoulChat({
     voiceCallActiveRef.current = true;
     setVoiceCallActive(true);
     const greeting = soul.personality.greeting.trim();
-    setVoiceStatus("speaking");
-    const opening = speak(greeting);
+    setVoiceStatus("thinking");
+    const controller = new AbortController();
+    voiceRequestRef.current?.abort();
+    voiceRequestRef.current = controller;
+    const opening = (async () => {
+      const audio = await (greetingAudioRef.current ??
+        fetchSupertonicAudio(greeting, {
+          voice: neuralVoice(soul.voice.profileId).id,
+          language: callLanguage,
+          speed: soul.voice.speed,
+          qualitySteps: NEURAL_QUALITY_STEPS,
+          soulId: soul.id,
+          sessionToken,
+          signal: controller.signal,
+        }));
+      controller.signal.throwIfAborted();
+      await playSupertonicAudio(audio, () => setVoiceStatus("speaking"));
+      controller.signal.throwIfAborted();
+    })();
     void opening
       .then(() => {
         if (voiceCallActiveRef.current) startListening(true);
@@ -530,6 +593,8 @@ export default function SoulChat({
     voiceCallActiveRef.current = false;
     voiceRequestRef.current?.abort();
     voiceRequestRef.current = null;
+    sendingRef.current = false;
+    setSending(false);
     recognitionRef.current?.abort();
     recognitionRef.current = null;
     stopSupertonic();
@@ -539,6 +604,7 @@ export default function SoulChat({
   }
 
   function restart() {
+    stopVoiceCall();
     const greeting = [greetingMessage(soul.id, soul.personality.greeting)];
     messagesRef.current = greeting;
     setMessages(greeting);

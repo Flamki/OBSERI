@@ -41,53 +41,59 @@ export const Route = createFileRoute("/api/chat/stream")({
           const reservation = access.ownerUserId
             ? await reserveUsage(access.ownerUserId, "text_responses", 1)
             : { reservationId: null };
+          const abort = new AbortController();
+          const signal = AbortSignal.any([request.signal, abort.signal]);
           let result: Awaited<ReturnType<typeof streamSoulVoiceAnswer>>;
           try {
-            result = await streamSoulVoiceAnswer(access.input);
+            result = await streamSoulVoiceAnswer(access.input, signal);
           } catch (error) {
             await finalizeUsage(reservation.reservationId, false);
             throw error;
           }
           const encoder = new TextEncoder();
+          const reader = result.stream.getReader();
           const stream = new ReadableStream<Uint8Array>({
             async start(controller) {
-              controller.enqueue(
-                encoder.encode(
-                  `${JSON.stringify({
-                    type: "meta",
-                    citations: result.citations,
-                    followUp: result.followUp,
-                    leadIntent: result.leadIntent,
-                    mode: result.mode,
-                  })}\n`,
-                ),
-              );
-              const reader = result.stream.getReader();
+              let committed = false;
+              const emit = (event: object) => {
+                signal.throwIfAborted();
+                controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+              };
               try {
+                emit({
+                  type: "meta",
+                  citations: result.citations,
+                  followUp: result.followUp,
+                  leadIntent: result.leadIntent,
+                  mode: result.mode,
+                });
                 while (true) {
                   const { done, value } = await reader.read();
                   if (done) break;
-                  controller.enqueue(
-                    encoder.encode(`${JSON.stringify({ type: "delta", text: value })}\n`),
+                  emit({ type: "delta", text: value });
+                }
+                emit({ type: "done" });
+                await finalizeUsage(reservation.reservationId, true);
+                committed = true;
+              } catch (error) {
+                if (!signal.aborted) {
+                  console.error("soul_voice_stream_failed", error);
+                  emit({ type: "error", message: "Voice stream interrupted. Please try again." });
+                }
+              } finally {
+                if (!committed) {
+                  await finalizeUsage(reservation.reservationId, false).catch((error) =>
+                    console.error("soul_voice_usage_release_failed", error),
                   );
                 }
-                controller.enqueue(encoder.encode(`${JSON.stringify({ type: "done" })}\n`));
-                await finalizeUsage(reservation.reservationId, true);
-                controller.close();
-              } catch (error) {
-                await finalizeUsage(reservation.reservationId, false);
-                controller.enqueue(
-                  encoder.encode(
-                    `${JSON.stringify({
-                      type: "error",
-                      message: error instanceof Error ? error.message : "Voice stream interrupted.",
-                    })}\n`,
-                  ),
-                );
-                controller.close();
-              } finally {
+                await reader.cancel().catch(() => undefined);
                 reader.releaseLock();
+                if (!signal.aborted) controller.close();
               }
+            },
+            cancel() {
+              abort.abort();
+              return reader.cancel();
             },
           });
           return new Response(stream, {

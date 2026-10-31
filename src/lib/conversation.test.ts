@@ -304,3 +304,40 @@ it("fulfils a vague follow-up offer with real page choices even if a model would
   expect(result.citations[0].url).toBe("https://merchant.example/projects");
   expect(mock).not.toHaveBeenCalled();
 });
+
+it("streams readable text before final JSON and still validates citations", async () => {
+  const input = fixture(["Does the CMS use PostgreSQL?"]);
+  vi.stubEnv("OBSERI_CHAT_API_URL", "https://api.fireworks.ai/inference/v1");
+  vi.stubEnv("OBSERI_CHAT_MODEL", "accounts/fireworks/models/gpt-oss-20b");
+  let source!: ReadableStreamDefaultController<Uint8Array>;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              source = controller;
+            },
+          }),
+        ),
+    ),
+  );
+  const drafts: string[] = [];
+  const result = answerSoulQuestion(input, { onAnswer: (answer) => drafts.push(answer) });
+  await vi.waitFor(() => expect(source).toBeDefined());
+  const encoder = new TextEncoder();
+  const send = (content: string) =>
+    source.enqueue(
+      encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`),
+    );
+  send('{"answer":"The CMS uses PostgreSQL.');
+  await vi.waitFor(() => expect(drafts).toContain("The CMS uses PostgreSQL."));
+  send('","citationIds":["cms","fabricated"],"followUp":"","leadIntent":"none"}');
+  source.enqueue(encoder.encode("data: [DONE]\n\n"));
+  source.close();
+  const completed = await result;
+  expect(completed.mode).toBe("model");
+  expect(completed.citations.map((citation) => citation.chunkId)).toEqual(["cms"]);
+  expect(completed.answer).toBe("The CMS uses PostgreSQL.");
+});
