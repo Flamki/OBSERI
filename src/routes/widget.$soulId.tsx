@@ -25,6 +25,11 @@ function EmbeddedSoul() {
   const conversationStarted = useRef(false);
 
   useEffect(() => {
+    document.documentElement.classList.add("obseri-embed");
+    return () => document.documentElement.classList.remove("obseri-embed");
+  }, []);
+
+  useEffect(() => {
     const update = (event: MessageEvent) => {
       if (
         event.source !== window.parent ||

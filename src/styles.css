@@ -3,6 +3,11 @@
 @import "@neondatabase/auth-ui/tailwind";
 @import "tw-animate-css";
 
+html.obseri-embed,
+html.obseri-embed body {
+  background: transparent;
+}
+
 .obseri-auth-page {
   --background: oklch(0.985 0.01 35);
   --foreground: oklch(0.16 0.015 25);

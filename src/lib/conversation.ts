@@ -61,7 +61,10 @@ export async function answerSoulQuestion(input: ChatRequest): Promise<ChatRespon
         temperature: 0.35,
         max_tokens: 500,
         ...(isFireworks
-          ? { reasoning_effort: "none", response_format: { type: "json_object" } }
+          ? {
+              reasoning_effort: model.includes("gpt-oss") ? "low" : "none",
+              response_format: { type: "json_object" },
+            }
           : {}),
         messages: [
           {
@@ -86,14 +89,23 @@ export async function answerSoulQuestion(input: ChatRequest): Promise<ChatRespon
       }),
       signal: AbortSignal.timeout(22_000),
     });
-    if (!response.ok) return fallback;
+    if (!response.ok) {
+      console.warn("soul_chat_provider_rejected", { status: response.status });
+      return fallback;
+    }
     const payload = (await response.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
     };
     const content = payload.choices?.[0]?.message?.content;
-    if (!content) return fallback;
+    if (!content) {
+      console.warn("soul_chat_model_empty_answer");
+      return fallback;
+    }
     const parsed = parseModelResponse(content);
-    if (!parsed) return fallback;
+    if (!parsed) {
+      console.warn("soul_chat_model_invalid_answer");
+      return fallback;
+    }
     const cited = ranked.filter((chunk) => parsed.citationIds.includes(chunk.id)).slice(0, 4);
     return {
       answer: parsed.answer,
