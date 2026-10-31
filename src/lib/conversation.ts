@@ -286,9 +286,14 @@ function buildEvidence(chunks: RankedChunk[], query: string) {
     }
     const lines = text.trim().split(/\n+/);
     const included = new Set<number>();
-    for (let index = 0; index < lines.length; index++) {
-      const tokens = tokenizeWithDuplicates(lines[index]);
-      if (!terms.some((term) => tokens.includes(term))) continue;
+    const matches = lines
+      .map((line, index) => ({ line, index, tokens: tokenizeWithDuplicates(line) }))
+      .filter(({ tokens }) => terms.some((term) => tokens.includes(term)));
+    // A direct statement is stronger evidence than a nearby stack/tag list.
+    const statements = matches.filter(
+      ({ line, tokens }) => /[.!?]$/.test(line.trim()) && tokens.length >= 5,
+    );
+    for (const { index, tokens } of statements.length ? statements : matches) {
       // Include the section leading into a fact, not the next project's heading/technology list.
       const heading =
         tokens.length <= 3 &&
@@ -353,8 +358,13 @@ function navigationAnswer(input: ChatRequest, pages: KnowledgeChunk[]): ChatResp
   if (!previous || !pages.length || !vague || !/\b(help|find|navigate)\b/i.test(question))
     return null;
   const choices = pages.slice(0, 3);
+  const destinations = choices.map((page) => page.pageTitle).join(" or ");
+  const answer = `You can open ${destinations} using the links below. Which page would you like to explore, or what topic should I help you find?`;
   return {
-    answer: `You can open ${choices.map((page) => page.pageTitle).join(" or ")} using the links below. Which page would you like to explore, or what topic should I help you find?`,
+    answer:
+      previous.content === answer
+        ? `Which should we explore: ${destinations}? Choose a link below, or name the specific topic you need.`
+        : answer,
     citations: toCitations(choices),
     followUp: "Which page would you like to explore?",
     leadIntent: "none",

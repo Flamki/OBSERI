@@ -230,7 +230,7 @@ it("keeps a project's technology list with its preceding context, not the next h
   await answerSoulQuestion(input);
   const evidence = JSON.parse(JSON.parse(mock.mock.calls[0][1].body).messages[1].content)
     .evidence[0].text;
-  expect(evidence).toContain("Freelancer operating system");
+  expect(evidence).not.toContain("Freelancer operating system");
   expect(evidence).toContain("real-estate platform");
   expect(evidence).not.toContain("Four-agent AI platform");
   expect(evidence).not.toContain("Four agents run");
