@@ -1,14 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { findOwnedSubscription, syncRazorpaySubscription } from "@/lib/billing-store";
 import { cancelRazorpaySubscription } from "@/lib/razorpay";
-import { requireUser } from "@/lib/user-auth";
+import { requireWorkspaceUser as requireUser } from "@/lib/server/team-store";
 
 export const Route = createFileRoute("/api/billing/cancel")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         try {
-          const user = await requireUser(request);
+          const user = await requireUser(request, true);
           const body = (await request.json()) as { subscriptionId?: unknown };
           if (typeof body.subscriptionId !== "string") {
             return apiError("Subscription id is required.", 422);

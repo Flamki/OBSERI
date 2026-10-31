@@ -13,6 +13,11 @@ test("PDF import saves page knowledge and exposes rendering choices", async ({ p
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+  await page.route("**/api/team?view=workspaces", (route) =>
+    route.fulfill({
+      json: { workspaces: [{ ownerId: user.id, name: "Test workspace", role: "owner" }] },
+    }),
+  );
   await page.route(/neonauth.*\/auth\//, (route) =>
     route.fulfill({
       json: route.request().url().includes("get-session")
@@ -99,13 +104,11 @@ test("PDF import saves page knowledge and exposes rendering choices", async ({ p
   await expect(page.getByLabel("JavaScript content")).toHaveValue("auto");
   await page.getByLabel("JavaScript content").selectOption("always");
   await page.getByRole("button", { name: "PDF upload", exact: true }).click();
-  await page
-    .locator('input[type="file"]')
-    .setInputFiles({
-      name: "Guide.pdf",
-      mimeType: "application/pdf",
-      buffer: Buffer.from("%PDF-1.4\nBrowser upload fixture"),
-    });
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "Guide.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4\nBrowser upload fixture"),
+  });
   await page.getByRole("button", { name: "Import PDF", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect

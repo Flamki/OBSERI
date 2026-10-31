@@ -1,3 +1,10 @@
+import {
+  TeamWorkspaceGate,
+  WorkspaceSwitcher,
+  TeamSettings,
+  OperationHealth,
+  useTeamWorkspace,
+} from "@/components/TeamWorkspace";
 import { CorrectAnswerDialog } from "@/components/CorrectAnswerDialog";
 import { KnowledgeAnswerTest } from "@/components/KnowledgeAnswerTest";
 import { addApprovedAnswer } from "@/lib/knowledge-corrections";
@@ -191,6 +198,11 @@ function AuthenticatedStudio() {
   const session = authClient.useSession();
   useEffect(() => {
     if (!session.isPending && !session.data?.user) {
+      const invite =
+        new URLSearchParams(window.location.hash.slice(1)).get("invite") ||
+        new URLSearchParams(window.location.search).get("invite");
+      if (invite && /^[\w-]{43}$/.test(invite))
+        sessionStorage.setItem("obseri-pending-invite", invite);
       window.location.replace("/auth/sign-in?redirectTo=/app");
     }
   }, [session.data?.user, session.isPending]);
@@ -202,10 +214,17 @@ function AuthenticatedStudio() {
       </div>
     );
   }
-  return <SoulStudio user={session.data.user} />;
+  return (
+    <TeamWorkspaceGate key={session.data.user.id} userId={session.data.user.id}>
+      <SoulStudio user={session.data.user} />
+    </TeamWorkspaceGate>
+  );
 }
 
 function SoulStudio({ user }: { user: StudioUser }) {
+  const team = useTeamWorkspace();
+  const workspaceCacheKey = `${STORAGE_KEY}:${user.id}:${team?.current.ownerId || user.id}`;
+  const [loadError, setLoadError] = useState("");
   const [workspace, setWorkspace] = useState<SoulWorkspace>(DEMO_WORKSPACE);
   const [view, setView] = useState<StudioView>("overview");
   const [hydrated, setHydrated] = useState(false);
@@ -228,12 +247,8 @@ function SoulStudio({ user }: { user: StudioUser }) {
 
   useEffect(() => {
     let active = true;
-    const userStorageKey = `${STORAGE_KEY}:${user.id}`;
     async function hydrateWorkspace() {
-      let localWorkspace = EMPTY_WORKSPACE;
       try {
-        const saved = localStorage.getItem(userStorageKey) ?? localStorage.getItem(STORAGE_KEY);
-        if (saved) localWorkspace = normalizeWorkspace(JSON.parse(saved) as SoulWorkspace);
         setSidebarCollapsed(localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true");
         const response = await authFetch("/api/workspace", { cache: "no-store" });
         if (!response.ok) throw new Error("Workspace could not be loaded.");
@@ -252,9 +267,10 @@ function SoulStudio({ user }: { user: StudioUser }) {
         }
       } catch {
         if (active) {
-          lastPersistedWorkspace.current = localWorkspace;
-          setWorkspace(localWorkspace);
-          setNeedsOnboarding(localWorkspace.souls.length === 0);
+          setLoadError(
+            "This workspace could not be loaded. Your access may have changed. Reload to check again.",
+          );
+          saveConflict.current = true;
         }
       } finally {
         if (active) setHydrated(true);
@@ -300,8 +316,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
 
   useEffect(() => {
     if (!hydrated || needsOnboarding || workspace.souls.length === 0) return;
-    const userStorageKey = `${STORAGE_KEY}:${user.id}`;
-    localStorage.setItem(userStorageKey, JSON.stringify(workspace));
+    localStorage.setItem(workspaceCacheKey, JSON.stringify(workspace));
     const timer = window.setTimeout(() => {
       if (saveConflict.current) return;
       void persistWorkspace(workspace)
@@ -317,7 +332,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
         .catch(() => setNotice("The workspace could not be saved."));
     }, 650);
     return () => window.clearTimeout(timer);
-  }, [hydrated, needsOnboarding, user.id, workspace]);
+  }, [hydrated, needsOnboarding, user.id, workspace, workspaceCacheKey]);
 
   useEffect(() => {
     if (hydrated) localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarCollapsed));
@@ -684,6 +699,21 @@ function SoulStudio({ user }: { user: StudioUser }) {
     );
   }
 
+  if (loadError)
+    return (
+      <div className="flex min-h-dvh items-center justify-center p-8">
+        <div>
+          <p role="alert">{loadError}</p>
+          <button className="mt-4 underline" onClick={() => window.location.reload()}>
+            Reload workspace
+          </button>
+          <button className="ml-6 underline" onClick={() => team?.switchTo(user.id)}>
+            Open my workspace
+          </button>
+        </div>
+      </div>
+    );
+
   return (
     <div className="obs-app h-dvh overflow-hidden bg-[#fafaf9] text-[#0b0b0c]">
       <div className="flex h-full">
@@ -702,6 +732,25 @@ function SoulStudio({ user }: { user: StudioUser }) {
         />
 
         <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
+          <WorkspaceSwitcher
+            onTeam={() => navigate("profile")}
+            beforeSwitch={async () => {
+              if (saveConflict.current) {
+                setNotice(
+                  "Reload the workspace before switching to avoid losing conflicting edits.",
+                );
+                return false;
+              }
+              try {
+                const response = await persistWorkspace(workspace);
+                if (response.ok) return true;
+              } catch {
+                /* Keep edits on screen. */
+              }
+              setNotice("Save failed. Please retry before switching workspaces.");
+              return false;
+            }}
+          />
           <Topbar
             workspace={workspace}
             soul={soul}
@@ -4126,6 +4175,7 @@ function ProfileWorkspaceView({
 }) {
   const session = authClient.useSession();
   const user = session.data?.user;
+  const isOwner = useTeamWorkspace()?.current.role !== "editor";
   const displayName = user?.name || user?.email?.split("@")[0] || "Obseri user";
   const initials = displayName
     .split(/\s+/)
@@ -4279,6 +4329,21 @@ function ProfileWorkspaceView({
     }
   }
 
+  if (!isOwner && billingOnly)
+    return (
+      <Page title="Workspace plan" description="Billing is managed by the workspace owner.">
+        <Card>
+          <h2 className="text-xl font-semibold">{billing?.plan.name ?? "Workspace"} plan</h2>
+          <p className="mt-3 text-sm text-stone-500">
+            Your team shares this plan's website, response and voice limits. Contact your workspace
+            owner to change the subscription.
+          </p>
+          <button onClick={onClose} className="mt-5 underline">
+            Close plans
+          </button>
+        </Card>
+      </Page>
+    );
   if (billingOnly) {
     return (
       <section
@@ -4416,14 +4481,16 @@ function ProfileWorkspaceView({
         {!billingOnly && (
           <div className="min-w-0 lg:border-r lg:border-[#e5e5e3]">
             <Card>
-              <SectionHeading title="Profile" description="The person who owns this workspace." />
+              <SectionHeading title="Profile" description="Your signed-in account." />
               <div className="mt-6 flex items-center gap-4">
                 <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#212120] font-semibold text-white">
                   {initials || "O"}
                 </span>
                 <div>
                   <p className="font-semibold">{displayName}</p>
-                  <p className="mt-1 text-sm text-[#7b7974]">Authenticated workspace owner</p>
+                  <p className="mt-1 text-sm text-[#7b7974]">
+                    {isOwner ? "Workspace owner" : "Workspace editor"}
+                  </p>
                 </div>
               </div>
               <div className="mt-6 grid gap-5 sm:grid-cols-2">
@@ -4445,6 +4512,8 @@ function ProfileWorkspaceView({
                 />
               </Field>
             </Card>
+            <TeamSettings />
+            <OperationHealth />
           </div>
         )}
         <div className={billingOnly ? "min-w-0" : "min-w-0 bg-[#f9f9f9]"}>
@@ -4482,7 +4551,8 @@ function ProfileWorkspaceView({
               value={Math.ceil((billing?.usage.voiceSeconds ?? 0) / 60)}
               limit={billing?.plan.limits.voiceMinutesPerMonth ?? null}
             />
-            {billing?.subscription?.status === "active" &&
+            {isOwner &&
+              billing?.subscription?.status === "active" &&
               !billing.subscription.cancelAtPeriodEnd && (
                 <button
                   type="button"

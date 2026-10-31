@@ -15,6 +15,11 @@ async function studio(page: Page) {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+  await page.route("**/api/team?view=workspaces", (route) =>
+    route.fulfill({
+      json: { workspaces: [{ ownerId: user.id, name: "Test workspace", role: "owner" }] },
+    }),
+  );
   await page.route(/neonauth.*\/auth\//, (route) =>
     route.fulfill({
       json: route.request().url().includes("get-session")

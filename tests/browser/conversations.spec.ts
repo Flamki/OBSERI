@@ -30,6 +30,11 @@ test.beforeEach(async ({ page }) => {
       createdAt: "2026-11-01T00:00:00.000Z",
     })),
   }));
+  await page.route("**/api/team?view=workspaces", (route) =>
+    route.fulfill({
+      json: { workspaces: [{ ownerId: user.id, name: "Test workspace", role: "owner" }] },
+    }),
+  );
   await page.route(/neonauth.*\/auth\//, (route) =>
     route.fulfill({
       json: route.request().url().includes("get-session")

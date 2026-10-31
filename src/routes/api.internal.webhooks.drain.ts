@@ -1,6 +1,6 @@
 import { refreshDueKnowledge } from "@/lib/knowledge-refresh-worker";
 import { createFileRoute } from "@tanstack/react-router";
-import { drainWebhookQueue } from "@/lib/integration-store";
+import { integrationDatabase, drainWebhookQueue } from "@/lib/integration-store";
 import { pruneConversionData } from "@/lib/analytics-store";
 
 async function drain({ request }: { request: Request }) {
@@ -9,6 +9,9 @@ async function drain({ request }: { request: Request }) {
     return Response.json({ error: { code: "unauthorized" } }, { status: 401 });
   }
   await pruneConversionData();
+  await integrationDatabase()`delete from obseri_operation_events where created_at < now() - interval '30 days'`;
+  await integrationDatabase()`delete from obseri_embedding_budgets where month < to_char(now() - interval '3 months', 'YYYY-MM')`;
+  await integrationDatabase()`delete from obseri_workspace_invitations where expires_at < now() - interval '30 days'`;
   const results = await drainWebhookQueue(25);
   const knowledge = await refreshDueKnowledge();
   return Response.json(

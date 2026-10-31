@@ -9,6 +9,7 @@ import {
 import { consumeRateLimit } from "./integration-store";
 import { assertWorkspaceWithinPlan, crawlPageAllowance } from "./billing-store";
 import { ingestWebsite } from "./knowledge";
+import { acquireImportLease } from "./server/operation-guards";
 import { createSoul, createWebsiteSource, type SoulWorkspace } from "./soul";
 vi.mock("./user-workspace-store", () => ({
   scheduledWorkspaces: vi.fn(),
@@ -19,6 +20,10 @@ vi.mock("./integration-store", () => ({ consumeRateLimit: vi.fn() }));
 vi.mock("./billing-store", () => ({
   assertWorkspaceWithinPlan: vi.fn(),
   crawlPageAllowance: vi.fn(),
+}));
+vi.mock("./server/operation-guards", () => ({
+  acquireImportLease: vi.fn(async () => async () => {}),
+  recordOperation: vi.fn(),
 }));
 vi.mock("./knowledge", () => ({ ingestWebsite: vi.fn() }));
 function fixture(): SoulWorkspace {
@@ -85,4 +90,10 @@ it("skips exhausted allowances and throttles repeated cron requests", async () =
   vi.mocked(consumeRateLimit).mockResolvedValue(false);
   expect(await refreshDueKnowledge()).toEqual({ refreshed: 0, skipped: true });
   expect(scheduledWorkspaces).toHaveBeenCalledTimes(1);
+});
+
+it("does not start a scheduled crawl when import capacity is exhausted", async () => {
+  vi.mocked(acquireImportLease).mockRejectedValueOnce(new Error("busy"));
+  expect(await refreshDueKnowledge()).toEqual({ refreshed: 0, failed: 1 });
+  expect(ingestWebsite).not.toHaveBeenCalled();
 });

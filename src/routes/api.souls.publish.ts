@@ -3,7 +3,7 @@ import { activeKnowledgeChunks } from "@/lib/knowledge-content";
 import { createFileRoute } from "@tanstack/react-router";
 import { publishSoul } from "@/lib/published-souls";
 import type { Soul } from "@/lib/soul";
-import { requireUser } from "@/lib/user-auth";
+import { requireWorkspaceUser as requireUser } from "@/lib/server/team-store";
 import { assertPlanFeature, assertWorkspaceWithinPlan } from "@/lib/billing-store";
 import { readUserWorkspace } from "@/lib/user-workspace-store";
 

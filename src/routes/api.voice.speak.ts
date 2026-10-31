@@ -5,7 +5,7 @@ import { getRuntimeEnvironment } from "@/lib/runtime-env";
 import { readBearerToken, verifyWidgetSession } from "@/lib/integration-security";
 import { consumeRateLimit, getPublishedSoul } from "@/lib/integration-store";
 import { isPublicVoiceDemo } from "@/lib/voice-demo";
-import { requireUser } from "@/lib/user-auth";
+import { requireWorkspaceUser as requireUser } from "@/lib/server/team-store";
 import { BillingStoreError, finalizeUsage, reserveUsage } from "@/lib/billing-store";
 
 const schema = z.object({

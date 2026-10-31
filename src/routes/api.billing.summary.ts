@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { billingSummary } from "@/lib/billing-store";
-import { requireUser } from "@/lib/user-auth";
+import { requireWorkspaceUser as requireUser } from "@/lib/server/team-store";
 
 export const Route = createFileRoute("/api/billing/summary")({
   server: {
@@ -8,9 +8,20 @@ export const Route = createFileRoute("/api/billing/summary")({
       GET: async ({ request }) => {
         try {
           const user = await requireUser(request);
-          return Response.json(await billingSummary(user.id), {
-            headers: { "cache-control": "no-store" },
-          });
+          const summary = await billingSummary(user.id);
+          return Response.json(
+            user.role === "editor"
+              ? {
+                  plan: summary.plan,
+                  usage: summary.usage,
+                  period: summary.period,
+                  subscription: null,
+                }
+              : summary,
+            {
+              headers: { "cache-control": "no-store" },
+            },
+          );
         } catch (error) {
           return billingError(error);
         }

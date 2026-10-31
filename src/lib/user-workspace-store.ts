@@ -55,7 +55,7 @@ export async function saveUserWorkspace(userId: string, value: unknown): Promise
   `;
   if (!saved.length)
     throw new WorkspaceStoreError(
-      "This workspace changed in another tab or a scheduled refresh. Download your local edits before reloading to avoid losing them.",
+      "This workspace changed in another tab, a teammate, or a scheduled refresh. Download your local edits before reloading to avoid losing them.",
       409,
     );
   return normalized;

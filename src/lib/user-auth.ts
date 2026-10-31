@@ -7,6 +7,7 @@ export type AuthenticatedUser = {
   id: string;
   email?: string;
   name?: string;
+  emailVerified?: boolean;
 };
 
 let jwks: ReturnType<typeof createRemoteJWKSet> | undefined;
@@ -46,6 +47,7 @@ export async function requireUser(request: Request): Promise<AuthenticatedUser> 
     return {
       id: payload.sub,
       email: typeof payload.email === "string" ? payload.email : undefined,
+      emailVerified: payload.emailVerified === true || payload.email_verified === true,
       name: typeof payload.name === "string" ? payload.name : undefined,
     };
   } catch {

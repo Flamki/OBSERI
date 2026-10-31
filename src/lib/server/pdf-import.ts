@@ -44,7 +44,10 @@ export async function importPdf(
   // Load the PDF runtime only for imports; a native dependency failure must not
   // prevent unrelated chat and widget routes from starting.
   const { PDFParse } = await import("pdf-parse").catch(() => {
-    throw new PdfImportError("PDF imports are temporarily unavailable. Please try again shortly.", 503);
+    throw new PdfImportError(
+      "PDF imports are temporarily unavailable. Please try again shortly.",
+      503,
+    );
   });
   const parser = new PDFParse({
     data,
@@ -74,7 +77,7 @@ export async function importPdf(
     const pages: KnowledgePage[] = [];
     const errors: KnowledgeBase["errors"] = [];
     for (const item of result.pages) {
-      const content = item.text.replace(/\u0000/g, "").trim();
+      const content = item.text.replaceAll("\u0000", "").trim();
       const url = `${rootUrl}/page/${item.num}`;
       if (!content) {
         errors.push({

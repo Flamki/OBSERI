@@ -1,8 +1,13 @@
+import {
+  acquireImportLease,
+  recordOperation,
+  readBoundedJson,
+} from "@/lib/server/operation-guards";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { ingestWebsite, type CrawlProgressEvent } from "@/lib/knowledge";
 import { ScanError } from "@/lib/scanner";
-import { requireUser } from "@/lib/user-auth";
+import { requireWorkspaceUser as requireUser } from "@/lib/server/team-store";
 import { readUserWorkspace } from "@/lib/user-workspace-store";
 import { crawlPageAllowance } from "@/lib/billing-store";
 
@@ -47,21 +52,34 @@ export const Route = createFileRoute("/api/ingest/stream")({
 
         let input: z.infer<typeof schema>;
         try {
-          const parsed = schema.safeParse(await request.json());
+          const parsed = schema.safeParse(await readBoundedJson(request));
           if (!parsed.success)
             return errorResponse("Invalid ingestion request.", 400, "invalid_request");
           input = parsed.data;
         } catch (error) {
           if (error instanceof SyntaxError)
             return errorResponse("Request body must be JSON.", 400, "invalid_json");
-          throw error;
+          return errorResponse(
+            "Invalid or incomplete import request.",
+            typeof error === "object" && error && "status" in error ? Number(error.status) : 400,
+            "invalid_request",
+          );
         }
 
-        const allowance = await crawlPageAllowance(
-          ownerUserId,
-          await readUserWorkspace(ownerUserId),
-          input.url,
-        );
+        let allowance: number;
+        try {
+          allowance = await crawlPageAllowance(
+            ownerUserId,
+            await readUserWorkspace(ownerUserId),
+            input.url,
+          );
+        } catch {
+          return errorResponse(
+            "Could not check import capacity. Please try again.",
+            503,
+            "capacity_unavailable",
+          );
+        }
         if (allowance < 1)
           return errorResponse(
             "Your plan's indexed-page capacity is full. Remove pages or upgrade before crawling another website.",
@@ -70,6 +88,18 @@ export const Route = createFileRoute("/api/ingest/stream")({
           );
         input = { ...input, maxPages: Math.min(input.maxPages, allowance) };
 
+        let release: () => Promise<void>;
+        try {
+          release = await acquireImportLease(ownerUserId);
+        } catch (error) {
+          return errorResponse(
+            typeof error === "object" && error && "status" in error
+              ? "Imports are busy. Try again shortly."
+              : "Imports unavailable.",
+            typeof error === "object" && error && "status" in error ? Number(error.status) : 503,
+            "import_busy",
+          );
+        }
         const encoder = new TextEncoder();
         const abort = new AbortController();
         let closed = false;
@@ -80,10 +110,19 @@ export const Route = createFileRoute("/api/ingest/stream")({
             };
 
             void ingestWebsite(
-              { ...input, signal: AbortSignal.any([request.signal, abort.signal]) },
+              {
+                ...input,
+                signal: AbortSignal.any([
+                  request.signal,
+                  abort.signal,
+                  AbortSignal.timeout(240_000),
+                ]),
+              },
               write,
             )
-              .catch((error) => {
+              .then(() => recordOperation(ownerUserId, "crawl", "ok", "completed"))
+              .catch(async (error) => {
+                await recordOperation(ownerUserId, "crawl", "failed", "import_failed");
                 const event: CrawlProgressEvent = {
                   type: "error",
                   stage: "error",
@@ -108,7 +147,8 @@ export const Route = createFileRoute("/api/ingest/stream")({
                 write(event);
                 console.error("streaming_knowledge_ingestion_failed", error);
               })
-              .finally(() => {
+              .finally(async () => {
+                await release();
                 if (!closed) {
                   closed = true;
                   controller.close();

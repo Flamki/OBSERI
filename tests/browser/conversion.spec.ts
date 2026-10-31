@@ -6,6 +6,11 @@ import { BILLING_PLANS } from "../../src/lib/billing-plans";
 test("landing explains the conversion flow and displays INR on desktop and mobile", async ({
   page,
 }) => {
+  await page.route("**/api/team?view=workspaces", (route) =>
+    route.fulfill({
+      json: { workspaces: [{ ownerId: user.id, name: "Test workspace", role: "owner" }] },
+    }),
+  );
   await page.route(/neonauth.*\/auth\//, (route) => route.fulfill({ json: null }));
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("See the interest.");
@@ -118,6 +123,11 @@ test("contact request stays editable after a failed save and confirms only after
     },
     { sessionId },
   );
+  await page.route("**/api/team?view=workspaces", (route) =>
+    route.fulfill({
+      json: { workspaces: [{ ownerId: user.id, name: "Test workspace", role: "owner" }] },
+    }),
+  );
   await page.route(/neonauth.*\/auth\//, (route) => route.fulfill({ json: null }));
   await page.route(`**/api/souls/${soul.id}`, (route) => route.fulfill({ json: { soul } }));
   let attempts = 0;
@@ -164,6 +174,11 @@ test("owner dashboard shows real response data, status changes, and empty states
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+  await page.route("**/api/team?view=workspaces", (route) =>
+    route.fulfill({
+      json: { workspaces: [{ ownerId: user.id, name: "Test workspace", role: "owner" }] },
+    }),
+  );
   await page.route(/neonauth.*\/auth\//, (route) =>
     route.fulfill({
       json: route.request().url().includes("get-session")

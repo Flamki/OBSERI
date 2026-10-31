@@ -6,7 +6,7 @@ import {
   saveSubscriptionPlanChange,
 } from "@/lib/billing-store";
 import { razorpayPlanId, updateRazorpaySubscription, type BillingCycle } from "@/lib/razorpay";
-import { requireUser } from "@/lib/user-auth";
+import { requireWorkspaceUser as requireUser } from "@/lib/server/team-store";
 import { readUserWorkspace } from "@/lib/user-workspace-store";
 
 export const Route = createFileRoute("/api/billing/change")({
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/api/billing/change")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const user = await requireUser(request);
+          const user = await requireUser(request, true);
           const body = (await request.json()) as Record<string, unknown>;
           if (
             typeof body.subscriptionId !== "string" ||

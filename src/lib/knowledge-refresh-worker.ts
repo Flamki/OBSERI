@@ -7,6 +7,7 @@ import { consumeRateLimit } from "./integration-store";
 import { assertWorkspaceWithinPlan, crawlPageAllowance } from "./billing-store";
 import { ingestWebsite } from "./knowledge";
 import { mergeSourceCrawl } from "./soul";
+import { acquireImportLease, recordOperation } from "./server/operation-guards";
 import { sourceRefreshDue } from "./knowledge-refresh";
 
 export async function refreshDueKnowledge() {
@@ -22,9 +23,11 @@ export async function refreshDueKnowledge() {
       for (const source of soul.knowledge.sources ?? []) {
         if (Date.now() > deadline - 10_000 || refreshed + failed >= 8) return { refreshed, failed };
         if (!sourceRefreshDue(source)) continue;
+        let release: (() => Promise<void>) | undefined;
         try {
           const allowance = await crawlPageAllowance(row.user_id, workspace, source.rootUrl);
           if (allowance < 1) continue;
+          release = await acquireImportLease(row.user_id);
           const currentSoul = workspace.souls.find((candidate) => candidate.id === soul.id)!;
           const crawled = await ingestWebsite({
             url: source.rootUrl,
@@ -52,14 +55,18 @@ export async function refreshDueKnowledge() {
           workspace = await saveUserWorkspace(row.user_id, next);
           await refreshPublishedKnowledge(row.user_id, currentSoul, updatedSoul);
           refreshed += 1;
+          await recordOperation(row.user_id, "crawl", "ok", "scheduled_refresh");
         } catch (error) {
           failed += 1;
+          if (release) await recordOperation(row.user_id, "crawl", "failed", "scheduled_refresh");
           // Do not log website content, credentials or database error payloads.
           console.warn("knowledge_refresh_failed", {
             status: typeof error === "object" && error && "status" in error ? error.status : 500,
           });
           if (typeof error === "object" && error && "status" in error && error.status === 409)
             break;
+        } finally {
+          await release?.();
         }
       }
     }

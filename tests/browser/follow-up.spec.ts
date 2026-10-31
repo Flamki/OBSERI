@@ -11,6 +11,11 @@ async function widget(page: Page, soul: ReturnType<typeof createSoul>) {
       path: "/",
     });
   });
+  await page.route("**/api/team?view=workspaces", (route) =>
+    route.fulfill({
+      json: { workspaces: [{ ownerId: user.id, name: "Test workspace", role: "owner" }] },
+    }),
+  );
   await page.route(/neonauth.*\/auth\//, (route) => route.fulfill({ json: null }));
   await page.route(`**/api/souls/${soul.id}`, (route) => route.fulfill({ json: { soul } }));
   await page.goto(`/widget/${soul.id}?mode=chat`);
@@ -72,6 +77,11 @@ test("customer can save, preview, validate, publish and disable follow-up settin
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+  await page.route("**/api/team?view=workspaces", (route) =>
+    route.fulfill({
+      json: { workspaces: [{ ownerId: user.id, name: "Test workspace", role: "owner" }] },
+    }),
+  );
   await page.route(/neonauth.*\/auth\//, (route) =>
     route.fulfill({
       json: route.request().url().includes("get-session")

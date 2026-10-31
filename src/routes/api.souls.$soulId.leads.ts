@@ -10,7 +10,7 @@ import {
   getPublishedSoul,
   IntegrationStoreError,
 } from "@/lib/integration-store";
-import { requireUser } from "@/lib/user-auth";
+import { requireWorkspaceUser as requireUser } from "@/lib/server/team-store";
 
 const statusSchema = z.object({
   id: z.string().uuid(),

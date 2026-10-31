@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { visitorContext } from "@/lib/visitor-context";
-import { requireUser } from "@/lib/user-auth";
+import { requireWorkspaceUser as requireUser } from "@/lib/server/team-store";
 import { trackingSchema } from "@/lib/analytics";
 import { analyticsReport, recordAnalytics, requireAnalyticsOwner } from "@/lib/analytics-store";
 import { readBearerToken, verifyWidgetSession } from "@/lib/integration-security";

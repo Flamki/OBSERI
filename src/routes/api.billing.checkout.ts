@@ -2,14 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { isBillingPlanId } from "@/lib/billing-plans";
 import { billingSummary, recordPendingSubscription } from "@/lib/billing-store";
 import { createRazorpaySubscription, publicRazorpayKeyId, type BillingCycle } from "@/lib/razorpay";
-import { requireUser } from "@/lib/user-auth";
+import { requireWorkspaceUser as requireUser } from "@/lib/server/team-store";
 
 export const Route = createFileRoute("/api/billing/checkout")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         try {
-          const user = await requireUser(request);
+          const user = await requireUser(request, true);
           const current = await billingSummary(user.id);
           if (
             current.subscription &&

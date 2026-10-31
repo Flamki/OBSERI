@@ -17,7 +17,9 @@ import { Route as AppRouteImport } from './routes/app'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiIngestRouteImport } from './routes/api.ingest'
+import { Route as ApiOperationsRouteImport } from './routes/api.operations'
 import { Route as ApiScanRouteImport } from './routes/api.scan'
+import { Route as ApiTeamRouteImport } from './routes/api.team'
 import { Route as ApiWorkspaceRouteImport } from './routes/api.workspace'
 import { Route as AuthPathnameRouteImport } from './routes/auth.$pathname'
 import { Route as WidgetSoulIdRouteImport } from './routes/widget.$soulId'
@@ -85,9 +87,19 @@ const ApiIngestRoute = ApiIngestRouteImport.update({
   path: '/api/ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOperationsRoute = ApiOperationsRouteImport.update({
+  id: '/api/operations',
+  path: '/api/operations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiScanRoute = ApiScanRouteImport.update({
   id: '/api/scan',
   path: '/api/scan',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTeamRoute = ApiTeamRouteImport.update({
+  id: '/api/team',
+  path: '/api/team',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
@@ -227,7 +239,9 @@ export interface FileRoutesByFullPath {
   '/pricing': typeof PricingRoute
   '/api/chat': typeof ApiChatRouteWithChildren
   '/api/ingest': typeof ApiIngestRouteWithChildren
+  '/api/operations': typeof ApiOperationsRoute
   '/api/scan': typeof ApiScanRoute
+  '/api/team': typeof ApiTeamRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/auth/$pathname': typeof AuthPathnameRoute
   '/widget/$soulId': typeof WidgetSoulIdRoute
@@ -263,7 +277,9 @@ export interface FileRoutesByTo {
   '/pricing': typeof PricingRoute
   '/api/chat': typeof ApiChatRouteWithChildren
   '/api/ingest': typeof ApiIngestRouteWithChildren
+  '/api/operations': typeof ApiOperationsRoute
   '/api/scan': typeof ApiScanRoute
+  '/api/team': typeof ApiTeamRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/auth/$pathname': typeof AuthPathnameRoute
   '/widget/$soulId': typeof WidgetSoulIdRoute
@@ -300,7 +316,9 @@ export interface FileRoutesById {
   '/pricing': typeof PricingRoute
   '/api/chat': typeof ApiChatRouteWithChildren
   '/api/ingest': typeof ApiIngestRouteWithChildren
+  '/api/operations': typeof ApiOperationsRoute
   '/api/scan': typeof ApiScanRoute
+  '/api/team': typeof ApiTeamRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/auth/$pathname': typeof AuthPathnameRoute
   '/widget/$soulId': typeof WidgetSoulIdRoute
@@ -338,7 +356,9 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/api/chat'
     | '/api/ingest'
+    | '/api/operations'
     | '/api/scan'
+    | '/api/team'
     | '/api/workspace'
     | '/auth/$pathname'
     | '/widget/$soulId'
@@ -374,7 +394,9 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/api/chat'
     | '/api/ingest'
+    | '/api/operations'
     | '/api/scan'
+    | '/api/team'
     | '/api/workspace'
     | '/auth/$pathname'
     | '/widget/$soulId'
@@ -410,7 +432,9 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/api/chat'
     | '/api/ingest'
+    | '/api/operations'
     | '/api/scan'
+    | '/api/team'
     | '/api/workspace'
     | '/auth/$pathname'
     | '/widget/$soulId'
@@ -447,7 +471,9 @@ export interface RootRouteChildren {
   PricingRoute: typeof PricingRoute
   ApiChatRoute: typeof ApiChatRouteWithChildren
   ApiIngestRoute: typeof ApiIngestRouteWithChildren
+  ApiOperationsRoute: typeof ApiOperationsRoute
   ApiScanRoute: typeof ApiScanRoute
+  ApiTeamRoute: typeof ApiTeamRoute
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   AuthPathnameRoute: typeof AuthPathnameRoute
   WidgetSoulIdRoute: typeof WidgetSoulIdRoute
@@ -527,11 +553,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/operations': {
+      id: '/api/operations'
+      path: '/api/operations'
+      fullPath: '/api/operations'
+      preLoaderRoute: typeof ApiOperationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/scan': {
       id: '/api/scan'
       path: '/api/scan'
       fullPath: '/api/scan'
       preLoaderRoute: typeof ApiScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/team': {
+      id: '/api/team'
+      path: '/api/team'
+      fullPath: '/api/team'
+      preLoaderRoute: typeof ApiTeamRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/workspace': {
@@ -762,7 +802,9 @@ const rootRouteChildren: RootRouteChildren = {
   PricingRoute: PricingRoute,
   ApiChatRoute: ApiChatRouteWithChildren,
   ApiIngestRoute: ApiIngestRouteWithChildren,
+  ApiOperationsRoute: ApiOperationsRoute,
   ApiScanRoute: ApiScanRoute,
+  ApiTeamRoute: ApiTeamRoute,
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   AuthPathnameRoute: AuthPathnameRoute,
   WidgetSoulIdRoute: WidgetSoulIdRoute,

@@ -302,6 +302,17 @@ export async function assertPlanTransitionAllowed(
 ) {
   const targetPlan = getBillingPlan(targetPlanId);
   if (workspace) assertWorkspaceFitsPlan(workspace, targetPlan);
+  if (targetPlan.limits.seats !== null) {
+    const [team] = await db()`select
+      (select count(*) from obseri_workspace_members where owner_user_id = ${ownerUserId}) +
+      (select count(*) from obseri_workspace_invitations where owner_user_id = ${ownerUserId} and expires_at > now() and accepted_at is null and revoked_at is null) + 1 as seats`;
+    if (Number(team.seats) > targetPlan.limits.seats)
+      throw new BillingStoreError(
+        `${targetPlan.name} includes ${targetPlan.limits.seats} seats. Remove teammates or revoke pending invitations before changing plans.`,
+        409,
+        "target_plan_seats_exceeded",
+      );
+  }
   const current = await billingSummary(ownerUserId);
   const textLimit = targetPlan.limits.textResponsesPerMonth;
   const voiceLimitSeconds =

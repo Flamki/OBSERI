@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { requireUser } from "@/lib/user-auth";
+import { requireWorkspaceUser as requireUser } from "@/lib/server/team-store";
 import { supertonicVoices } from "@/lib/voice-catalog";
 
 export const Route = createFileRoute("/api/voice/profiles")({

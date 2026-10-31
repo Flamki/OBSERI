@@ -37,6 +37,11 @@ try {
     "obseri_usage_monthly",
     "obseri_usage_grants",
     "obseri_usage_reservations",
+    "obseri_workspace_members",
+    "obseri_workspace_invitations",
+    "obseri_operation_events",
+    "obseri_embedding_budgets",
+    "obseri_import_leases",
   ];
   const rows = await sql`
     select table_name

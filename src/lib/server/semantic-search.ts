@@ -1,3 +1,4 @@
+import { withinDeadline, reserveEmbeddingCharacters, recordOperation } from "./operation-guards";
 import { createHash } from "node:crypto";
 import { integrationDatabase } from "../integration-store";
 import { retrievalQuery, type ChatRequest } from "../conversation";
@@ -34,12 +35,23 @@ export async function embedTexts(
   texts: string[],
   kind: "document" | "query",
   signal: AbortSignal,
+  owner?: string,
 ): Promise<number[][]> {
   const config = configuration();
   if (!config) throw new Error("Embeddings not configured");
   const input = texts.map((text) =>
     config.model.includes("nomic") ? `search_${kind}: ${text}` : text,
   );
+  signal.throwIfAborted();
+  if (owner)
+    await withinDeadline(
+      reserveEmbeddingCharacters(
+        owner,
+        input.reduce((n, text) => n + text.length, 0),
+      ),
+      signal,
+    );
+  signal.throwIfAborted();
   const response = await fetch(`${config.api}/embeddings`, {
     method: "POST",
     headers: { authorization: `Bearer ${config.key}`, "content-type": "application/json" },
@@ -90,6 +102,7 @@ export async function indexKnowledge(owner: string, chunks: KnowledgeChunk[], si
         batch.map(([, text]) => text),
         "document",
         signal,
+        owner,
       );
       await sql`
         insert into obseri_knowledge_vectors ${sql(
@@ -115,6 +128,7 @@ export async function indexKnowledge(owner: string, chunks: KnowledgeChunk[], si
           "knowledge_embedding_failed",
           error instanceof Error ? error.message : "Embedding unavailable",
         );
+      void recordOperation(owner, "semantic", "fallback", "index_unavailable");
       break;
     }
   }
@@ -136,16 +150,19 @@ export async function prepareSemanticSearch(
   try {
     const config = configuration()!;
     const cacheKey = hash(`${owner}|${config.api}|${config.model}|${query}`);
-    const [vectors, queryVector] = await Promise.all([
-      indexKnowledge(owner, input.chunks, signal),
-      queryCache.has(cacheKey)
-        ? queryCache.get(cacheKey)!
-        : embedTexts([query], "query", signal).then((v) => {
-            if (queryCache.size >= 256) queryCache.delete(queryCache.keys().next().value!);
-            queryCache.set(cacheKey, v[0]);
-            return v[0];
-          }),
-    ]);
+    const [vectors, queryVector] = await withinDeadline(
+      Promise.all([
+        indexKnowledge(owner, input.chunks, signal),
+        queryCache.has(cacheKey)
+          ? queryCache.get(cacheKey)!
+          : embedTexts([query], "query", signal, owner).then((v) => {
+              if (queryCache.size >= 256) queryCache.delete(queryCache.keys().next().value!);
+              queryCache.set(cacheKey, v[0]);
+              return v[0];
+            }),
+      ]),
+      signal,
+    );
     parentSignal?.throwIfAborted();
     const semanticScores: Record<string, number> = {};
     for (const chunk of input.chunks) {
@@ -155,6 +172,7 @@ export async function prepareSemanticSearch(
     return { ...input, semanticScores };
   } catch (error) {
     parentSignal?.throwIfAborted();
+    void recordOperation(owner, "semantic", "fallback", "retrieval_unavailable");
     console.warn(
       "knowledge_semantic_fallback",
       error instanceof Error ? error.message : "Semantic search unavailable",

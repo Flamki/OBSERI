@@ -1,0 +1,180 @@
+import { PGlite } from "@electric-sql/pglite";
+import { readFile } from "node:fs/promises";
+import { beforeAll, beforeEach, afterAll, expect, it, vi } from "vitest";
+const state = vi.hoisted(() => ({
+  sql: null as unknown,
+  seats: 5,
+  actor: { id: "owner", email: "owner@example.com", emailVerified: true },
+}));
+vi.mock("./integration-store", () => ({ integrationDatabase: () => state.sql }));
+vi.mock("./billing-store", () => ({
+  billingSummary: async () => ({ plan: { name: "Test", limits: { seats: state.seats } } }),
+}));
+vi.mock("./user-auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./user-auth")>()),
+  requireUser: async () => state.actor,
+}));
+import {
+  acceptInvitation,
+  inviteEditor,
+  listWorkspaces,
+  requireWorkspaceUser,
+  revokeAccess,
+  teamDetails,
+} from "./server/team-store";
+import {
+  reserveEmbeddingCharacters,
+  acquireImportLease,
+  withinDeadline,
+  readBoundedJson,
+} from "./server/operation-guards";
+const pg = new PGlite();
+type TestSql = {
+  (strings: TemplateStringsArray, ...values: unknown[]): Promise<unknown[]>;
+  begin: (fn: (tx: TestSql) => Promise<unknown>) => Promise<unknown>;
+};
+function adapter(db: Pick<PGlite, "query">): TestSql {
+  const sql: TestSql = (strings: TemplateStringsArray, ...values: unknown[]) =>
+    db
+      .query(
+        strings.reduce((s, t, i) => s + (i ? `$${i}` : "") + t, ""),
+        values,
+      )
+      .then((r) => r.rows);
+  sql.begin = (fn: (tx: TestSql) => Promise<unknown>) => pg.transaction((tx) => fn(adapter(tx)));
+  return sql;
+}
+beforeAll(async () => {
+  state.sql = adapter(pg);
+  await pg.exec(
+    'create schema neon_auth; create table neon_auth."user" (id text primary key, email text, "emailVerified" boolean)',
+  );
+  await pg.exec(
+    "create table obseri_user_workspaces (user_id text primary key, workspace jsonb, created_at timestamptz default now())",
+  );
+  await pg.exec(await readFile("db/migrations/007_teams_and_operations.sql", "utf8"));
+});
+beforeEach(async () => {
+  await pg.exec(
+    "truncate obseri_user_workspaces cascade; truncate obseri_embedding_budgets, obseri_import_leases",
+  );
+  await pg.query(
+    "insert into obseri_user_workspaces (user_id, workspace) values ('owner', '{\"name\":\"Shared\"}'), ('other', '{\"name\":\"Other\"}')",
+  );
+  await pg.exec(
+    `truncate neon_auth."user"; insert into neon_auth."user" values ('editor','editor@example.com',true), ('unverified','editor@example.com',false), ('wrong','wrong@example.com',true)`,
+  );
+  state.seats = 5;
+  state.actor = { id: "owner", email: "owner@example.com", emailVerified: true };
+});
+afterAll(() => pg.close());
+const member = { id: "editor", email: "editor@example.com", emailVerified: true };
+const request = (owner = "owner") =>
+  new Request("https://obseri.com/api/workspace", {
+    headers: { "x-obseri-workspace-owner": owner },
+  });
+it("binds invitation acceptance to a verified email and prevents replay", async () => {
+  const token = await inviteEditor("owner", member.email);
+  expect(JSON.stringify(await teamDetails("owner"))).not.toContain(token);
+  await expect(
+    acceptInvitation({ ...member, id: "unverified", emailVerified: false }, token),
+  ).rejects.toMatchObject({ status: 403 });
+  await expect(
+    acceptInvitation({ ...member, id: "wrong", email: "wrong@example.com" }, token),
+  ).rejects.toMatchObject({ status: 403 });
+  expect(await acceptInvitation(member, token)).toBe("owner");
+  await expect(acceptInvitation(member, token)).rejects.toMatchObject({ status: 404 });
+  expect((await listWorkspaces(member)).map((w) => w.ownerId)).toEqual(["editor", "owner"]);
+});
+it("denies forged workspace headers, owner actions and revoked membership", async () => {
+  state.actor = member;
+  await expect(requireWorkspaceUser(request())).rejects.toMatchObject({ status: 403 });
+  await acceptInvitation(member, await inviteEditor("owner", member.email));
+  expect(await requireWorkspaceUser(request())).toMatchObject({
+    id: "owner",
+    actorUserId: "editor",
+    role: "editor",
+  });
+  await expect(requireWorkspaceUser(request(), true)).rejects.toMatchObject({ status: 403 });
+  await expect(requireWorkspaceUser(request("other"))).rejects.toMatchObject({ status: 403 });
+  await revokeAccess("other", { userId: member.id });
+  expect((await requireWorkspaceUser(request())).id).toBe("owner");
+  await revokeAccess("owner", { userId: member.id });
+  await expect(requireWorkspaceUser(request())).rejects.toMatchObject({ status: 403 });
+});
+it("reserves seats for pending invites and invalidates reissued and revoked links", async () => {
+  state.seats = 2;
+  const old = await inviteEditor("owner", member.email);
+  await expect(inviteEditor("owner", "another@example.com")).rejects.toMatchObject({ status: 402 });
+  const replacement = await inviteEditor("owner", member.email);
+  await expect(acceptInvitation(member, old)).rejects.toMatchObject({ status: 404 });
+  const { invitations } = await teamDetails("owner");
+  await revokeAccess("owner", { invitationId: invitations[0].id });
+  await expect(acceptInvitation(member, replacement)).rejects.toMatchObject({ status: 404 });
+});
+it("rejects expired invitations and blocks shared access after plan expiry", async () => {
+  const token = await inviteEditor("owner", member.email);
+  await pg.exec("update obseri_workspace_invitations set expires_at = now() - interval '1 day'");
+  await expect(acceptInvitation(member, token)).rejects.toMatchObject({ status: 404 });
+  await acceptInvitation(member, await inviteEditor("owner", member.email));
+  state.actor = member;
+  state.seats = 1;
+  await expect(requireWorkspaceUser(request())).rejects.toMatchObject({ status: 403 });
+});
+it("allows only the available number of concurrent invitations", async () => {
+  state.seats = 3;
+  const attempts = await Promise.allSettled(
+    Array.from({ length: 8 }, (_, i) => inviteEditor("owner", `member${i}@example.com`)),
+  );
+  expect(attempts.filter((r) => r.status === "fulfilled")).toHaveLength(2);
+  expect((await teamDetails("owner")).invitations).toHaveLength(2);
+});
+it("reserves embedding costs atomically across concurrent requests and tenants", async () => {
+  vi.stubEnv("OBSERI_EMBEDDING_MONTHLY_CHAR_LIMIT", "1000");
+  try {
+    const attempts = await Promise.allSettled(
+      Array.from({ length: 20 }, () => reserveEmbeddingCharacters("owner", 100)),
+    );
+    expect(attempts.filter((r) => r.status === "fulfilled")).toHaveLength(10);
+    await expect(reserveEmbeddingCharacters("other", 1000)).resolves.toBeUndefined();
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
+it("limits concurrent imports, releases seats and recovers expired workers", async () => {
+  const releases = await Promise.all([acquireImportLease("owner"), acquireImportLease("owner")]);
+  await expect(acquireImportLease("owner")).rejects.toMatchObject({ status: 429 });
+  await releases[0]();
+  const release = await acquireImportLease("owner");
+  await release();
+  await releases[1]();
+  await pg.exec(
+    "insert into obseri_import_leases values ('expired','owner',now() - interval '1 minute')",
+  );
+  const last = await acquireImportLease("owner");
+  await last();
+});
+it("bounds unresponsive work without requiring driver cancellation", async () => {
+  const controller = new AbortController();
+  const pending = withinDeadline(new Promise<never>(() => {}), controller.signal);
+  controller.abort(new Error("deadline"));
+  await expect(pending).rejects.toThrow("deadline");
+});
+
+it("rejects oversized chunked JSON and accepts valid UTF-8 requests", async () => {
+  const bytes = new TextEncoder().encode(JSON.stringify({ name: "Café" }));
+  const request = () =>
+    new Request("https://obseri.com/api/team", {
+      method: "POST",
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(bytes.slice(0, 14));
+          controller.enqueue(bytes.slice(14));
+          controller.close();
+        },
+      }),
+      duplex: "half",
+    } as RequestInit);
+  await expect(readBoundedJson(request(), 100)).resolves.toEqual({ name: "Café" });
+  await expect(readBoundedJson(request(), 5)).rejects.toMatchObject({ status: 413 });
+});

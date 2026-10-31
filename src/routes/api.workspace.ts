@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { requireUser } from "@/lib/user-auth";
+import { requireWorkspaceUser as requireUser } from "@/lib/server/team-store";
 import { readUserWorkspace, saveUserWorkspace } from "@/lib/user-workspace-store";
 import { applyWorkspacePlanPolicy, assertWorkspaceWithinPlan } from "@/lib/billing-store";
 import type { SoulWorkspace } from "@/lib/soul";

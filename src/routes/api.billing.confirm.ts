@@ -1,14 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { findOwnedSubscription, syncRazorpaySubscription } from "@/lib/billing-store";
 import { fetchRazorpaySubscription, verifyRazorpayCheckoutSignature } from "@/lib/razorpay";
-import { requireUser } from "@/lib/user-auth";
+import { requireWorkspaceUser as requireUser } from "@/lib/server/team-store";
 
 export const Route = createFileRoute("/api/billing/confirm")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         try {
-          const user = await requireUser(request);
+          const user = await requireUser(request, true);
           const body = (await request.json()) as Record<string, unknown>;
           const subscriptionId = stringField(body.razorpay_subscription_id);
           const paymentId = stringField(body.razorpay_payment_id);

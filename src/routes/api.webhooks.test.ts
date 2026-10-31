@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { createWebhookEvent, deliverWebhook } from "@/lib/webhooks";
 import { getPublishedSoulForOwner } from "@/lib/integration-store";
-import { requireUser } from "@/lib/user-auth";
+import { requireWorkspaceUser as requireUser } from "@/lib/server/team-store";
 import { assertPlanFeature } from "@/lib/billing-store";
 
 const schema = z.object({

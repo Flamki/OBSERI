@@ -1,8 +1,13 @@
+import {
+  acquireImportLease,
+  recordOperation,
+  readBoundedJson,
+} from "@/lib/server/operation-guards";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { ingestWebsite } from "@/lib/knowledge";
 import { ScanError } from "@/lib/scanner";
-import { requireUser } from "@/lib/user-auth";
+import { requireWorkspaceUser as requireUser } from "@/lib/server/team-store";
 import { readUserWorkspace } from "@/lib/user-workspace-store";
 import { crawlPageAllowance } from "@/lib/billing-store";
 
@@ -35,12 +40,14 @@ export const Route = createFileRoute("/api/ingest")({
           limits: { maxPages: 50, maxDepth: 4 },
         }),
       POST: async ({ request }) => {
+        let release: (() => Promise<void>) | undefined;
+        let owner: string | undefined;
         try {
           const user = await requireUser(request);
           const length = Number(request.headers.get("content-length") ?? "0");
           if (length > 250_000)
             return errorResponse("Request is too large.", 413, "request_too_large");
-          const parsed = schema.safeParse(await request.json());
+          const parsed = schema.safeParse(await readBoundedJson(request));
           if (!parsed.success)
             return errorResponse("Invalid ingestion request.", 400, "invalid_request");
           const allowance = await crawlPageAllowance(
@@ -54,16 +61,20 @@ export const Route = createFileRoute("/api/ingest")({
               402,
               "indexed_page_limit_reached",
             );
+          owner = user.id;
+          release = await acquireImportLease(owner);
           const knowledge = await ingestWebsite({
             ...parsed.data,
-            signal: request.signal,
+            signal: AbortSignal.any([request.signal, AbortSignal.timeout(240_000)]),
             maxPages: Math.min(parsed.data.maxPages, allowance),
           });
+          await recordOperation(owner, "crawl", "ok", "completed");
           return Response.json(
             { knowledge },
             { headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } },
           );
         } catch (error) {
+          if (owner && release) await recordOperation(owner, "crawl", "failed", "import_failed");
           if (error instanceof ScanError)
             return errorResponse(error.message, error.status, error.code);
           if (error instanceof SyntaxError)
@@ -80,6 +91,8 @@ export const Route = createFileRoute("/api/ingest")({
             500,
             "ingestion_failed",
           );
+        } finally {
+          await release?.();
         }
       },
     },

@@ -34,13 +34,11 @@ it("indexes JavaScript-rendered text and links instead of the empty app shell", 
   expect(result.snapshot?.rendered).toBe(true);
 });
 it("always-render mode does not accept stale HTML cache validators", async () => {
-  const fetch = vi
-    .fn()
-    .mockResolvedValue(
-      new Response("<p>" + "Static content. ".repeat(100) + "</p>", {
-        headers: { "content-type": "text/html" },
-      }),
-    );
+  const fetch = vi.fn().mockResolvedValue(
+    new Response("<p>" + "Static content. ".repeat(100) + "</p>", {
+      headers: { "content-type": "text/html" },
+    }),
+  );
   vi.stubGlobal("fetch", fetch);
   vi.mocked(renderPublicPage).mockResolvedValue({
     title: "Updated",

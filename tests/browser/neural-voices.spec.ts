@@ -18,6 +18,11 @@ test("voice library offers only Neural presets and never falls back on preview f
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+  await page.route("**/api/team?view=workspaces", (route) =>
+    route.fulfill({
+      json: { workspaces: [{ ownerId: user.id, name: "Test workspace", role: "owner" }] },
+    }),
+  );
   await page.route(/neonauth.*\/auth\//, (route) =>
     route.fulfill({
       json: route.request().url().includes("get-session")
@@ -73,6 +78,11 @@ test("voice library offers only Neural presets and never falls back on preview f
 test("signed-out landing demo requests Neural audio and reports failure without browser speech", async ({
   page,
 }) => {
+  await page.route("**/api/team?view=workspaces", (route) =>
+    route.fulfill({
+      json: { workspaces: [{ ownerId: user.id, name: "Test workspace", role: "owner" }] },
+    }),
+  );
   await page.route(/neonauth.*\/auth\//, (route) => route.fulfill({ json: null }));
   await page.addInitScript(() => {
     window.speechSynthesis.speak = () => {

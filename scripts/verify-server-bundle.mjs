@@ -14,7 +14,11 @@ const server = resolve(".vercel/output/functions/__server.func");
 let copied = 0;
 for (const name of Object.keys(canvasPackage.optionalDependencies ?? {})) {
   let entry;
-  try { entry = canvasRequire.resolve(name); } catch { continue; }
+  try {
+    entry = canvasRequire.resolve(name);
+  } catch {
+    continue;
+  }
   await cp(dirname(entry), join(server, "node_modules", name), { recursive: true });
   copied++;
 }
@@ -24,7 +28,9 @@ const isolated = await mkdtemp(join(tmpdir(), "obseri-bundle-check-"));
 try {
   await cp(join(server, "node_modules"), join(isolated, "node_modules"), { recursive: true });
   await cp("scripts/fixtures/knowledge.pdf", join(isolated, "knowledge.pdf"));
-  await writeFile(join(isolated, "check.mjs"), `
+  await writeFile(
+    join(isolated, "check.mjs"),
+    `
     import assert from 'node:assert/strict';
     import { PDFParse } from 'pdf-parse';
     import puppeteer from 'puppeteer-core';
@@ -47,9 +53,12 @@ try {
       } finally { await browser.close(); }
     }
     console.log('Isolated deployment bundle: PDF extraction and browser runtime passed.');
-  `);
+  `,
+  );
   execFileSync(process.execPath, [join(isolated, "check.mjs")], {
-    cwd: isolated, stdio: "inherit", timeout: 60_000,
+    cwd: isolated,
+    stdio: "inherit",
+    timeout: 60_000,
     env: { ...process.env, NODE_PATH: "" },
   });
 } finally {

@@ -1,14 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { findOwnedSubscription } from "@/lib/billing-store";
 import { fetchRazorpayInvoices } from "@/lib/razorpay";
-import { requireUser } from "@/lib/user-auth";
+import { requireWorkspaceUser as requireUser } from "@/lib/server/team-store";
 
 export const Route = createFileRoute("/api/billing/invoices")({
   server: {
     handlers: {
       GET: async ({ request }) => {
         try {
-          const user = await requireUser(request);
+          const user = await requireUser(request, true);
           const subscriptionId = new URL(request.url).searchParams.get("subscriptionId");
           if (!subscriptionId) return apiError("Subscription is required.", 422);
           const owned = await findOwnedSubscription(user.id, subscriptionId);

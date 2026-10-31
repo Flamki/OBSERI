@@ -2,7 +2,7 @@ import { activeKnowledgeChunks } from "@/lib/knowledge-content";
 import type { ChatRequest } from "@/lib/conversation";
 import { consumeRateLimit, getPublishedSoul } from "@/lib/integration-store";
 import { readBearerToken, verifyWidgetSession } from "@/lib/integration-security";
-import { requireUser } from "@/lib/user-auth";
+import { requireWorkspaceUser as requireUser } from "@/lib/server/team-store";
 
 export async function resolveChatRequest(
   request: Request,
