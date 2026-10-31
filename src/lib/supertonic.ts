@@ -210,7 +210,7 @@ export function fetchSupertonicAudio(
   return audio;
 }
 
-export async function playSupertonicAudio(blob: Blob) {
+export async function playSupertonicAudio(blob: Blob, onStarted?: () => void) {
   speechGeneration += 1;
   clearActiveAudio();
   const href = URL.createObjectURL(blob);
@@ -241,6 +241,9 @@ export async function playSupertonicAudio(blob: Blob) {
     audio.onerror = () => finish(new Error("Neural voice playback failed."));
     void audio
       .play()
+      .then(() => {
+        if (!settled) onStarted?.();
+      })
       .catch((cause) =>
         finish(cause instanceof Error ? cause : new Error("Neural voice playback failed.")),
       );

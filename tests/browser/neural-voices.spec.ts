@@ -54,7 +54,8 @@ test("voice library offers only Neural presets and never falls back on preview f
     });
   });
   await page.goto("/app?view=voice");
-  await expect(page.getByText("10 voices", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "The voice collection 10" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Select / })).toHaveCount(10);
   for (const voice of supertonicVoices)
     await expect(
       page.getByRole("button", { name: `Preview ${voice.name}`, exact: true }),

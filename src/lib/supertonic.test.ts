@@ -33,6 +33,23 @@ afterEach(() => {
 });
 
 describe("Neural audio playback lifecycle", () => {
+  it("reports playback only after the browser starts and not after cancellation", async () => {
+    const started = vi.fn();
+    const playback = playSupertonicAudio(new Blob(), started);
+    expect(started).not.toHaveBeenCalled();
+    await Promise.resolve();
+    expect(started).toHaveBeenCalledOnce();
+    TestAudio.instances[0].onended?.();
+    await playback;
+
+    const cancelledStart = vi.fn();
+    const cancelled = playSupertonicAudio(new Blob(), cancelledStart);
+    const rejected = expect(cancelled).rejects.toMatchObject({ name: "AbortError" });
+    stopSupertonic();
+    await rejected;
+    expect(cancelledStart).not.toHaveBeenCalled();
+  });
+
   it("settles a stopped playback and releases its media resources", async () => {
     const playback = playSupertonicAudio(new Blob());
     const rejected = expect(playback).rejects.toMatchObject({ name: "AbortError" });
