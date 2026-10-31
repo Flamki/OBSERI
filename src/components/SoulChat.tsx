@@ -1,4 +1,5 @@
-import { neuralVoice } from "@/lib/voice-catalog";
+import { findSpeechBoundary } from "@/lib/speech-segments";
+import { NEURAL_QUALITY_STEPS, neuralVoice } from "@/lib/voice-catalog";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowUp,
@@ -157,7 +158,7 @@ export default function SoulChat({
         .id,
       language: callLanguage,
       speed: soul.voice.speed,
-      qualitySteps: 2,
+      qualitySteps: NEURAL_QUALITY_STEPS,
       soulId: soul.id,
       sessionToken,
     }).catch(() => undefined);
@@ -279,7 +280,7 @@ export default function SoulChat({
     }
 
     const assistantId = crypto.randomUUID();
-    const speaker = createStreamingSpeaker();
+    const speaker = createStreamingSpeaker(requestController.signal);
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -341,13 +342,13 @@ export default function SoulChat({
         .id,
       language: callLanguage,
       speed: soul.voice.speed,
-      qualitySteps: 2,
+      qualitySteps: NEURAL_QUALITY_STEPS,
       soulId: soul.id,
       sessionToken,
     });
   }
 
-  function createStreamingSpeaker() {
+  function createStreamingSpeaker(signal: AbortSignal) {
     let pendingText = "";
     let synthesis = Promise.resolve();
     let playback = Promise.resolve();
@@ -358,28 +359,33 @@ export default function SoulChat({
       // Keep inference serialized on the small voice host, but start the
       // next synthesis while the previous phrase is playing. This removes
       // the dead-air gap between phrases without stampeding the model.
-      const audio = synthesis.then(() =>
-        fetchSupertonicAudio(segment, {
+      const audio = synthesis.then(() => {
+        signal.throwIfAborted();
+        return fetchSupertonicAudio(segment, {
+          signal,
           voice: neuralVoice(
             soul.voice.provider === "supertonic" ? soul.voice.profileId : undefined,
           ).id,
           language: callLanguage,
           speed: soul.voice.speed,
-          qualitySteps: 2,
+          qualitySteps: NEURAL_QUALITY_STEPS,
           soulId: soul.id,
           sessionToken,
-        }),
-      );
+        });
+      });
       synthesis = audio.then(
         () => undefined,
         () => undefined,
       );
       playback = playback.then(async () => {
-        if (!voiceCallActiveRef.current) return;
+        if (signal.aborted || !voiceCallActiveRef.current) return;
         const blob = await audio;
-        if (!voiceCallActiveRef.current) return;
+        if (signal.aborted || !voiceCallActiveRef.current) return;
         await playSupertonicAudio(blob);
       });
+      // Observe failures immediately while the text stream is still arriving.
+      // finish() still propagates the original failure to the call UI.
+      void playback.catch(() => undefined);
     };
 
     return {
@@ -513,7 +519,8 @@ export default function SoulChat({
       .then(() => {
         if (voiceCallActiveRef.current) startListening(true);
       })
-      .catch(() => {
+      .catch((cause: unknown) => {
+        if (cause instanceof DOMException && cause.name === "AbortError") return;
         setError("The selected voice is temporarily unavailable. Please try again shortly.");
         stopVoiceCall();
       });
@@ -983,17 +990,6 @@ type SpeechRecognitionInstance = {
 };
 
 type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
-
-function findSpeechBoundary(text: string) {
-  if (text.length < 16) return -1;
-  const sentence = text.match(/^[\s\S]{16,}?[.!?](?:["')\]]*)\s/);
-  if (sentence) return sentence[0].length;
-  if (text.length < 76) return -1;
-  const comma = text.slice(30, 72).lastIndexOf(", ");
-  if (comma >= 0) return 30 + comma + 2;
-  const space = text.lastIndexOf(" ", 68);
-  return space >= 30 ? space + 1 : -1;
-}
 
 function prepareVoiceChunks(question: string, soul: Soul): KnowledgeChunk[] {
   const chunks = soul.knowledge.pages.flatMap((page) => page.chunks);

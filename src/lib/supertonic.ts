@@ -12,7 +12,7 @@ export const SUPERTONIC_MODEL_REVISION = "3cadd1ee6394adea1bd021217a0e650ede09a3
 const modelRoot = `https://huggingface.co/Supertone/supertonic-3/resolve/${SUPERTONIC_MODEL_REVISION}`;
 const onnxRoot = `${modelRoot}/onnx`;
 
-import { type SupertonicVoiceId } from "./voice-catalog";
+import { NEURAL_QUALITY_STEPS, type SupertonicVoiceId } from "./voice-catalog";
 export { supertonicVoices, type SupertonicVoiceId } from "./voice-catalog";
 
 export type SupertonicBackend = "webgpu" | "wasm";
@@ -34,6 +34,7 @@ let runtimePromise: Promise<Runtime> | null = null;
 let readyRuntime: Runtime | null = null;
 let activeAudio: HTMLAudioElement | null = null;
 let activeAudioUrl = "";
+let finishActiveAudio: ((error?: Error) => void) | null = null;
 let speechGeneration = 0;
 const cloudAudioCache = new Map<string, Promise<Blob>>();
 const CLOUD_AUDIO_CACHE_LIMIT = 32;
@@ -129,6 +130,7 @@ export async function synthesizeSupertonic(
     soulId?: string;
     sessionToken?: string;
     onProgress?: (stage: SupertonicLoadStage) => void;
+    signal?: AbortSignal;
   } = {},
 ) {
   const runtime = await preloadSupertonic(options.onProgress);
@@ -142,7 +144,10 @@ export async function synthesizeSupertonic(
   const style = await styleValue;
   runtime.styles.set(voice, style);
   const language = normalizeLanguage(options.language);
-  const qualitySteps = Math.min(8, Math.max(2, options.qualitySteps ?? 4));
+  const qualitySteps = Math.min(
+    8,
+    Math.max(NEURAL_QUALITY_STEPS, options.qualitySteps ?? NEURAL_QUALITY_STEPS),
+  );
   const { wav } = await runtime.tts.call(
     normalizeSpeechText(text),
     language,
@@ -176,10 +181,15 @@ export function fetchSupertonicAudio(
     voice: options.voice ?? "F1",
     language: normalizeLanguage(options.language),
     speed: options.speed ?? 1.03,
-    qualitySteps: Math.min(8, Math.max(2, options.qualitySteps ?? 4)),
+    qualitySteps: Math.min(
+      8,
+      Math.max(NEURAL_QUALITY_STEPS, options.qualitySteps ?? NEURAL_QUALITY_STEPS),
+    ),
     soulId: options.soulId,
     sessionToken: options.sessionToken,
   };
+  // A cancellable turn owns its request; never share it with another turn.
+  if (options.signal) return fetchCloudSupertonic(request, options.signal);
   const cacheKey = JSON.stringify(request);
   const cached = cloudAudioCache.get(cacheKey);
   if (cached) return cached;
@@ -201,20 +211,31 @@ export function fetchSupertonicAudio(
 }
 
 export async function playSupertonicAudio(blob: Blob) {
-  const generation = ++speechGeneration;
-  if (generation !== speechGeneration) throw new DOMException("Speech stopped", "AbortError");
+  speechGeneration += 1;
   clearActiveAudio();
   const href = URL.createObjectURL(blob);
   const audio = new Audio(href);
   activeAudio = audio;
   activeAudioUrl = href;
   await new Promise<void>((resolve, reject) => {
+    let settled = false;
     const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      audio.onended = null;
+      audio.onerror = null;
+      audio.onpause = null;
+      if (finishActiveAudio === finish) finishActiveAudio = null;
       if (activeAudio === audio) activeAudio = null;
       if (activeAudioUrl === href) activeAudioUrl = "";
       URL.revokeObjectURL(href);
       if (error) reject(error);
       else resolve();
+    };
+    finishActiveAudio = finish;
+    // Browsers also emit pause immediately before ended at natural completion.
+    audio.onpause = () => {
+      if (!audio.ended) finish(new DOMException("Speech stopped", "AbortError"));
     };
     audio.onended = () => finish();
     audio.onerror = () => finish(new Error("Neural voice playback failed."));
@@ -226,15 +247,18 @@ export async function playSupertonicAudio(blob: Blob) {
   });
 }
 
-async function fetchCloudSupertonic(request: {
-  text: string;
-  voice: SupertonicVoiceId;
-  language: string;
-  speed: number;
-  qualitySteps: number;
-  soulId?: string;
-  sessionToken?: string;
-}) {
+async function fetchCloudSupertonic(
+  request: {
+    text: string;
+    voice: SupertonicVoiceId;
+    language: string;
+    speed: number;
+    qualitySteps: number;
+    soulId?: string;
+    sessionToken?: string;
+  },
+  signal?: AbortSignal,
+) {
   const response = await authFetch("/api/voice/speak", {
     method: "POST",
     headers: {
@@ -251,7 +275,9 @@ async function fetchCloudSupertonic(request: {
       soulId: request.soulId,
     }),
     // Bound the wait and surface an error; never substitute a different voice.
-    signal: AbortSignal.timeout(5_000),
+    signal: signal
+      ? AbortSignal.any([signal, AbortSignal.timeout(15_000)])
+      : AbortSignal.timeout(15_000),
   });
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as {
@@ -268,9 +294,12 @@ export function stopSupertonic() {
 }
 
 function clearActiveAudio() {
-  if (activeAudio) {
-    activeAudio.pause();
-    activeAudio.src = "";
+  const audio = activeAudio;
+  finishActiveAudio?.(new DOMException("Speech stopped", "AbortError"));
+  if (audio) {
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
     activeAudio = null;
   }
   if (activeAudioUrl) {

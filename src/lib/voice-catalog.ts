@@ -1,3 +1,5 @@
+export const NEURAL_QUALITY_STEPS = 5;
+
 export const supertonicVoices = [
   { id: "F1", name: "Aster", description: "Warm, polished and conversational", gender: "Female" },
   { id: "F2", name: "Luma", description: "Bright, clear and welcoming", gender: "Female" },

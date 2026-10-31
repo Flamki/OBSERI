@@ -1,3 +1,5 @@
+import { NEURAL_QUALITY_STEPS } from "./voice-catalog";
+
 // Public marketing demos have a separate, bounded allowance; customer voice
 // calls still require an account or a signed widget session and plan allowance.
 export function isPublicVoiceDemo(
@@ -15,6 +17,6 @@ export function isPublicVoiceDemo(
     allowed &&
     input.soulId === "obseri-landing-voice-demo" &&
     input.text.length <= 400 &&
-    (input.qualitySteps ?? 4) <= 4
+    (input.qualitySteps ?? NEURAL_QUALITY_STEPS) <= NEURAL_QUALITY_STEPS
   );
 }

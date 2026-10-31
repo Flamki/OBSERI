@@ -36,8 +36,10 @@ describe("public voice demo policy", () => {
   const input = { soulId: "obseri-landing-voice-demo", text: "Hello", qualitySteps: 4 };
   const request = (origin = "https://obseri.com") =>
     new Request("https://obseri.com/api/voice/speak", { headers: { origin } });
-  it("permits the short first-party demo", () =>
-    expect(isPublicVoiceDemo(request(), input)).toBe(true));
+  it("permits the short first-party demo at the live voice quality", () => {
+    expect(isPublicVoiceDemo(request(), input)).toBe(true);
+    expect(isPublicVoiceDemo(request(), { ...input, qualitySteps: 5 })).toBe(true);
+  });
   it("rejects customer IDs, external origins and expensive requests", () => {
     expect(isPublicVoiceDemo(request(), { ...input, soulId: "customer-soul" })).toBe(false);
     expect(isPublicVoiceDemo(request("https://other.example"), input)).toBe(false);

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { supertonicVoices } from "@/lib/voice-catalog";
+import { NEURAL_QUALITY_STEPS, supertonicVoices } from "@/lib/voice-catalog";
 import { getRuntimeEnvironment } from "@/lib/runtime-env";
 import { readBearerToken, verifyWidgetSession } from "@/lib/integration-security";
 import { consumeRateLimit, getPublishedSoul } from "@/lib/integration-store";
@@ -17,7 +17,13 @@ const schema = z.object({
     .default("F1"),
   language: z.string().min(2).max(10).default("en"),
   speed: z.number().min(0.5).max(2).optional(),
-  qualitySteps: z.number().int().min(2).max(8).optional(),
+  qualitySteps: z
+    .number()
+    .int()
+    .min(2)
+    .max(8)
+    .transform((steps) => Math.max(NEURAL_QUALITY_STEPS, steps))
+    .optional(),
   soulId: z.string().min(1).max(100).optional(),
 });
 
@@ -65,7 +71,7 @@ export const Route = createFileRoute("/api/voice/speak")({
               text: parsed.data.text,
               voice: parsed.data.profileId ?? "F1",
               lang: normalizeLanguage(parsed.data.language),
-              steps: parsed.data.qualitySteps ?? 4,
+              steps: parsed.data.qualitySteps ?? NEURAL_QUALITY_STEPS,
               speed: parsed.data.speed ?? 1.03,
               response_format: "wav",
             } satisfies SupertonicGenerationRequest;
