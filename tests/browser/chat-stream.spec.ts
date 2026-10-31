@@ -58,6 +58,7 @@ test("text appears while the model is still answering, with sources only after v
   await expect(page.getByText("We build websites", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Send message" })).toBeDisabled();
   expect(await page.evaluate(() => window.__chatRequest.chunks)).toEqual([]);
+  await expect(page.getByText(/is thinking/)).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Services" })).toHaveCount(0);
   await page.evaluate(() =>
     window.__answerEvent({

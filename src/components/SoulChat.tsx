@@ -808,7 +808,7 @@ export default function SoulChat({
                 </div>
               </div>
             ))}
-            {sending && (
+            {sending && messages.at(-1)?.role !== "assistant" && (
               <div className="flex items-center gap-2 text-sm text-[#7b7973]">
                 <LoaderCircle className="h-4 w-4 animate-spin" /> {soul.personality.name} is
                 thinking...
@@ -944,7 +944,7 @@ export default function SoulChat({
             </div>
           </div>
         ))}
-        {sending && (
+        {sending && messages.at(-1)?.role !== "assistant" && (
           <div className={`flex items-center gap-2 text-sm ${mutedTone}`}>
             <LoaderCircle className="h-4 w-4 animate-spin" /> {soul.personality.name} is thinking…
           </div>
