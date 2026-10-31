@@ -141,6 +141,16 @@ it("reserves embedding costs atomically across concurrent requests and tenants",
     vi.unstubAllEnvs();
   }
 });
+it("compares embedding budgets numerically across different digit lengths", async () => {
+  vi.stubEnv("OBSERI_EMBEDDING_MONTHLY_CHAR_LIMIT", "5000");
+  try {
+    await expect(reserveEmbeddingCharacters("owner", 79)).resolves.toBeUndefined();
+    await expect(reserveEmbeddingCharacters("owner", 4921)).resolves.toBeUndefined();
+    await expect(reserveEmbeddingCharacters("owner", 1)).rejects.toThrow("budget reached");
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
 it("limits concurrent imports, releases seats and recovers expired workers", async () => {
   const releases = await Promise.all([acquireImportLease("owner"), acquireImportLease("owner")]);
   await expect(acquireImportLease("owner")).rejects.toMatchObject({ status: 429 });

@@ -23,7 +23,7 @@ export async function reserveEmbeddingCharacters(owner: string, characters: numb
   const month = new Date().toISOString().slice(0, 7);
   const rows =
     await integrationDatabase()`insert into obseri_embedding_budgets (owner_user_id, month, characters)
-    select ${owner}, ${month}, ${characters} where ${characters} <= ${limit}
+    select ${owner}, ${month}, ${characters}::bigint where ${characters}::bigint <= ${limit}::bigint
     on conflict (owner_user_id, month) do update set characters = obseri_embedding_budgets.characters + excluded.characters
     where obseri_embedding_budgets.characters + excluded.characters <= ${limit}
     returning characters`;
