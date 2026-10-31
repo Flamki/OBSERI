@@ -2,11 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, Orbit } from "lucide-react";
 import SoulChat from "@/components/SoulChat";
+import ContactCapture from "@/components/ContactCapture";
 import type { Soul } from "@/lib/soul";
 
 export const Route = createFileRoute("/widget/$soulId")({
   validateSearch: (search: Record<string, unknown>) => ({
-    mode: search.mode === "chat" ? ("chat" as const) : ("voice" as const),
+    mode: search.mode === "voice" ? ("voice" as const) : ("chat" as const),
   }),
   head: () => ({
     meta: [{ title: "Website soul · Obseri" }, { name: "robots", content: "noindex, nofollow" }],
@@ -20,7 +21,28 @@ function EmbeddedSoul() {
   const [soul, setSoul] = useState<Soul | null>(null);
   const [error, setError] = useState("");
   const conversationId = useRef(crypto.randomUUID());
-  const context = readWidgetContext();
+  const [context, setContext] = useState(readWidgetContext);
+  const conversationStarted = useRef(false);
+
+  useEffect(() => {
+    const update = (event: MessageEvent) => {
+      if (
+        event.source !== window.parent ||
+        event.origin !== context.parentOrigin ||
+        event.data?.type !== "obseri:context"
+      )
+        return;
+      if (typeof event.data.session !== "string") return;
+      setContext({
+        session: event.data.session,
+        parentOrigin: context.parentOrigin,
+        sessionId: typeof event.data.sessionId === "string" ? event.data.sessionId : undefined,
+        path: typeof event.data.path === "string" ? event.data.path : "/",
+      });
+    };
+    window.addEventListener("message", update);
+    return () => window.removeEventListener("message", update);
+  }, [context.parentOrigin]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -53,6 +75,18 @@ function EmbeddedSoul() {
           voiceMode
           sessionToken={context.session}
           initialPanelMode={mode}
+          contactAction={
+            soul.personality.leadCapture ? (
+              <ContactCapture
+                soulId={soul.id}
+                conversationId={conversationId.current}
+                sessionToken={context.session}
+                sessionId={context.sessionId}
+                path={context.path}
+                businessName={soul.name}
+              />
+            ) : undefined
+          }
           onClose={() =>
             window.parent.postMessage(
               { type: "obseri:close" },
@@ -60,6 +94,16 @@ function EmbeddedSoul() {
             )
           }
           onMessagesChange={(messages, leadIntent) => {
+            if (
+              !conversationStarted.current &&
+              messages.some((message) => message.role === "visitor")
+            ) {
+              conversationStarted.current = true;
+              window.parent.postMessage(
+                { type: "obseri:conversation-started" },
+                context.parentOrigin,
+              );
+            }
             void fetch(`/api/souls/${encodeURIComponent(soul.id)}/events`, {
               method: "POST",
               headers: {
@@ -96,15 +140,27 @@ function EmbeddedSoul() {
   );
 }
 
-function readWidgetContext(): { session: string; parentOrigin: string } {
-  if (typeof window === "undefined") return { session: "", parentOrigin: "" };
+function readWidgetContext(): {
+  session: string;
+  parentOrigin: string;
+  sessionId?: string;
+  path: string;
+} {
+  if (typeof window === "undefined") return { session: "", parentOrigin: "", path: "/" };
   try {
-    const value = JSON.parse(window.name) as { session?: unknown; parentOrigin?: unknown };
+    const value = JSON.parse(window.name) as {
+      session?: unknown;
+      parentOrigin?: unknown;
+      sessionId?: unknown;
+      path?: unknown;
+    };
     return {
       session: typeof value.session === "string" ? value.session : "",
       parentOrigin: typeof value.parentOrigin === "string" ? value.parentOrigin : "",
+      sessionId: typeof value.sessionId === "string" ? value.sessionId : undefined,
+      path: typeof value.path === "string" ? value.path : "/",
     };
   } catch {
-    return { session: "", parentOrigin: "" };
+    return { session: "", parentOrigin: "", path: "/" };
   }
 }

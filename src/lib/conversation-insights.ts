@@ -28,9 +28,9 @@ export function extractContact(conversation: SoulConversation): ConversationCont
   return contact;
 }
 
-/** A conversation worth following up: clear buying intent, or the visitor left contact details. */
+/** A real visitor conversation with contact details, distinct from anonymous buying intent. */
 export function isLead(conversation: SoulConversation): boolean {
-  if (conversation.leadIntent === "high" || conversation.leadIntent === "medium") return true;
+  if (conversation.channel === "playground") return false;
   const contact = extractContact(conversation);
   return Boolean(contact.email || contact.phone);
 }

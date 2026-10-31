@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowUp,
   BookOpen,
@@ -56,6 +56,7 @@ export default function SoulChat({
   onClose,
   onMessagesChange,
   sessionToken,
+  contactAction,
 }: {
   soul: Soul;
   compact?: boolean;
@@ -65,6 +66,7 @@ export default function SoulChat({
   onClose?: () => void;
   onMessagesChange?: (messages: SoulMessage[], leadIntent: ChatResponse["leadIntent"]) => void;
   sessionToken?: string;
+  contactAction?: ReactNode;
 }) {
   const [messages, setMessages] = useState<SoulMessage[]>(() => [
     greetingMessage(soul.id, soul.personality.greeting),
@@ -835,6 +837,7 @@ export default function SoulChat({
         )}
 
         <div className="shrink-0 px-4 pb-4 pt-2">
+          {contactAction}
           <div className="flex items-end gap-2 rounded-full border border-[#deddda] bg-white p-1.5 pl-5 shadow-[0_4px_16px_rgba(25,29,22,.06)] focus-within:border-[#bcbab5]">
             <textarea
               value={value}
@@ -968,6 +971,7 @@ export default function SoulChat({
       </div>
 
       <div className={`border-t p-4 ${dividerTone}`}>
+        {contactAction}
         {messages.length === 1 && (
           <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
             {["What do you offer?", "How does it work?", "Which option fits me?"].map((prompt) => (

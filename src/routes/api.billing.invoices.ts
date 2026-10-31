@@ -20,7 +20,8 @@ export const Route = createFileRoute("/api/billing/invoices")({
                 id: invoice.id,
                 number: invoice.invoice_number ?? invoice.id,
                 status: invoice.status,
-                amountPaise: invoice.amount_paid ?? invoice.gross_amount ?? invoice.amount ?? 0,
+                amountMinor: invoice.amount_paid ?? invoice.gross_amount ?? invoice.amount ?? 0,
+                currency: invoice.currency ?? null,
                 issuedAt: invoice.issued_at
                   ? new Date(invoice.issued_at * 1_000).toISOString()
                   : null,

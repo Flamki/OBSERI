@@ -52,9 +52,14 @@ describe("extractContact", () => {
 });
 
 describe("isLead", () => {
-  it("counts medium and high intent as leads", () => {
-    expect(isLead(conversation(["Pricing?"], "high"))).toBe(true);
-    expect(isLead(conversation(["Pricing?"], "medium"))).toBe(true);
+  it("excludes Studio test contacts", () => {
+    const test = conversation(["sam@example.com"], "high");
+    test.channel = "playground";
+    expect(isLead(test)).toBe(false);
+  });
+  it("does not count anonymous intent as a contactable lead", () => {
+    expect(isLead(conversation(["Pricing?"], "high"))).toBe(false);
+    expect(isLead(conversation(["Pricing?"], "medium"))).toBe(false);
     expect(isLead(conversation(["Pricing?"], "low"))).toBe(false);
   });
 

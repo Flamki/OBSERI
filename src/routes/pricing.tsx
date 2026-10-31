@@ -9,10 +9,10 @@ import {
   Mic2,
   ShieldCheck,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BILLING_PLANS,
-  formatInr,
+  formatPrice,
   type BillingPlan,
   type BillingPlanId,
 } from "@/lib/billing-plans";
@@ -152,6 +152,8 @@ function BillingCycleToggle({
   cycle: BillingCycle;
   setCycle: (value: BillingCycle) => void;
 }) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
   return (
     <div
       className="mx-auto mt-9 inline-flex rounded-full border border-white/70 bg-white/38 p-1.5 shadow-[0_14px_40px_rgba(70,38,50,.1)] backdrop-blur-xl"
@@ -162,6 +164,7 @@ function BillingCycleToggle({
           key={value}
           type="button"
           aria-pressed={cycle === value}
+          disabled={!ready}
           onClick={() => setCycle(value)}
           className={`h-10 rounded-full px-5 text-[11px] font-semibold capitalize transition-all ${
             cycle === value
@@ -186,7 +189,7 @@ function PricingCard({
   plan: BillingPlan;
   cycle: BillingCycle;
 }) {
-  const price = cycle === "annual" ? plan.annualPriceInrPaise : plan.monthlyPriceInrPaise;
+  const price = cycle === "annual" ? plan.annualPriceMinor : plan.monthlyPriceMinor;
   const monthlyEquivalent =
     cycle === "annual" && price !== null && price > 0 ? Math.round(price / 12) : price;
   const limitRows = planLimitRows(plan);
@@ -234,14 +237,14 @@ function PricingCard({
 
       <div className="mt-7 min-h-[78px]">
         {price === 0 ? (
-          <p className={`text-[3rem] font-normal tracking-[-.05em] ${serif}`}>₹0</p>
+          <p className={`text-[3rem] font-normal tracking-[-.05em] ${serif}`}>$0</p>
         ) : (
           <>
             <div className="flex items-end gap-1.5">
               <span
                 className={`text-[2.75rem] font-normal leading-none tracking-[-.05em] ${serif}`}
               >
-                {formatInr(monthlyEquivalent ?? 0)}
+                {formatPrice(monthlyEquivalent ?? 0)}
               </span>
               <span
                 className={`pb-1 text-[11px] ${plan.highlighted ? "text-white/42" : "text-black/38"}`}
@@ -252,8 +255,8 @@ function PricingCard({
             <p
               className={`mt-2 text-[10px] ${plan.highlighted ? "text-white/38" : "text-black/35"}`}
             >
-              {cycle === "annual" ? `${formatInr(price ?? 0)} billed yearly` : "Billed monthly"} ·
-              GST included
+              {cycle === "annual" ? `${formatPrice(price ?? 0)} billed yearly` : "Billed monthly"} ·
+              INR
             </p>
           </>
         )}
@@ -427,7 +430,7 @@ function PricingFooter() {
     <footer className="bg-[#17171a] px-6 pb-10 text-white lg:px-10">
       <div className="mx-auto flex max-w-[1180px] flex-col gap-5 border-t border-white/10 pt-8 text-[10px] text-white/35 sm:flex-row sm:items-center sm:justify-between">
         <img src="/obseri-logo-light.svg" alt="Obseri" className="h-7 w-auto" />
-        <span>Prices include applicable GST. Capacity is enforced per workspace.</span>
+        <span>All prices in INR. Any applicable taxes are shown at checkout.</span>
         <a
           href="mailto:flamki@obseri.com?subject=Obseri%20pricing"
           className="transition hover:text-white"

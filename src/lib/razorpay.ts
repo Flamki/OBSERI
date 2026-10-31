@@ -1,5 +1,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { SELF_SERVE_PLAN_IDS, type BillingPlanId } from "@/lib/billing-plans";
+import {
+  BILLING_CURRENCY,
+  BILLING_PLANS,
+  SELF_SERVE_PLAN_IDS,
+  type BillingPlanId,
+} from "@/lib/billing-plans";
 
 export type BillingCycle = "monthly" | "annual";
 
@@ -16,6 +21,7 @@ export type RazorpaySubscription = {
 };
 
 export type RazorpayInvoice = {
+  currency?: string;
   id: string;
   subscription_id?: string | null;
   invoice_number?: string | null;
@@ -60,7 +66,8 @@ export function razorpayPlanId(planId: BillingPlanId, cycle: BillingCycle) {
   if (planId === "free" || planId === "enterprise") {
     throw new RazorpayError("Choose a paid self-serve plan.", 422, "invalid_plan");
   }
-  const envName = `RAZORPAY_PLAN_${planId.toUpperCase()}_${cycle.toUpperCase()}`;
+  const suffix = BILLING_CURRENCY === "INR" ? "" : `_${BILLING_CURRENCY}`;
+  const envName = `RAZORPAY_PLAN_${planId.toUpperCase()}_${cycle.toUpperCase()}${suffix}`;
   const value = process.env[envName]?.trim();
   if (!value) {
     throw new RazorpayError(
@@ -77,7 +84,12 @@ export function billingPlanFromRazorpayPlanId(providerPlanId: string) {
     if (planId === "free") continue;
     for (const cycle of ["monthly", "annual"] as const) {
       const envName = `RAZORPAY_PLAN_${planId.toUpperCase()}_${cycle.toUpperCase()}`;
-      if (process.env[envName]?.trim() === providerPlanId) return { planId, cycle };
+      // Retain both mappings for historical subscription webhooks.
+      if (
+        process.env[`${envName}_USD`]?.trim() === providerPlanId ||
+        process.env[envName]?.trim() === providerPlanId
+      )
+        return { planId, cycle };
     }
   }
   return null;
@@ -114,6 +126,7 @@ export async function createRazorpaySubscription(input: {
   email?: string;
 }) {
   const providerPlanId = razorpayPlanId(input.planId, input.cycle);
+  await verifyProviderPlan(providerPlanId, input.planId, input.cycle);
   const subscription = await request<RazorpaySubscription>("/subscriptions", {
     method: "POST",
     body: JSON.stringify({
@@ -153,24 +166,66 @@ export function cancelRazorpaySubscription(subscriptionId: string, atCycleEnd = 
   );
 }
 
-export function updateRazorpaySubscription(input: {
+export async function updateRazorpaySubscription(input: {
   subscriptionId: string;
   planId: BillingPlanId;
   cycle: BillingCycle;
 }) {
   assertProviderId(input.subscriptionId, "sub_");
+  const providerPlanId = razorpayPlanId(input.planId, input.cycle);
+  await verifyProviderPlan(providerPlanId, input.planId, input.cycle);
+  const current = await fetchRazorpaySubscription(input.subscriptionId);
+  const currentPlan = await request<{ item: { currency: string } }>(
+    `/plans/${encodeURIComponent(current.plan_id)}`,
+  );
+  if (currentPlan.item.currency !== BILLING_CURRENCY) {
+    throw new RazorpayError(
+      "This subscription uses a previous currency. Contact support to change billing currency.",
+      409,
+      "currency_migration_required",
+    );
+  }
   return request<RazorpaySubscription>(
     `/subscriptions/${encodeURIComponent(input.subscriptionId)}`,
     {
       method: "PATCH",
       body: JSON.stringify({
-        plan_id: razorpayPlanId(input.planId, input.cycle),
+        plan_id: providerPlanId,
         quantity: 1,
         schedule_change_at: "now",
         customer_notify: true,
       }),
     },
   );
+}
+
+export async function verifyProviderPlan(
+  providerPlanId: string,
+  planId: BillingPlanId,
+  cycle: BillingCycle,
+) {
+  assertProviderId(providerPlanId, "plan_");
+  const plan = await request<{
+    period: string;
+    interval: number;
+    item: { currency: string; amount: number };
+  }>(`/plans/${encodeURIComponent(providerPlanId)}`);
+  const expected =
+    cycle === "monthly"
+      ? BILLING_PLANS[planId].monthlyPriceMinor
+      : BILLING_PLANS[planId].annualPriceMinor;
+  if (
+    plan.item.currency !== BILLING_CURRENCY ||
+    plan.item.amount !== expected ||
+    plan.period !== (cycle === "monthly" ? "monthly" : "yearly") ||
+    plan.interval !== 1
+  ) {
+    throw new RazorpayError(
+      "The billing plan does not match the advertised price. Contact support.",
+      503,
+      "billing_price_mismatch",
+    );
+  }
 }
 
 export function verifyRazorpayCheckoutSignature(input: {

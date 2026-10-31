@@ -17,10 +17,16 @@ export const Route = createFileRoute("/api/widgets/$soulId/session")({
           if (!originAllowed(origin, record.soul.channels.allowedDomains)) {
             return jsonError("This domain is not allowed to load the widget.", 403, headers);
           }
-          const allowed = await consumeRateLimit(`session:${params.soulId}:${origin}`, 30, 60);
+          const allowed = await consumeRateLimit(`session:${params.soulId}:${origin}`, 600, 60);
           if (!allowed) return jsonError("Too many session requests.", 429, headers);
           return Response.json(
-            { session: createWidgetSession(params.soulId, origin), parentOrigin: origin },
+            {
+              session: createWidgetSession(params.soulId, origin),
+              parentOrigin: origin,
+              analyticsEnabled: record.soul.channels.analyticsEnabled !== false,
+              proactiveEnabled: record.soul.channels.proactiveEnabled !== false,
+              consentRequired: Boolean(record.soul.channels.consentRequired),
+            },
             { headers: { ...headers, "cache-control": "no-store" } },
           );
         } catch (error) {

@@ -1,6 +1,6 @@
 # Billing and plan model
 
-Status: implementation baseline, July 2026. Listed prices are the final Razorpay plan amounts. Finance must configure the correct GST/tax treatment and invoice fields in the merchant account before launch.
+Status: INR release catalog, October 31, 2026. Public prices and the provisioning script share `src/lib/billing-prices.json`. Amounts use INR paise. Tax treatment must match the merchant account and checkout.
 
 ## Business rule
 
@@ -18,8 +18,8 @@ Current shared production infrastructure is expected to start near **$60–$80/m
 Variable-cost safety budgets used for plan design:
 
 - Managed real-time voice: **₹10–₹12/minute**, including speech, model, networking, and a provider-change buffer. Current ElevenAgents pricing is $0.08/minute before every possible surrounding cost.
-- Text answer: **₹0.20/response** internal reserve, including retrieval and model generation.
-- Incremental crawl/index work: **₹0.04/page processed** internal reserve.
+- Text answer: **$0.20/response** internal reserve, including retrieval and model generation.
+- Incremental crawl/index work: **$0.04/page processed** internal reserve.
 - Razorpay: **2% plus 18% GST on the fee**, or about 2.36% of collected revenue for standard domestic payments.
 
 These are conservative budgets, not customer-facing overage rates. Review real p50/p95 costs after the first 20 paying customers and every quarter thereafter.
@@ -34,23 +34,17 @@ These are conservative budgets, not customer-facing overage rates. Review real p
 | Scale      | ₹34,999 |       10 |        10,000 |                 20,000 |       300 min |     15 | Manual incremental |  365 days |
 | Enterprise |  Custom |   Custom |        Custom |              Committed |     Committed | Custom | Custom             |    Custom |
 
-Annual billing is priced at 85% of twelve monthly payments (15% discount). The public UI should highlight Growth, not Scale.
+Annual totals preserve existing provider plans: ₹35,690 (Launch), ₹1,12,190 (Growth), and ₹3,56,990 (Scale), approximately 15% below twelve monthly payments.
 
-### Full-allowance contribution check
+### Currency rollout
 
-The table below assumes every customer consumes every included text response, voice minute, and indexed-page allowance in the same month, using the upper ₹12/minute voice reserve. It reserves 18% of the listed amount for indirect tax and includes the estimated Razorpay fee, but excludes shared fixed infrastructure.
+This release uses the existing INR plan variables (`RAZORPAY_PLAN_<PLAN>_<CYCLE>`). New checkouts and plan changes verify provider currency, amount, period and interval before any subscription mutation. The invoice API returns `amountMinor` and the actual provider currency.
 
-| Plan   | Monthly revenue | Reserved variable cost | Payment fee | Contribution |  Contribution margin |
-| ------ | --------------: | ---------------------: | ----------: | -----------: | -------------------: |
-| Launch |          ₹3,499 |                   ₹572 |         ₹83 |       ₹2,310 | 77.9% of net revenue |
-| Growth |         ₹10,999 |                 ₹2,520 |        ₹260 |       ₹6,541 | 70.2% of net revenue |
-| Scale  |         ₹34,999 |                 ₹8,000 |        ₹826 |      ₹20,834 | 70.2% of net revenue |
+USD billing is deferred: the merchant API rejected USD plan creation. The proposed future USD prices are $39/$129/$399 monthly and $397.80/$1,315.80/$4,069.80 yearly. They are not advertised or charged by this release. Enablement, six verified USD plans, an updated shared catalog, and renewed checkout testing are required before rollout. Do not switch existing subscribers' currency automatically.
 
-At the 15% annual discount, the conservative contribution margin remains approximately 75% for Launch and 65% for Growth and Scale. This is why Growth includes 120—not 150—managed voice minutes, and Scale includes 300—not 500. Higher allowances would make the plans fragile at full utilization.
+International card acceptance is also awaiting merchant approval. INR pricing alone does not establish that overseas recurring card payments work.
 
-### Enterprise boundary
-
-Enterprise is not “unlimited.” It starts with a committed monthly volume and a scoped order form. It can add SSO, audit controls, a private voice/model deployment, custom region and retention, an SLA, procurement support, and dedicated capacity. Do not promise private GPU capacity until its infrastructure cost is included in the contract.
+Recalculate margins from measured usage and payment costs before increasing allowances.
 
 ## Overage policy
 
@@ -83,7 +77,7 @@ Never trust a successful browser callback as proof of payment. Razorpay webhooks
 - [x] Server-side checkout confirmation plus signed, idempotent webhook processing.
 - [x] Repeatable Razorpay plan provisioning script (`npm run billing:setup`).
 - [ ] Razorpay live account and Subscriptions access approved.
-- [ ] Six live plan IDs and the live key pair stored as server-only Vercel variables.
+- [ ] Six verified INR live plan IDs and the live key pair stored as server-only Vercel variables.
 - [ ] Webhook secret stored in Vercel and endpoint enabled at `/api/billing/webhook`.
 - [ ] Checkout, cancellation, plan change, webhook replay, failed renewal, and refund tested in Razorpay test mode.
 - [ ] Spend alerts on Vercel, Neon, AWS, and model/voice providers.

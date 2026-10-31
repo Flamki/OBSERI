@@ -25,6 +25,8 @@ try {
   }
 
   const expectedTables = [
+    "obseri_analytics_events",
+    "obseri_leads",
     "obseri_conversations",
     "obseri_published_souls",
     "obseri_rate_limits",

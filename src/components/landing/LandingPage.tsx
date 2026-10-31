@@ -1,5 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import {
+  Activity,
+  MousePointer2,
   ArrowRight,
   ArrowUpRight,
   AudioLines,
@@ -32,7 +34,7 @@ import {
   type VoiceAgent,
   type VoiceStatus,
 } from "@/components/landing/useVoiceAgent";
-import { BILLING_PLANS, formatInr } from "@/lib/billing-plans";
+import { BILLING_PLANS, formatPrice } from "@/lib/billing-plans";
 
 export const LANDING_FAQ: ReadonlyArray<{ question: string; answer: string }> = [
   {
@@ -58,7 +60,7 @@ export const LANDING_FAQ: ReadonlyArray<{ question: string; answer: string }> = 
   {
     question: "What happens when someone is ready to buy?",
     answer:
-      "The agent recognises buying intent, asks for contact details with consent, and records the lead. On Growth and above, signed webhooks push conversation and lead events straight into your CRM or workflow.",
+      "Visitors can submit a contact request with explicit permission to follow up. Your Conversions dashboard connects tracked visits to conversations and requests, and your team can mark qualified or won outcomes. On Launch and above, signed webhooks deliver requests to your workflow.",
   },
   {
     question: "Is there a free plan?",
@@ -204,7 +206,7 @@ function useScriptPlayer(length: number, running: boolean, stepMs = 1800) {
 /* -------------------------------------------------------------------------- */
 
 const navLinks = [
-  { href: "#product", label: "Product" },
+  { href: "#demo", label: "See it work" },
   { href: "#use-cases", label: "Use cases" },
   { href: "#trust", label: "Trust" },
   { href: "#faq", label: "FAQ" },
@@ -323,25 +325,30 @@ function Hero() {
             <span className="flex items-center gap-1.5 rounded-full bg-[#f5f5f3] px-2.5 py-1 text-[12px] font-medium text-[#0b0b0c]">
               <span className="h-1.5 w-1.5 rounded-full bg-[#ff5c7a]" /> Live
             </span>
-            Talk to a real Obseri agent below
+            Website intelligence. A personal next step.
             <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
           </a>
         </Reveal>
         <Reveal delay={80}>
           <h1 className="mx-auto mt-7 max-w-[980px] text-balance text-[clamp(2.9rem,7.4vw,6rem)] font-semibold leading-[0.96] tracking-[-0.055em]">
-            Make every visit a lead.
+            See the interest.
+            <br />
+            <span className="text-[#9b79bb]">Start the conversation.</span>
           </h1>
         </Reveal>
         <Reveal delay={160}>
           <p className="mx-auto mt-6 max-w-[620px] text-[17px] leading-7 text-[#6f6f73] sm:text-[19px] sm:leading-8">
-            Obseri turns your website into a lifelike voice and chat agent. It answers from your own
-            pages, qualifies every buyer, and sends you the lead.
+            Understand where visitors come from. Help them with answers from your own website. Turn
+            their questions into contact requests you can act on—all through one embed.
           </p>
         </Reveal>
         <Reveal delay={240} className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
-          <PrimaryButton to="/app">Build your agent free</PrimaryButton>
-          <SecondaryButton href={salesEmail}>Talk to sales</SecondaryButton>
+          <PrimaryButton to="/app">Start understanding your visitors</PrimaryButton>
+          <SecondaryButton href="#demo">Explore the experience</SecondaryButton>
         </Reveal>
+        <p className="mt-5 text-[13px] text-[#929098]">
+          Free to start · Analytics + chat + voice · No credit card
+        </p>
       </div>
 
       <Reveal delay={320} className="relative mx-auto mt-16 max-w-[1160px] sm:mt-20">
@@ -352,9 +359,10 @@ function Hero() {
   );
 }
 
-type DemoTab = "voice" | "chat" | "train" | "embed";
+type DemoTab = "conversions" | "voice" | "chat" | "train" | "embed";
 
 const demoTabs: Array<{ id: DemoTab; label: string; icon: ReactNode }> = [
+  { id: "conversions", label: "Visitor to lead", icon: <Activity /> },
   { id: "voice", label: "Voice agent", icon: <AudioLines /> },
   { id: "chat", label: "Website chat", icon: <MessageSquareText /> },
   { id: "train", label: "Train on your site", icon: <Globe2 /> },
@@ -362,7 +370,7 @@ const demoTabs: Array<{ id: DemoTab; label: string; icon: ReactNode }> = [
 ];
 
 function HeroDemo() {
-  const [tab, setTab] = useState<DemoTab>("voice");
+  const [tab, setTab] = useState<DemoTab>("conversions");
 
   return (
     <div
@@ -395,14 +403,136 @@ function HeroDemo() {
           ))}
         </div>
         <p className="hidden items-center gap-2 px-2 text-[13px] text-[#8a8a8f] sm:flex">
-          <span className="h-2 w-2 rounded-full bg-[#22c55e]" /> Running on obseri.com
+          <span
+            className={`h-2 w-2 rounded-full ${tab === "voice" ? "bg-[#22c55e]" : "bg-[#b59acb]"}`}
+          />{" "}
+          {tab === "voice" ? "Live voice demo" : "Interactive product example"}
         </p>
       </div>
       <div className="min-h-[520px]">
+        {tab === "conversions" && <ConversionDemo />}
         {tab === "voice" && <VoiceTab />}
         {tab === "chat" && <ChatTab />}
         {tab === "train" && <TrainTab />}
         {tab === "embed" && <EmbedTab />}
+      </div>
+    </div>
+  );
+}
+
+function ConversionDemo() {
+  const [step, setStep] = useState(0);
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
+  const steps = [
+    {
+      name: "Observe",
+      title: "A visit becomes a story.",
+      body: "Connect the source, the pages, and the questions. Understand the journey behind an enquiry, without collecting every click or keystroke.",
+      icon: <Globe2 />,
+      label: "Visitor arrives",
+      detail: "Google → /services → /pricing",
+    },
+    {
+      name: "Assist",
+      title: "Meet interest with an answer.",
+      body: "A small, dismissible invitation offers help on pricing and product pages. Visitors choose text or voice, with answers grounded in your website.",
+      icon: <MessageSquareText />,
+      label: "A question worth answering",
+      detail: "“Which package would work for a small team?”",
+    },
+    {
+      name: "Convert",
+      title: "Give the conversation somewhere to go.",
+      body: "Capture an explicit request with contact details. See the journey, follow up, and mark the outcome. Know what came through your website.",
+      icon: <UserRoundCheck />,
+      label: "Contact request received",
+      detail: "A name, an email, and a reason to follow up.",
+    },
+  ];
+  const active = steps[step];
+  return (
+    <div className="grid min-h-[520px] lg:grid-cols-[.9fr_1.1fr]">
+      <div className="flex flex-col justify-center p-7 sm:p-12">
+        <p className="text-xs font-medium uppercase tracking-[.18em] text-[#a082b7]">
+          The Obseri loop
+        </p>
+        <h3 className="mt-5 text-[clamp(1.8rem,3vw,2.8rem)] font-semibold leading-[1.05] tracking-[-.045em]">
+          {active.title}
+        </h3>
+        <p className="mt-5 max-w-md text-[15px] leading-7 text-[#817688]">{active.body}</p>
+        <div className="mt-8 flex flex-wrap gap-2">
+          {steps.map((item, index) => (
+            <button
+              key={item.name}
+              disabled={!ready}
+              onClick={() => setStep(index)}
+              aria-pressed={step === index}
+              className={`flex items-center gap-2 rounded-full border px-4 py-2.5 text-sm transition [&_svg]:h-4 [&_svg]:w-4 ${step === index ? "border-[#665079] bg-[#665079] text-white" : "border-[#e6dfeb] bg-white text-[#a18fae] hover:border-[#ab90bd]"}`}
+            >
+              {item.icon}
+              {item.name}
+            </button>
+          ))}
+        </div>
+        <p className="mt-6 text-xs text-[#a89cae]">
+          Illustrative journey. Your dashboard uses your own visitor data.
+        </p>
+      </div>
+      <div className="relative flex flex-col justify-center overflow-hidden border-t border-[#eee8f2] bg-[#f6f2f9] p-6 sm:p-10 lg:border-l lg:border-t-0">
+        <div className="pointer-events-none absolute -right-20 -top-28 h-80 w-80 rounded-full bg-[#e5d8f1] opacity-60 blur-3xl" />
+        <div className="relative rounded-2xl border border-white bg-white/80 p-5 shadow-[0_15px_60px_-25px_#a38ab9] sm:p-7">
+          <div className="flex items-center justify-between border-b border-[#eee8f2] pb-4">
+            <span className="flex items-center gap-2 text-sm font-semibold text-[#6e567f]">
+              <Activity className="h-4 w-4" /> Visitor journey
+            </span>
+            <span className="rounded-full bg-[#f2edf7] px-2 py-1 text-[10px] uppercase tracking-wider text-[#ab96bb]">
+              Example
+            </span>
+          </div>
+          <div className="my-6 space-y-5">
+            {steps.map((item, index) => (
+              <button
+                key={item.name}
+                disabled={!ready}
+                onClick={() => setStep(index)}
+                className={`flex w-full items-start gap-4 text-left transition ${index > step ? "opacity-35" : "opacity-100"}`}
+              >
+                <span
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl [&_svg]:h-4 [&_svg]:w-4 ${index === step ? "bg-[#eadef2] text-[#87629f]" : "bg-[#f5f2f8] text-[#b6a7c2]"}`}
+                >
+                  {item.icon}
+                </span>
+                <span>
+                  <strong className="block text-sm font-medium text-[#685575]">{item.label}</strong>
+                  <span className="mt-1 block text-xs leading-5 text-[#a193ac]">{item.detail}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+          <div aria-live="polite" className="rounded-xl border border-[#e7dcef] bg-[#f8f4fb] p-4">
+            <p className="flex items-center gap-2 text-xs font-medium text-[#9c80b0]">
+              <MousePointer2 className="h-3 w-3" />
+              {step === 0
+                ? "A useful signal"
+                : step === 1
+                  ? "A relevant invitation"
+                  : "A clear next step"}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-[#756080]">
+              {step === 0
+                ? "A visitor is exploring your services and pricing."
+                : step === 1
+                  ? "“Not sure which plan fits? Ask me a question.”"
+                  : "“I’m comparing options for our team. Could someone help me get started?”"}
+            </p>
+            {step === 2 && (
+              <div className="mt-3 flex items-center gap-2 text-xs text-[#769680]">
+                <Check className="h-3.5 w-3.5" /> Permission to follow up recorded
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -911,8 +1041,8 @@ function Capabilities() {
           eyebrow="Product"
           title={
             <>
-              Everything your best salesperson does.
-              <span className="text-[#a1a1a5]"> On every page, all day.</span>
+              Understand the visit.
+              <span className="text-[#a1a1a5]"> Be there for the next step.</span>
             </>
           }
         />
@@ -1387,7 +1517,7 @@ function PricingTeaser() {
         <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {plans.map((plan, index) => {
             const highlighted = "highlighted" in plan && plan.highlighted;
-            const price = plan.monthlyPriceInrPaise;
+            const price = plan.monthlyPriceMinor;
             return (
               <Reveal key={plan.id} delay={index * 80} className="h-full">
                 <article
@@ -1411,7 +1541,7 @@ function PricingTeaser() {
                   </p>
                   <p className="mt-6 flex items-baseline gap-1.5">
                     <span className="text-[36px] font-semibold tracking-[-0.04em]">
-                      {formatInr(price)}
+                      {formatPrice(price)}
                     </span>
                     <span
                       className={`text-[14px] ${highlighted ? "text-white/50" : "text-[#8a8a8f]"}`}
@@ -1569,7 +1699,8 @@ function Footer() {
         <div>
           <img src="/obseri-logo-dark.svg" alt="Obseri" className="h-8 w-auto" />
           <p className="mt-5 max-w-xs text-[14px] leading-6 text-[#6f6f73]">
-            Voice and chat agents trained on your website. Make every visit a lead.
+            Website analytics, helpful conversations, and contact requests. See the interest. Start
+            the conversation.
           </p>
         </div>
         {columns.map((column) => (

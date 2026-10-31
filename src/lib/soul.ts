@@ -135,6 +135,9 @@ export type AppearanceConfig = {
 };
 
 export type ChannelConfig = {
+  analyticsEnabled?: boolean;
+  proactiveEnabled?: boolean;
+  consentRequired?: boolean;
   widgetEnabled: boolean;
   webhookEnabled: boolean;
   allowedDomains: string[];

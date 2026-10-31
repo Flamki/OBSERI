@@ -1,6 +1,6 @@
 # Obseri
 
-> Obseri turns a website URL into a source-grounded AI voice agent and text chatbot trained on that website's content.
+> Obseri connects website visitor analytics, source-grounded voice and chat, and permission-based contact requests in one embed.
 
 ## Product
 
@@ -12,6 +12,10 @@
 - [Soul Studio](https://obseri.com/app): Build and test website knowledge, personality, voice, integrations, and conversations.
 
 ## Core capabilities
+
+- Visitor sources, page journeys, and a session-based conversation-to-contact funnel.
+- Explicit contact requests, CSV export, and owner-marked qualified/won outcomes.
+- INR pricing: Free, Launch ₹3,499/month, Growth ₹10,999/month, Scale ₹34,999/month; annual billing saves approximately 15%.
 
 - Advanced website crawling with robots.txt, sitemap, canonical URL, deduplication, and incremental refresh support.
 - Source-grounded retrieval with citations and pre-launch retrieval testing.

@@ -46,6 +46,8 @@ function db(): Sql {
   return client;
 }
 
+export { db as integrationDatabase };
+
 export async function publishSoul(input: {
   value: unknown;
   ownerKey: string;
@@ -259,6 +261,8 @@ export async function persistConversation(input: {
         lead_intent = excluded.lead_intent,
         messages = excluded.messages,
         updated_at = excluded.updated_at
+      where obseri_conversations.soul_id = excluded.soul_id
+        and obseri_conversations.origin = excluded.origin
     `;
     if (retentionDays !== null) {
       await transaction`

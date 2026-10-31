@@ -1,3 +1,7 @@
+import prices from "./billing-prices.json" with { type: "json" };
+
+export const BILLING_CURRENCY = prices.currency;
+
 export type BillingPlanId = "free" | "launch" | "growth" | "scale" | "enterprise";
 export type BillingFeature = "webhooks" | "remove_branding" | "api_access";
 
@@ -15,8 +19,8 @@ export type BillingPlan = {
   id: BillingPlanId;
   name: string;
   description: string;
-  monthlyPriceInrPaise: number | null;
-  annualPriceInrPaise: number | null;
+  monthlyPriceMinor: number | null;
+  annualPriceMinor: number | null;
   limits: BillingLimits;
   features: readonly string[];
   highlighted?: boolean;
@@ -31,9 +35,9 @@ export const BILLING_PLANS = {
   free: {
     id: "free",
     name: "Free",
-    description: "Build and test one website soul.",
-    monthlyPriceInrPaise: 0,
-    annualPriceInrPaise: 0,
+    description: "Find your first website conversations.",
+    monthlyPriceMinor: 0,
+    annualPriceMinor: 0,
     limits: {
       websites: 1,
       indexedPages: 30,
@@ -43,14 +47,19 @@ export const BILLING_PLANS = {
       retentionDays: 7,
       refreshIntervalHours: null,
     },
-    features: ["Website voice and chat widget", "Manual website refresh", "Community support"],
+    features: [
+      "Voice and chat assistant",
+      "Visitor analytics and journeys",
+      "Contact capture and conversion funnel",
+      "Community support",
+    ],
   },
   launch: {
     id: "launch",
     name: "Launch",
-    description: "For a live website starting real conversations.",
-    monthlyPriceInrPaise: 349_900,
-    annualPriceInrPaise: 3_569_000,
+    description: "Turn website interest into contact requests.",
+    monthlyPriceMinor: prices.launch.monthly,
+    annualPriceMinor: prices.launch.annual,
     limits: {
       websites: 1,
       indexedPages: 300,
@@ -60,14 +69,19 @@ export const BILLING_PLANS = {
       retentionDays: 30,
       refreshIntervalHours: null,
     },
-    features: ["Manual incremental refresh", "Lead capture", "Email support"],
+    features: [
+      "Everything in Free",
+      "Signed lead webhooks",
+      "Contact outcomes and CSV export",
+      "Email support",
+    ],
   },
   growth: {
     id: "growth",
     name: "Growth",
     description: "For teams turning website traffic into pipeline.",
-    monthlyPriceInrPaise: 1_099_900,
-    annualPriceInrPaise: 11_219_000,
+    monthlyPriceMinor: prices.growth.monthly,
+    annualPriceMinor: prices.growth.annual,
     limits: {
       websites: 3,
       indexedPages: 2_000,
@@ -90,8 +104,8 @@ export const BILLING_PLANS = {
     id: "scale",
     name: "Scale",
     description: "For high-volume teams with multiple websites.",
-    monthlyPriceInrPaise: 3_499_900,
-    annualPriceInrPaise: 35_699_000,
+    monthlyPriceMinor: prices.scale.monthly,
+    annualPriceMinor: prices.scale.annual,
     limits: {
       websites: 10,
       indexedPages: 10_000,
@@ -113,8 +127,8 @@ export const BILLING_PLANS = {
     id: "enterprise",
     name: "Enterprise",
     description: "Custom capacity, security, and deployment controls.",
-    monthlyPriceInrPaise: null,
-    annualPriceInrPaise: null,
+    monthlyPriceMinor: null,
+    annualPriceMinor: null,
     limits: {
       websites: null,
       indexedPages: null,
@@ -138,7 +152,7 @@ export const BILLING_PLANS = {
 export const SELF_SERVE_PLAN_IDS = ["free", "launch", "growth", "scale"] as const;
 
 export const BILLING_FEATURE_MINIMUM: Record<BillingFeature, BillingPlanId> = {
-  webhooks: "growth",
+  webhooks: "launch",
   remove_branding: "growth",
   api_access: "scale",
 };
@@ -166,10 +180,11 @@ export function getBillingPlan(value: unknown): BillingPlan {
   return isBillingPlanId(value) ? BILLING_PLANS[value] : BILLING_PLANS.free;
 }
 
-export function formatInr(paise: number): string {
+export function formatPrice(cents: number): string {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(paise / 100);
+    currency: BILLING_CURRENCY,
+    minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(cents / 100);
 }

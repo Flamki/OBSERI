@@ -2,7 +2,7 @@ import { assertPublicHttpUrlResolved } from "@/lib/scanner";
 
 export type ObseriWebhookEvent = {
   id: string;
-  type: "conversation.updated" | "lead.detected" | "webhook.test";
+  type: "conversation.updated" | "lead.detected" | "lead.captured" | "webhook.test";
   createdAt: string;
   soulId: string;
   data: Record<string, unknown>;

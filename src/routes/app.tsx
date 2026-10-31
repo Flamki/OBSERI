@@ -1,3 +1,5 @@
+import { Activity } from "lucide-react";
+import ConversionDashboard from "@/components/ConversionDashboard";
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
@@ -83,7 +85,7 @@ import {
   BILLING_PLANS,
   SELF_SERVE_PLAN_IDS,
   billingPlanIncludesFeature,
-  formatInr,
+  formatPrice,
   type BillingPlan,
   type BillingPlanId,
 } from "@/lib/billing-plans";
@@ -120,6 +122,7 @@ export const Route = createFileRoute("/app")({
 });
 
 type StudioView =
+  | "analytics"
   | "overview"
   | "knowledge"
   | "personality"
@@ -136,6 +139,10 @@ const STORAGE_KEY = "obseri.soul-studio.v1";
 const SIDEBAR_STORAGE_KEY = "obseri.sidebar-collapsed.v1";
 
 const PAGE_META: Record<StudioView, { title: string; description: string }> = {
+  analytics: {
+    title: "Conversions",
+    description: "Visitor journeys, contact requests, and outcomes.",
+  },
   overview: { title: "Overview", description: "How your website agent is doing." },
   knowledge: { title: "Knowledge", description: "The pages and facts your soul can use." },
   personality: {
@@ -707,6 +714,12 @@ function SoulStudio({ user }: { user: StudioUser }) {
                 onOpenConversation={openConversation}
                 onRefresh={() => void refreshKnowledge()}
               />
+            ) : view === "analytics" ? (
+              <ConversionDashboard
+                key={soul.id}
+                soulId={soul.id}
+                onInstall={() => navigate("deploy")}
+              />
             ) : view === "knowledge" ? (
               <KnowledgeView
                 soul={soul}
@@ -853,6 +866,7 @@ function Sidebar({
     {
       label: "Results",
       items: [
+        { id: "analytics", label: "Conversions", icon: <Activity /> },
         {
           id: "conversations",
           label: "Conversations",
@@ -3852,7 +3866,7 @@ function DeployView({
   const [previewMode, setPreviewMode] = useState<"closed" | "chat" | "voice">("closed");
   const webhookAvailable = billingPlanIncludesFeature(plan.id, "webhooks");
   const origin = typeof window === "undefined" ? "https://app.obseri.com" : window.location.origin;
-  const code = `<script\n  src="${origin}/obseri-widget.js"\n  data-soul-id="${soul.id}"\n  data-widget-token="${soul.channels.widgetToken}"\n  data-position="${soul.appearance.position}"\n  data-accent="${soul.appearance.accent}"\n  async\n></script>`;
+  const code = `<script\n  src="${origin}/obseri-widget.js"\n  data-soul-id="${soul.id}"\n  data-widget-token="${soul.channels.widgetToken}"\n  data-position="${soul.appearance.position}"\n  data-accent="${soul.appearance.accent}"\n  data-analytics="${soul.channels.analyticsEnabled === false ? "off" : "on"}"\n  data-proactive="${soul.channels.proactiveEnabled === false ? "off" : "on"}"\n  data-consent="${soul.channels.consentRequired ? "required" : "not-required"}"\n  async\n></script>`;
   const updateAppearance = (patch: Partial<Soul["appearance"]>) =>
     onUpdate((current) => ({ ...current, appearance: { ...current.appearance, ...patch } }));
   const updateChannels = (patch: Partial<Soul["channels"]>) =>
@@ -3956,6 +3970,48 @@ function DeployView({
                 title="Install the widget"
                 description="Paste this before the closing </body> tag."
               />
+              <div className="mt-5 space-y-3 rounded-xl border border-[#e5dfed] bg-[#faf8fc] p-4 text-sm text-[#756681]">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={soul.channels.analyticsEnabled !== false}
+                    onChange={(e) => updateChannels({ analyticsEnabled: e.target.checked })}
+                  />
+                  Track page journeys and conversion activity
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={soul.channels.proactiveEnabled !== false}
+                    onChange={(e) => updateChannels({ proactiveEnabled: e.target.checked })}
+                  />
+                  Offer help once on pricing and product pages
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(soul.channels.consentRequired)}
+                    onChange={(e) => updateChannels({ consentRequired: e.target.checked })}
+                  />
+                  Wait for my consent manager before tracking
+                </label>
+                <p className="text-xs leading-5">
+                  No keystroke recording or cross-site identity. Do Not Track and Global Privacy
+                  Control disable analytics. Conversion data is retained for 30 days. After changing
+                  these options, publish and replace the embed on your site.
+                </p>
+                {soul.channels.consentRequired && (
+                  <p className="break-all text-xs leading-5">
+                    After consent is granted, dispatch{" "}
+                    <code>
+                      window.dispatchEvent(new CustomEvent("obseri:consent", &#123; detail: &#123;
+                      granted: true &#125; &#125;))
+                    </code>
+                    . Dispatch with <code>granted: false</code> when consent is withdrawn. Contact
+                    requests remain available without analytics.
+                  </p>
+                )}
+              </div>
               <div className="relative mt-5 overflow-hidden rounded-xl bg-[#1c1c1b] p-5">
                 <pre className="overflow-x-auto whitespace-pre-wrap text-sm leading-6 text-[#e0dfdc]">
                   <code>{code}</code>
@@ -4080,13 +4136,13 @@ function DeployView({
                   <Webhook className="h-5 w-5" />
                 </span>
                 <p className="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-[#c23d58]">
-                  Growth feature
+                  Launch feature
                 </p>
                 <h2 className="mt-2 text-3xl font-semibold tracking-[-0.04em]">
                   Connect conversations to your stack.
                 </h2>
                 <p className="mt-3 max-w-xl text-sm leading-6 text-[#74736e]">
-                  Signed conversation and lead webhooks are available on Growth and higher. Your
+                  Signed conversation and lead webhooks are available on Launch and higher. Your
                   widget and chat remain live on {plan.name}.
                 </p>
                 <button type="button" onClick={onUpgrade} className="primary-button mt-7">
@@ -4206,7 +4262,7 @@ function OverviewView({
   const complete = steps.filter((step) => step.done).length;
   const nextStep = steps.find((step) => !step.done);
   const visitorConversations = conversations.filter((item) => item.channel !== "playground");
-  const leads = conversations.filter(isLead);
+  const leads = visitorConversations.filter(isLead);
   const firstName = (user.name || user.email?.split("@")[0] || "").split(/[\s._-]+/)[0];
   const pageLimit = plan.limits.indexedPages;
   const pages = soul.knowledge.pages.length;
@@ -4223,7 +4279,7 @@ function OverviewView({
       view: "conversations",
     },
     {
-      label: "Leads",
+      label: "Contacts in chat",
       value: leads.length.toLocaleString("en-IN"),
       detail: `${leads.filter((item) => item.leadIntent === "high").length} hot · ${countSince(leads, 7)} this week`,
       view: "conversations",
@@ -4373,9 +4429,9 @@ function OverviewView({
           <section className="rounded-[24px] border border-[#ebebe8] bg-white">
             <div className="flex items-center justify-between border-b border-[#f0f0ee] px-5 py-4 sm:px-6">
               <div>
-                <h2 className="text-[15px] font-semibold">Latest leads</h2>
+                <h2 className="text-[15px] font-semibold">Contacts in conversations</h2>
                 <p className="mt-0.5 text-xs text-[#8a8984]">
-                  Visitors who showed buying intent or left contact details
+                  Real visitors who shared contact details in chat
                 </p>
               </div>
               {leads.length > 0 && (
@@ -5336,7 +5392,7 @@ function PlanCard({
   busy: boolean;
   onChoose: () => void;
 }) {
-  const total = cycle === "annual" ? plan.annualPriceInrPaise : plan.monthlyPriceInrPaise;
+  const total = cycle === "annual" ? plan.annualPriceMinor : plan.monthlyPriceMinor;
   const monthlyEquivalent =
     cycle === "annual" && total !== null && total > 0 ? Math.round(total / 12) : total;
   const isHighlighted = plan.highlighted;
@@ -5394,12 +5450,12 @@ function PlanCard({
       </p>
       <div className="mt-7 min-h-[78px]">
         {monthlyEquivalent === 0 ? (
-          <p className="text-[2.75rem] font-semibold tracking-[-.055em]">{formatInr(0)}</p>
+          <p className="text-[2.75rem] font-semibold tracking-[-.055em]">{formatPrice(0)}</p>
         ) : (
           <>
             <div className="flex items-end gap-1.5">
               <span className="text-[2.75rem] font-semibold leading-none tracking-[-.055em]">
-                {monthlyEquivalent === null ? "Custom" : formatInr(monthlyEquivalent)}
+                {monthlyEquivalent === null ? "Custom" : formatPrice(monthlyEquivalent)}
               </span>
               {monthlyEquivalent !== null ? (
                 <span
@@ -5413,8 +5469,8 @@ function PlanCard({
               <p
                 className={`mt-2 text-[11px] ${isHighlighted ? "text-white/45" : "text-[#8a8a8f]"}`}
               >
-                {cycle === "annual" ? `${formatInr(total)} billed yearly` : "Billed monthly"} · GST
-                included
+                {cycle === "annual" ? `${formatPrice(total)} billed yearly` : "Billed monthly"} ·
+                INR
               </p>
             ) : null}
           </>

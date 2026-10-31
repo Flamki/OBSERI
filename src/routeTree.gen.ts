@@ -9,51 +9,48 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as PricingRouteImport } from './routes/pricing'
-import { Route as AppRouteImport } from './routes/app'
-import { Route as AiVoiceAgentForWebsiteRouteImport } from './routes/ai-voice-agent-for-website'
-import { Route as AiChatbotTrainedOnYourWebsiteRouteImport } from './routes/ai-chatbot-trained-on-your-website'
-import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as WidgetSoulIdRouteImport } from './routes/widget.$soulId'
-import { Route as AuthPathnameRouteImport } from './routes/auth.$pathname'
-import { Route as ApiWorkspaceRouteImport } from './routes/api.workspace'
-import { Route as ApiScanRouteImport } from './routes/api.scan'
-import { Route as ApiIngestRouteImport } from './routes/api.ingest'
+import { Route as AboutRouteImport } from './routes/about'
+import { Route as AiChatbotTrainedOnYourWebsiteRouteImport } from './routes/ai-chatbot-trained-on-your-website'
+import { Route as AiVoiceAgentForWebsiteRouteImport } from './routes/ai-voice-agent-for-website'
+import { Route as AppRouteImport } from './routes/app'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ApiChatRouteImport } from './routes/api.chat'
-import { Route as ApiWebhooksTestRouteImport } from './routes/api.webhooks.test'
-import { Route as ApiVoiceSpeakRouteImport } from './routes/api.voice.speak'
-import { Route as ApiVoiceProfilesRouteImport } from './routes/api.voice.profiles'
-import { Route as ApiVoiceCloneRouteImport } from './routes/api.voice.clone'
-import { Route as ApiSoulsPublishRouteImport } from './routes/api.souls.publish'
-import { Route as ApiSoulsSoulIdRouteImport } from './routes/api.souls.$soulId'
-import { Route as ApiIngestStreamRouteImport } from './routes/api.ingest.stream'
-import { Route as ApiChatStreamRouteImport } from './routes/api.chat.stream'
-import { Route as ApiBillingWebhookRouteImport } from './routes/api.billing.webhook'
-import { Route as ApiBillingSummaryRouteImport } from './routes/api.billing.summary'
-import { Route as ApiBillingInvoicesRouteImport } from './routes/api.billing.invoices'
-import { Route as ApiBillingConfirmRouteImport } from './routes/api.billing.confirm'
-import { Route as ApiBillingCheckoutRouteImport } from './routes/api.billing.checkout'
-import { Route as ApiBillingChangeRouteImport } from './routes/api.billing.change'
+import { Route as ApiIngestRouteImport } from './routes/api.ingest'
+import { Route as ApiScanRouteImport } from './routes/api.scan'
+import { Route as ApiWorkspaceRouteImport } from './routes/api.workspace'
+import { Route as AuthPathnameRouteImport } from './routes/auth.$pathname'
+import { Route as WidgetSoulIdRouteImport } from './routes/widget.$soulId'
 import { Route as ApiBillingCancelRouteImport } from './routes/api.billing.cancel'
-import { Route as ApiWidgetsSoulIdSessionRouteImport } from './routes/api.widgets.$soulId.session'
-import { Route as ApiSoulsSoulIdEventsRouteImport } from './routes/api.souls.$soulId.events'
-import { Route as ApiSoulsSoulIdConversationsRouteImport } from './routes/api.souls.$soulId.conversations'
+import { Route as ApiBillingChangeRouteImport } from './routes/api.billing.change'
+import { Route as ApiBillingCheckoutRouteImport } from './routes/api.billing.checkout'
+import { Route as ApiBillingConfirmRouteImport } from './routes/api.billing.confirm'
+import { Route as ApiBillingInvoicesRouteImport } from './routes/api.billing.invoices'
+import { Route as ApiBillingSummaryRouteImport } from './routes/api.billing.summary'
+import { Route as ApiBillingWebhookRouteImport } from './routes/api.billing.webhook'
+import { Route as ApiChatStreamRouteImport } from './routes/api.chat.stream'
+import { Route as ApiIngestStreamRouteImport } from './routes/api.ingest.stream'
+import { Route as ApiSoulsSoulIdRouteImport } from './routes/api.souls.$soulId'
+import { Route as ApiSoulsPublishRouteImport } from './routes/api.souls.publish'
+import { Route as ApiVoiceCloneRouteImport } from './routes/api.voice.clone'
+import { Route as ApiVoiceProfilesRouteImport } from './routes/api.voice.profiles'
+import { Route as ApiVoiceSpeakRouteImport } from './routes/api.voice.speak'
+import { Route as ApiWebhooksTestRouteImport } from './routes/api.webhooks.test'
 import { Route as ApiInternalWebhooksDrainRouteImport } from './routes/api.internal.webhooks.drain'
+import { Route as ApiSoulsSoulIdAnalyticsRouteImport } from './routes/api.souls.$soulId.analytics'
+import { Route as ApiSoulsSoulIdConversationsRouteImport } from './routes/api.souls.$soulId.conversations'
+import { Route as ApiSoulsSoulIdEventsRouteImport } from './routes/api.souls.$soulId.events'
+import { Route as ApiSoulsSoulIdLeadsRouteImport } from './routes/api.souls.$soulId.leads'
+import { Route as ApiWidgetsSoulIdSessionRouteImport } from './routes/api.widgets.$soulId.session'
 
-const PricingRoute = PricingRouteImport.update({
-  id: '/pricing',
-  path: '/pricing',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppRoute = AppRouteImport.update({
-  id: '/app',
-  path: '/app',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AiVoiceAgentForWebsiteRoute = AiVoiceAgentForWebsiteRouteImport.update({
-  id: '/ai-voice-agent-for-website',
-  path: '/ai-voice-agent-for-website',
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AiChatbotTrainedOnYourWebsiteRoute =
@@ -62,39 +59,19 @@ const AiChatbotTrainedOnYourWebsiteRoute =
     path: '/ai-chatbot-trained-on-your-website',
     getParentRoute: () => rootRouteImport,
   } as any)
-const AboutRoute = AboutRouteImport.update({
-  id: '/about',
-  path: '/about',
+const AiVoiceAgentForWebsiteRoute = AiVoiceAgentForWebsiteRouteImport.update({
+  id: '/ai-voice-agent-for-website',
+  path: '/ai-voice-agent-for-website',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
-const WidgetSoulIdRoute = WidgetSoulIdRouteImport.update({
-  id: '/widget/$soulId',
-  path: '/widget/$soulId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthPathnameRoute = AuthPathnameRouteImport.update({
-  id: '/auth/$pathname',
-  path: '/auth/$pathname',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
-  id: '/api/workspace',
-  path: '/api/workspace',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiScanRoute = ApiScanRouteImport.update({
-  id: '/api/scan',
-  path: '/api/scan',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiIngestRoute = ApiIngestRouteImport.update({
-  id: '/api/ingest',
-  path: '/api/ingest',
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiChatRoute = ApiChatRouteImport.update({
@@ -102,74 +79,29 @@ const ApiChatRoute = ApiChatRouteImport.update({
   path: '/api/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiWebhooksTestRoute = ApiWebhooksTestRouteImport.update({
-  id: '/api/webhooks/test',
-  path: '/api/webhooks/test',
+const ApiIngestRoute = ApiIngestRouteImport.update({
+  id: '/api/ingest',
+  path: '/api/ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiVoiceSpeakRoute = ApiVoiceSpeakRouteImport.update({
-  id: '/api/voice/speak',
-  path: '/api/voice/speak',
+const ApiScanRoute = ApiScanRouteImport.update({
+  id: '/api/scan',
+  path: '/api/scan',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiVoiceProfilesRoute = ApiVoiceProfilesRouteImport.update({
-  id: '/api/voice/profiles',
-  path: '/api/voice/profiles',
+const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
+  id: '/api/workspace',
+  path: '/api/workspace',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiVoiceCloneRoute = ApiVoiceCloneRouteImport.update({
-  id: '/api/voice/clone',
-  path: '/api/voice/clone',
+const AuthPathnameRoute = AuthPathnameRouteImport.update({
+  id: '/auth/$pathname',
+  path: '/auth/$pathname',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSoulsPublishRoute = ApiSoulsPublishRouteImport.update({
-  id: '/api/souls/publish',
-  path: '/api/souls/publish',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiSoulsSoulIdRoute = ApiSoulsSoulIdRouteImport.update({
-  id: '/api/souls/$soulId',
-  path: '/api/souls/$soulId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiIngestStreamRoute = ApiIngestStreamRouteImport.update({
-  id: '/stream',
-  path: '/stream',
-  getParentRoute: () => ApiIngestRoute,
-} as any)
-const ApiChatStreamRoute = ApiChatStreamRouteImport.update({
-  id: '/stream',
-  path: '/stream',
-  getParentRoute: () => ApiChatRoute,
-} as any)
-const ApiBillingWebhookRoute = ApiBillingWebhookRouteImport.update({
-  id: '/api/billing/webhook',
-  path: '/api/billing/webhook',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBillingSummaryRoute = ApiBillingSummaryRouteImport.update({
-  id: '/api/billing/summary',
-  path: '/api/billing/summary',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBillingInvoicesRoute = ApiBillingInvoicesRouteImport.update({
-  id: '/api/billing/invoices',
-  path: '/api/billing/invoices',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBillingConfirmRoute = ApiBillingConfirmRouteImport.update({
-  id: '/api/billing/confirm',
-  path: '/api/billing/confirm',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBillingCheckoutRoute = ApiBillingCheckoutRouteImport.update({
-  id: '/api/billing/checkout',
-  path: '/api/billing/checkout',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBillingChangeRoute = ApiBillingChangeRouteImport.update({
-  id: '/api/billing/change',
-  path: '/api/billing/change',
+const WidgetSoulIdRoute = WidgetSoulIdRouteImport.update({
+  id: '/widget/$soulId',
+  path: '/widget/$soulId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiBillingCancelRoute = ApiBillingCancelRouteImport.update({
@@ -177,14 +109,85 @@ const ApiBillingCancelRoute = ApiBillingCancelRouteImport.update({
   path: '/api/billing/cancel',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiWidgetsSoulIdSessionRoute = ApiWidgetsSoulIdSessionRouteImport.update({
-  id: '/api/widgets/$soulId/session',
-  path: '/api/widgets/$soulId/session',
+const ApiBillingChangeRoute = ApiBillingChangeRouteImport.update({
+  id: '/api/billing/change',
+  path: '/api/billing/change',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSoulsSoulIdEventsRoute = ApiSoulsSoulIdEventsRouteImport.update({
-  id: '/events',
-  path: '/events',
+const ApiBillingCheckoutRoute = ApiBillingCheckoutRouteImport.update({
+  id: '/api/billing/checkout',
+  path: '/api/billing/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingConfirmRoute = ApiBillingConfirmRouteImport.update({
+  id: '/api/billing/confirm',
+  path: '/api/billing/confirm',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingInvoicesRoute = ApiBillingInvoicesRouteImport.update({
+  id: '/api/billing/invoices',
+  path: '/api/billing/invoices',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingSummaryRoute = ApiBillingSummaryRouteImport.update({
+  id: '/api/billing/summary',
+  path: '/api/billing/summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingWebhookRoute = ApiBillingWebhookRouteImport.update({
+  id: '/api/billing/webhook',
+  path: '/api/billing/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiChatStreamRoute = ApiChatStreamRouteImport.update({
+  id: '/stream',
+  path: '/stream',
+  getParentRoute: () => ApiChatRoute,
+} as any)
+const ApiIngestStreamRoute = ApiIngestStreamRouteImport.update({
+  id: '/stream',
+  path: '/stream',
+  getParentRoute: () => ApiIngestRoute,
+} as any)
+const ApiSoulsSoulIdRoute = ApiSoulsSoulIdRouteImport.update({
+  id: '/api/souls/$soulId',
+  path: '/api/souls/$soulId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSoulsPublishRoute = ApiSoulsPublishRouteImport.update({
+  id: '/api/souls/publish',
+  path: '/api/souls/publish',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiVoiceCloneRoute = ApiVoiceCloneRouteImport.update({
+  id: '/api/voice/clone',
+  path: '/api/voice/clone',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiVoiceProfilesRoute = ApiVoiceProfilesRouteImport.update({
+  id: '/api/voice/profiles',
+  path: '/api/voice/profiles',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiVoiceSpeakRoute = ApiVoiceSpeakRouteImport.update({
+  id: '/api/voice/speak',
+  path: '/api/voice/speak',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWebhooksTestRoute = ApiWebhooksTestRouteImport.update({
+  id: '/api/webhooks/test',
+  path: '/api/webhooks/test',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiInternalWebhooksDrainRoute =
+  ApiInternalWebhooksDrainRouteImport.update({
+    id: '/api/internal/webhooks/drain',
+    path: '/api/internal/webhooks/drain',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiSoulsSoulIdAnalyticsRoute = ApiSoulsSoulIdAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
   getParentRoute: () => ApiSoulsSoulIdRoute,
 } as any)
 const ApiSoulsSoulIdConversationsRoute =
@@ -193,12 +196,21 @@ const ApiSoulsSoulIdConversationsRoute =
     path: '/conversations',
     getParentRoute: () => ApiSoulsSoulIdRoute,
   } as any)
-const ApiInternalWebhooksDrainRoute =
-  ApiInternalWebhooksDrainRouteImport.update({
-    id: '/api/internal/webhooks/drain',
-    path: '/api/internal/webhooks/drain',
-    getParentRoute: () => rootRouteImport,
-  } as any)
+const ApiSoulsSoulIdEventsRoute = ApiSoulsSoulIdEventsRouteImport.update({
+  id: '/events',
+  path: '/events',
+  getParentRoute: () => ApiSoulsSoulIdRoute,
+} as any)
+const ApiSoulsSoulIdLeadsRoute = ApiSoulsSoulIdLeadsRouteImport.update({
+  id: '/leads',
+  path: '/leads',
+  getParentRoute: () => ApiSoulsSoulIdRoute,
+} as any)
+const ApiWidgetsSoulIdSessionRoute = ApiWidgetsSoulIdSessionRouteImport.update({
+  id: '/api/widgets/$soulId/session',
+  path: '/api/widgets/$soulId/session',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -229,8 +241,10 @@ export interface FileRoutesByFullPath {
   '/api/voice/speak': typeof ApiVoiceSpeakRoute
   '/api/webhooks/test': typeof ApiWebhooksTestRoute
   '/api/internal/webhooks/drain': typeof ApiInternalWebhooksDrainRoute
+  '/api/souls/$soulId/analytics': typeof ApiSoulsSoulIdAnalyticsRoute
   '/api/souls/$soulId/conversations': typeof ApiSoulsSoulIdConversationsRoute
   '/api/souls/$soulId/events': typeof ApiSoulsSoulIdEventsRoute
+  '/api/souls/$soulId/leads': typeof ApiSoulsSoulIdLeadsRoute
   '/api/widgets/$soulId/session': typeof ApiWidgetsSoulIdSessionRoute
 }
 export interface FileRoutesByTo {
@@ -262,8 +276,10 @@ export interface FileRoutesByTo {
   '/api/voice/speak': typeof ApiVoiceSpeakRoute
   '/api/webhooks/test': typeof ApiWebhooksTestRoute
   '/api/internal/webhooks/drain': typeof ApiInternalWebhooksDrainRoute
+  '/api/souls/$soulId/analytics': typeof ApiSoulsSoulIdAnalyticsRoute
   '/api/souls/$soulId/conversations': typeof ApiSoulsSoulIdConversationsRoute
   '/api/souls/$soulId/events': typeof ApiSoulsSoulIdEventsRoute
+  '/api/souls/$soulId/leads': typeof ApiSoulsSoulIdLeadsRoute
   '/api/widgets/$soulId/session': typeof ApiWidgetsSoulIdSessionRoute
 }
 export interface FileRoutesById {
@@ -296,8 +312,10 @@ export interface FileRoutesById {
   '/api/voice/speak': typeof ApiVoiceSpeakRoute
   '/api/webhooks/test': typeof ApiWebhooksTestRoute
   '/api/internal/webhooks/drain': typeof ApiInternalWebhooksDrainRoute
+  '/api/souls/$soulId/analytics': typeof ApiSoulsSoulIdAnalyticsRoute
   '/api/souls/$soulId/conversations': typeof ApiSoulsSoulIdConversationsRoute
   '/api/souls/$soulId/events': typeof ApiSoulsSoulIdEventsRoute
+  '/api/souls/$soulId/leads': typeof ApiSoulsSoulIdLeadsRoute
   '/api/widgets/$soulId/session': typeof ApiWidgetsSoulIdSessionRoute
 }
 export interface FileRouteTypes {
@@ -331,8 +349,10 @@ export interface FileRouteTypes {
     | '/api/voice/speak'
     | '/api/webhooks/test'
     | '/api/internal/webhooks/drain'
+    | '/api/souls/$soulId/analytics'
     | '/api/souls/$soulId/conversations'
     | '/api/souls/$soulId/events'
+    | '/api/souls/$soulId/leads'
     | '/api/widgets/$soulId/session'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -364,8 +384,10 @@ export interface FileRouteTypes {
     | '/api/voice/speak'
     | '/api/webhooks/test'
     | '/api/internal/webhooks/drain'
+    | '/api/souls/$soulId/analytics'
     | '/api/souls/$soulId/conversations'
     | '/api/souls/$soulId/events'
+    | '/api/souls/$soulId/leads'
     | '/api/widgets/$soulId/session'
   id:
     | '__root__'
@@ -397,8 +419,10 @@ export interface FileRouteTypes {
     | '/api/voice/speak'
     | '/api/webhooks/test'
     | '/api/internal/webhooks/drain'
+    | '/api/souls/$soulId/analytics'
     | '/api/souls/$soulId/conversations'
     | '/api/souls/$soulId/events'
+    | '/api/souls/$soulId/leads'
     | '/api/widgets/$soulId/session'
   fileRoutesById: FileRoutesById
 }
@@ -434,32 +458,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/pricing': {
-      id: '/pricing'
-      path: '/pricing'
-      fullPath: '/pricing'
-      preLoaderRoute: typeof PricingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/app': {
-      id: '/app'
-      path: '/app'
-      fullPath: '/app'
-      preLoaderRoute: typeof AppRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/ai-voice-agent-for-website': {
-      id: '/ai-voice-agent-for-website'
-      path: '/ai-voice-agent-for-website'
-      fullPath: '/ai-voice-agent-for-website'
-      preLoaderRoute: typeof AiVoiceAgentForWebsiteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/ai-chatbot-trained-on-your-website': {
-      id: '/ai-chatbot-trained-on-your-website'
-      path: '/ai-chatbot-trained-on-your-website'
-      fullPath: '/ai-chatbot-trained-on-your-website'
-      preLoaderRoute: typeof AiChatbotTrainedOnYourWebsiteRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/about': {
@@ -469,46 +472,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AboutRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/ai-chatbot-trained-on-your-website': {
+      id: '/ai-chatbot-trained-on-your-website'
+      path: '/ai-chatbot-trained-on-your-website'
+      fullPath: '/ai-chatbot-trained-on-your-website'
+      preLoaderRoute: typeof AiChatbotTrainedOnYourWebsiteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/widget/$soulId': {
-      id: '/widget/$soulId'
-      path: '/widget/$soulId'
-      fullPath: '/widget/$soulId'
-      preLoaderRoute: typeof WidgetSoulIdRouteImport
+    '/ai-voice-agent-for-website': {
+      id: '/ai-voice-agent-for-website'
+      path: '/ai-voice-agent-for-website'
+      fullPath: '/ai-voice-agent-for-website'
+      preLoaderRoute: typeof AiVoiceAgentForWebsiteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/auth/$pathname': {
-      id: '/auth/$pathname'
-      path: '/auth/$pathname'
-      fullPath: '/auth/$pathname'
-      preLoaderRoute: typeof AuthPathnameRouteImport
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/workspace': {
-      id: '/api/workspace'
-      path: '/api/workspace'
-      fullPath: '/api/workspace'
-      preLoaderRoute: typeof ApiWorkspaceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/scan': {
-      id: '/api/scan'
-      path: '/api/scan'
-      fullPath: '/api/scan'
-      preLoaderRoute: typeof ApiScanRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/ingest': {
-      id: '/api/ingest'
-      path: '/api/ingest'
-      fullPath: '/api/ingest'
-      preLoaderRoute: typeof ApiIngestRouteImport
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/chat': {
@@ -518,102 +507,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiChatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/webhooks/test': {
-      id: '/api/webhooks/test'
-      path: '/api/webhooks/test'
-      fullPath: '/api/webhooks/test'
-      preLoaderRoute: typeof ApiWebhooksTestRouteImport
+    '/api/ingest': {
+      id: '/api/ingest'
+      path: '/api/ingest'
+      fullPath: '/api/ingest'
+      preLoaderRoute: typeof ApiIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/voice/speak': {
-      id: '/api/voice/speak'
-      path: '/api/voice/speak'
-      fullPath: '/api/voice/speak'
-      preLoaderRoute: typeof ApiVoiceSpeakRouteImport
+    '/api/scan': {
+      id: '/api/scan'
+      path: '/api/scan'
+      fullPath: '/api/scan'
+      preLoaderRoute: typeof ApiScanRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/voice/profiles': {
-      id: '/api/voice/profiles'
-      path: '/api/voice/profiles'
-      fullPath: '/api/voice/profiles'
-      preLoaderRoute: typeof ApiVoiceProfilesRouteImport
+    '/api/workspace': {
+      id: '/api/workspace'
+      path: '/api/workspace'
+      fullPath: '/api/workspace'
+      preLoaderRoute: typeof ApiWorkspaceRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/voice/clone': {
-      id: '/api/voice/clone'
-      path: '/api/voice/clone'
-      fullPath: '/api/voice/clone'
-      preLoaderRoute: typeof ApiVoiceCloneRouteImport
+    '/auth/$pathname': {
+      id: '/auth/$pathname'
+      path: '/auth/$pathname'
+      fullPath: '/auth/$pathname'
+      preLoaderRoute: typeof AuthPathnameRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/souls/publish': {
-      id: '/api/souls/publish'
-      path: '/api/souls/publish'
-      fullPath: '/api/souls/publish'
-      preLoaderRoute: typeof ApiSoulsPublishRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/souls/$soulId': {
-      id: '/api/souls/$soulId'
-      path: '/api/souls/$soulId'
-      fullPath: '/api/souls/$soulId'
-      preLoaderRoute: typeof ApiSoulsSoulIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/ingest/stream': {
-      id: '/api/ingest/stream'
-      path: '/stream'
-      fullPath: '/api/ingest/stream'
-      preLoaderRoute: typeof ApiIngestStreamRouteImport
-      parentRoute: typeof ApiIngestRoute
-    }
-    '/api/chat/stream': {
-      id: '/api/chat/stream'
-      path: '/stream'
-      fullPath: '/api/chat/stream'
-      preLoaderRoute: typeof ApiChatStreamRouteImport
-      parentRoute: typeof ApiChatRoute
-    }
-    '/api/billing/webhook': {
-      id: '/api/billing/webhook'
-      path: '/api/billing/webhook'
-      fullPath: '/api/billing/webhook'
-      preLoaderRoute: typeof ApiBillingWebhookRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/billing/summary': {
-      id: '/api/billing/summary'
-      path: '/api/billing/summary'
-      fullPath: '/api/billing/summary'
-      preLoaderRoute: typeof ApiBillingSummaryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/billing/invoices': {
-      id: '/api/billing/invoices'
-      path: '/api/billing/invoices'
-      fullPath: '/api/billing/invoices'
-      preLoaderRoute: typeof ApiBillingInvoicesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/billing/confirm': {
-      id: '/api/billing/confirm'
-      path: '/api/billing/confirm'
-      fullPath: '/api/billing/confirm'
-      preLoaderRoute: typeof ApiBillingConfirmRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/billing/checkout': {
-      id: '/api/billing/checkout'
-      path: '/api/billing/checkout'
-      fullPath: '/api/billing/checkout'
-      preLoaderRoute: typeof ApiBillingCheckoutRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/billing/change': {
-      id: '/api/billing/change'
-      path: '/api/billing/change'
-      fullPath: '/api/billing/change'
-      preLoaderRoute: typeof ApiBillingChangeRouteImport
+    '/widget/$soulId': {
+      id: '/widget/$soulId'
+      path: '/widget/$soulId'
+      fullPath: '/widget/$soulId'
+      preLoaderRoute: typeof WidgetSoulIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/billing/cancel': {
@@ -623,18 +549,116 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBillingCancelRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/widgets/$soulId/session': {
-      id: '/api/widgets/$soulId/session'
-      path: '/api/widgets/$soulId/session'
-      fullPath: '/api/widgets/$soulId/session'
-      preLoaderRoute: typeof ApiWidgetsSoulIdSessionRouteImport
+    '/api/billing/change': {
+      id: '/api/billing/change'
+      path: '/api/billing/change'
+      fullPath: '/api/billing/change'
+      preLoaderRoute: typeof ApiBillingChangeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/souls/$soulId/events': {
-      id: '/api/souls/$soulId/events'
-      path: '/events'
-      fullPath: '/api/souls/$soulId/events'
-      preLoaderRoute: typeof ApiSoulsSoulIdEventsRouteImport
+    '/api/billing/checkout': {
+      id: '/api/billing/checkout'
+      path: '/api/billing/checkout'
+      fullPath: '/api/billing/checkout'
+      preLoaderRoute: typeof ApiBillingCheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/confirm': {
+      id: '/api/billing/confirm'
+      path: '/api/billing/confirm'
+      fullPath: '/api/billing/confirm'
+      preLoaderRoute: typeof ApiBillingConfirmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/invoices': {
+      id: '/api/billing/invoices'
+      path: '/api/billing/invoices'
+      fullPath: '/api/billing/invoices'
+      preLoaderRoute: typeof ApiBillingInvoicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/summary': {
+      id: '/api/billing/summary'
+      path: '/api/billing/summary'
+      fullPath: '/api/billing/summary'
+      preLoaderRoute: typeof ApiBillingSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/webhook': {
+      id: '/api/billing/webhook'
+      path: '/api/billing/webhook'
+      fullPath: '/api/billing/webhook'
+      preLoaderRoute: typeof ApiBillingWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/chat/stream': {
+      id: '/api/chat/stream'
+      path: '/stream'
+      fullPath: '/api/chat/stream'
+      preLoaderRoute: typeof ApiChatStreamRouteImport
+      parentRoute: typeof ApiChatRoute
+    }
+    '/api/ingest/stream': {
+      id: '/api/ingest/stream'
+      path: '/stream'
+      fullPath: '/api/ingest/stream'
+      preLoaderRoute: typeof ApiIngestStreamRouteImport
+      parentRoute: typeof ApiIngestRoute
+    }
+    '/api/souls/$soulId': {
+      id: '/api/souls/$soulId'
+      path: '/api/souls/$soulId'
+      fullPath: '/api/souls/$soulId'
+      preLoaderRoute: typeof ApiSoulsSoulIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/souls/publish': {
+      id: '/api/souls/publish'
+      path: '/api/souls/publish'
+      fullPath: '/api/souls/publish'
+      preLoaderRoute: typeof ApiSoulsPublishRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/voice/clone': {
+      id: '/api/voice/clone'
+      path: '/api/voice/clone'
+      fullPath: '/api/voice/clone'
+      preLoaderRoute: typeof ApiVoiceCloneRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/voice/profiles': {
+      id: '/api/voice/profiles'
+      path: '/api/voice/profiles'
+      fullPath: '/api/voice/profiles'
+      preLoaderRoute: typeof ApiVoiceProfilesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/voice/speak': {
+      id: '/api/voice/speak'
+      path: '/api/voice/speak'
+      fullPath: '/api/voice/speak'
+      preLoaderRoute: typeof ApiVoiceSpeakRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/webhooks/test': {
+      id: '/api/webhooks/test'
+      path: '/api/webhooks/test'
+      fullPath: '/api/webhooks/test'
+      preLoaderRoute: typeof ApiWebhooksTestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/internal/webhooks/drain': {
+      id: '/api/internal/webhooks/drain'
+      path: '/api/internal/webhooks/drain'
+      fullPath: '/api/internal/webhooks/drain'
+      preLoaderRoute: typeof ApiInternalWebhooksDrainRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/souls/$soulId/analytics': {
+      id: '/api/souls/$soulId/analytics'
+      path: '/analytics'
+      fullPath: '/api/souls/$soulId/analytics'
+      preLoaderRoute: typeof ApiSoulsSoulIdAnalyticsRouteImport
       parentRoute: typeof ApiSoulsSoulIdRoute
     }
     '/api/souls/$soulId/conversations': {
@@ -644,11 +668,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSoulsSoulIdConversationsRouteImport
       parentRoute: typeof ApiSoulsSoulIdRoute
     }
-    '/api/internal/webhooks/drain': {
-      id: '/api/internal/webhooks/drain'
-      path: '/api/internal/webhooks/drain'
-      fullPath: '/api/internal/webhooks/drain'
-      preLoaderRoute: typeof ApiInternalWebhooksDrainRouteImport
+    '/api/souls/$soulId/events': {
+      id: '/api/souls/$soulId/events'
+      path: '/events'
+      fullPath: '/api/souls/$soulId/events'
+      preLoaderRoute: typeof ApiSoulsSoulIdEventsRouteImport
+      parentRoute: typeof ApiSoulsSoulIdRoute
+    }
+    '/api/souls/$soulId/leads': {
+      id: '/api/souls/$soulId/leads'
+      path: '/leads'
+      fullPath: '/api/souls/$soulId/leads'
+      preLoaderRoute: typeof ApiSoulsSoulIdLeadsRouteImport
+      parentRoute: typeof ApiSoulsSoulIdRoute
+    }
+    '/api/widgets/$soulId/session': {
+      id: '/api/widgets/$soulId/session'
+      path: '/api/widgets/$soulId/session'
+      fullPath: '/api/widgets/$soulId/session'
+      preLoaderRoute: typeof ApiWidgetsSoulIdSessionRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -678,13 +716,17 @@ const ApiIngestRouteWithChildren = ApiIngestRoute._addFileChildren(
 )
 
 interface ApiSoulsSoulIdRouteChildren {
+  ApiSoulsSoulIdAnalyticsRoute: typeof ApiSoulsSoulIdAnalyticsRoute
   ApiSoulsSoulIdConversationsRoute: typeof ApiSoulsSoulIdConversationsRoute
   ApiSoulsSoulIdEventsRoute: typeof ApiSoulsSoulIdEventsRoute
+  ApiSoulsSoulIdLeadsRoute: typeof ApiSoulsSoulIdLeadsRoute
 }
 
 const ApiSoulsSoulIdRouteChildren: ApiSoulsSoulIdRouteChildren = {
+  ApiSoulsSoulIdAnalyticsRoute: ApiSoulsSoulIdAnalyticsRoute,
   ApiSoulsSoulIdConversationsRoute: ApiSoulsSoulIdConversationsRoute,
   ApiSoulsSoulIdEventsRoute: ApiSoulsSoulIdEventsRoute,
+  ApiSoulsSoulIdLeadsRoute: ApiSoulsSoulIdLeadsRoute,
 }
 
 const ApiSoulsSoulIdRouteWithChildren = ApiSoulsSoulIdRoute._addFileChildren(

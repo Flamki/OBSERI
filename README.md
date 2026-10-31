@@ -7,6 +7,12 @@ Soul in Studio, test what it knows, choose how it sounds, and publish it as an i
 widget. Conversation and lead events can be delivered to customer systems through signed
 webhooks.
 
+## Conversion release (October 2026)
+
+The current checkout adds visitor sources and journeys, a conversion dashboard, explicit contact requests, team-marked outcomes, a contextual help invitation, and the existing INR billing (₹3,499/₹10,999/₹34,999 monthly). Structured contacts are separate from anonymous buying intent, and Studio tests do not count as leads.
+
+See [conversion release and deployment](docs/conversion-release.md) before rollout. Apply migration `004_conversion_analytics.sql`, validate the six existing INR provider plans, and deploy the app together. These source changes do not establish that the live deployment has been updated. The older release notes below describe earlier stages and may refer to previous infrastructure or billing plans.
+
 ## Live release
 
 - Production: [obseri.com](https://obseri.com)
