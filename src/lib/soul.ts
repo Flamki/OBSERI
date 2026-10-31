@@ -24,6 +24,7 @@ export type KnowledgeSource = {
   status: "pending" | "crawling" | "ready" | "warning" | "error" | "paused";
   pageLimit: number;
   crawlDepth: number;
+  rendering?: "auto" | "always" | "never";
   cadence: KnowledgeRefreshCadence;
   includePatterns: string[];
   excludePatterns: string[];

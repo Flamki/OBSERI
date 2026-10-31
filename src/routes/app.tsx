@@ -591,6 +591,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
           url: source.rootUrl,
           maxPages: source.pageLimit,
           maxDepth: source.crawlDepth,
+          rendering: source.rendering ?? "auto",
           includePatterns: source.includePatterns,
           excludePatterns: source.excludePatterns,
           validators: normalizeKnowledgeBase(soul.knowledge, soul.siteUrl)
@@ -1800,6 +1801,19 @@ function KnowledgeView({
             setAddOpen(false);
             await onAddSource(source);
           }}
+          onDocument={(imported) => {
+            onUpdate((current) => ({
+              ...current,
+              status: "ready",
+              pages: [...current.pages, ...imported.pages],
+              sources: [...(current.sources ?? []), ...(imported.sources ?? [])],
+              errors: [...current.errors, ...imported.errors],
+            }));
+            setAddOpen(false);
+            onNotice(
+              `Imported ${imported.pages.length} PDF pages.${imported.errors.length ? " Some pages need OCR; see source warnings." : ""} Publish to update the live assistant.`,
+            );
+          }}
           onManual={(name, content) => {
             addManualSource(name, content);
             setAddOpen(false);
@@ -1842,24 +1856,59 @@ function AddKnowledgeSourceDialog({
   onClose,
   onWebsite,
   onManual,
+  onDocument,
 }: {
   onClose: () => void;
   onWebsite: (source: KnowledgeSource) => Promise<void>;
   onManual: (name: string, content: string) => void;
+  onDocument: (knowledge: KnowledgeBase) => void;
 }) {
-  const [kind, setKind] = useState<"website" | "manual">("website");
+  const [kind, setKind] = useState<"website" | "manual" | "pdf">("website");
   const [url, setUrl] = useState("");
   const [name, setName] = useState("");
   const [content, setContent] = useState("");
   const [pageLimit, setPageLimit] = useState(40);
   const [crawlDepth, setCrawlDepth] = useState(4);
   const [cadence, setCadence] = useState<KnowledgeSource["cadence"]>("manual");
+  const [pdf, setPdf] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [rendering, setRendering] = useState<"auto" | "always" | "never">("auto");
   const [excludePatterns, setExcludePatterns] = useState("/admin/*, /account/*, /search*");
   const [error, setError] = useState("");
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
+    if (importing) return;
     setError("");
+    if (kind === "pdf") {
+      if (!pdf || pdf.size > 3_000_000) {
+        setError("Choose a PDF smaller than 3 MB.");
+        return;
+      }
+      setImporting(true);
+      try {
+        const response = await authFetch("/api/knowledge/pdf", {
+          method: "POST",
+          headers: {
+            "content-type": "application/pdf",
+            "x-file-name": encodeURIComponent(pdf.name),
+          },
+          body: pdf,
+        });
+        const result = (await response.json()) as {
+          knowledge?: KnowledgeBase;
+          error?: { message?: string };
+        };
+        if (!response.ok || !result.knowledge)
+          throw new Error(result.error?.message || "PDF import failed.");
+        onDocument(result.knowledge);
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "PDF import failed.");
+      } finally {
+        setImporting(false);
+      }
+      return;
+    }
     if (kind === "manual") {
       if (name.trim().length < 2 || content.trim().length < 40) {
         setError("Give the source a name and add at least 40 characters of useful content.");
@@ -1881,6 +1930,7 @@ function AddKnowledgeSourceDialog({
     source.pageLimit = pageLimit;
     source.crawlDepth = crawlDepth;
     source.cadence = cadence;
+    source.rendering = rendering;
     source.excludePatterns = excludePatterns
       .split(",")
       .map((pattern) => pattern.trim())
@@ -1899,13 +1949,13 @@ function AddKnowledgeSourceDialog({
       <button className="absolute inset-0" onClick={onClose} aria-label="Close" />
       <form
         onSubmit={submit}
-        className="relative w-full max-w-[560px] rounded-2xl border border-black/10 bg-white shadow-[0_30px_90px_rgba(0,0,0,.18)]"
+        className="relative max-h-[calc(100dvh-2rem)] w-full max-w-[560px] overflow-y-auto rounded-2xl border border-black/10 bg-white shadow-[0_30px_90px_rgba(0,0,0,.18)]"
       >
         <div className="flex items-start justify-between border-b border-[#e9e8e6] px-6 py-5">
           <div>
             <h2 className="text-lg font-semibold tracking-[-0.02em]">Add knowledge source</h2>
             <p className="mt-1 text-xs text-[#82807a]">
-              Connect a site or add trusted text your agent can cite.
+              Connect a site, upload a PDF, or add trusted text.
             </p>
           </div>
           <button type="button" onClick={onClose} className="icon-button">
@@ -1913,7 +1963,7 @@ function AddKnowledgeSourceDialog({
           </button>
         </div>
         <div className="p-6">
-          <div className="grid grid-cols-2 gap-2 rounded-xl bg-[#f3f3f2] p-1">
+          <div className="grid grid-cols-3 gap-2 rounded-xl bg-[#f3f3f2] p-1">
             <button
               type="button"
               onClick={() => setKind("website")}
@@ -1929,6 +1979,14 @@ function AddKnowledgeSourceDialog({
             >
               <FileText className="mr-2 inline h-3.5 w-3.5" />
               Paste text
+            </button>
+            <button
+              type="button"
+              onClick={() => setKind("pdf")}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold ${kind === "pdf" ? "bg-white shadow-sm" : "text-[#787671]"}`}
+            >
+              <FileText className="mr-2 inline h-3.5 w-3.5" />
+              PDF upload
             </button>
           </div>
           {kind === "website" ? (
@@ -1990,6 +2048,17 @@ function AddKnowledgeSourceDialog({
                   </select>
                 </Field>
               </div>
+              <Field label="JavaScript content" className="mt-4">
+                <select
+                  className="clean-input"
+                  value={rendering}
+                  onChange={(event) => setRendering(event.target.value as typeof rendering)}
+                >
+                  <option value="auto">Automatic — render app shells when needed</option>
+                  <option value="always">Always render — for dynamic websites</option>
+                  <option value="never">HTML only — fastest</option>
+                </select>
+              </Field>
               <Field label="Exclude paths" hint="Comma separated · supports *" className="mt-4">
                 <input
                   value={excludePatterns}
@@ -2003,6 +2072,24 @@ function AddKnowledgeSourceDialog({
                 pages, and shows every crawl step live.
               </div>
             </>
+          ) : kind === "pdf" ? (
+            <Field
+              label="PDF document"
+              hint="Up to 3 MB · 50 pages · selectable text"
+              className="mt-5"
+            >
+              <input
+                type="file"
+                accept="application/pdf,.pdf"
+                disabled={importing}
+                onChange={(event) => setPdf(event.target.files?.[0] ?? null)}
+                className="clean-input"
+              />
+              <p className="mt-3 text-xs leading-5 text-[#787671]">
+                Each page becomes searchable knowledge. Scanned images need OCR first. The extracted
+                text stays in your workspace; the original file is not published.
+              </p>
+            </Field>
           ) : (
             <>
               <Field label="Source name" className="mt-5">
@@ -2037,9 +2124,15 @@ function AddKnowledgeSourceDialog({
           <button type="button" onClick={onClose} className="secondary-button">
             Cancel
           </button>
-          <button className="primary-button">
+          <button className="primary-button" disabled={importing}>
             <Plus className="h-4 w-4" />
-            {kind === "website" ? "Start crawl" : "Add knowledge"}
+            {importing
+              ? "Reading PDF…"
+              : kind === "website"
+                ? "Start crawl"
+                : kind === "pdf"
+                  ? "Import PDF"
+                  : "Add knowledge"}
           </button>
         </div>
       </form>
@@ -2950,7 +3043,10 @@ function DeployView({
         },
         body: JSON.stringify(publishableSoul),
       });
-      const payload = (await response.json()) as { error?: { message?: string } };
+      const payload = (await response.json()) as {
+        error?: { message?: string };
+        searchIndex?: { indexed: number; total: number };
+      };
       if (!response.ok) throw new Error(payload.error?.message || "Publishing failed.");
       onUpdate((current) => ({
         ...current,
@@ -2959,7 +3055,11 @@ function DeployView({
           ? current.channels
           : { ...current.channels, webhookEnabled: false },
       }));
-      onNotice("Published. Your website widget is ready.");
+      onNotice(
+        payload.searchIndex && payload.searchIndex.indexed < payload.searchIndex.total
+          ? "Published. Keyword search is ready; semantic indexing is incomplete and will retry with incoming questions."
+          : "Published. Your website widget is ready.",
+      );
     } catch (error) {
       onNotice(error instanceof Error ? error.message : "Publishing failed.");
     } finally {
@@ -3895,7 +3995,7 @@ function ConversationsView({
                         {message.citations.slice(0, 3).map((citation) => (
                           <a
                             key={citation.chunkId}
-                            href={citation.url}
+                            href={/^https?:\/\//.test(citation.url) ? citation.url : undefined}
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex max-w-[240px] items-center gap-1 truncate rounded-full border border-[#e7e7e4] bg-white px-2.5 py-1 text-[11px] text-[#6f6e69] hover:text-[#0b0b0c]"

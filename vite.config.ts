@@ -10,6 +10,7 @@ export default defineConfig(({ command }) => ({
     host: "::",
     port: 8080,
   },
+  ssr: { external: ["pdf-parse", "puppeteer-core", "@sparticuz/chromium"] },
   css: {
     // Keep development and production on the same CSS transformation path.
     transformer: "lightningcss",
@@ -39,7 +40,19 @@ export default defineConfig(({ command }) => ({
       server: { entry: "server" },
     }),
     ...(command === "build"
-      ? [nitro({ defaultPreset: "vercel", vercel: { functions: { maxDuration: 300 } } })]
+      ? [
+          nitro({
+            defaultPreset: "vercel",
+            traceDeps: [
+              "@sparticuz/chromium*",
+              "puppeteer-core",
+              "pdf-parse*",
+              "pdfjs-dist*",
+              "@napi-rs/canvas*",
+            ],
+            vercel: { functions: { maxDuration: 300 } },
+          }),
+        ]
       : []),
     react(),
   ],

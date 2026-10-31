@@ -1,3 +1,4 @@
+import { prepareSemanticSearch } from "@/lib/server/semantic-search";
 import { personalitySchema } from "@/lib/personality";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
@@ -24,7 +25,7 @@ const schema = z.object({
   stream: z.boolean().optional(),
   soulId: z.string().min(1).max(100),
   personality: personalitySchema,
-  chunks: z.array(chunkSchema).max(250),
+  chunks: z.array(chunkSchema).max(2500),
   messages: z.array(messageSchema).min(1).max(20),
 });
 
@@ -35,7 +36,7 @@ export const Route = createFileRoute("/api/chat")({
       POST: async ({ request }) => {
         try {
           const length = Number(request.headers.get("content-length") ?? "0");
-          if (length > 420_000)
+          if (length > 2_000_000)
             return errorResponse("Knowledge payload is too large.", 413, "payload_too_large");
           const parsed = schema.safeParse(await request.json());
           if (!parsed.success)
@@ -56,10 +57,18 @@ export const Route = createFileRoute("/api/chat")({
                   controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
                 };
                 try {
-                  const result = await answerSoulQuestion(access.input, {
+                  const input = await prepareSemanticSearch(
+                    access.input,
+                    access.ownerUserId,
+                    signal,
+                  );
+                  const result = await answerSoulQuestion(input, {
                     signal,
                     onAnswer: (text) => emit({ type: "answer", text }),
                   });
+                  result.searchMode = Object.keys(input.semanticScores ?? {}).length
+                    ? "hybrid"
+                    : "keyword";
                   signal.throwIfAborted();
                   await finalizeUsage(reservation.reservationId, true);
                   committed = true;
@@ -96,7 +105,15 @@ export const Route = createFileRoute("/api/chat")({
           }
           let committed = false;
           try {
-            const result = await answerSoulQuestion(access.input);
+            const input = await prepareSemanticSearch(
+              access.input,
+              access.ownerUserId,
+              request.signal,
+            );
+            const result = await answerSoulQuestion(input, { signal: request.signal });
+            result.searchMode = Object.keys(input.semanticScores ?? {}).length
+              ? "hybrid"
+              : "keyword";
             await finalizeUsage(reservation.reservationId, true);
             committed = true;
             return Response.json(result, {

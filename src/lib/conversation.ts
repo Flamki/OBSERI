@@ -4,6 +4,7 @@ import { conversationStyleInstructions, resolveConversationStyle } from "@/lib/p
 import type { KnowledgeChunk, PersonalityConfig, SoulMessage } from "@/lib/soul";
 
 export type ChatRequest = {
+  semanticScores?: Record<string, number>;
   soulId: string;
   personality: PersonalityConfig;
   chunks: KnowledgeChunk[];
@@ -16,6 +17,7 @@ export type ChatResponse = {
   followUp: string;
   leadIntent: "none" | "low" | "medium" | "high";
   mode: "retrieval" | "model";
+  searchMode?: "hybrid" | "keyword";
 };
 
 export type VoiceStreamResult = {
@@ -39,7 +41,10 @@ export async function answerSoulQuestion(
 ): Promise<ChatResponse> {
   const question = input.messages.at(-1)?.content.trim() ?? "";
   const query = retrievalQuery(input.messages);
-  const ranked = selectDiverseChunks(rankKnowledgeChunks(query, input.chunks), 6);
+  const ranked = selectDiverseChunks(
+    hybridRankKnowledgeChunks(query, input.chunks, input.semanticScores),
+    6,
+  );
   const pages = pageDirectory(input.chunks);
   const navigation = navigationAnswer(input, pages);
   if (navigation) return navigation;
@@ -165,7 +170,10 @@ export async function streamSoulVoiceAnswer(
 ): Promise<VoiceStreamResult> {
   const question = input.messages.at(-1)?.content.trim() ?? "";
   const query = retrievalQuery(input.messages);
-  const ranked = selectDiverseChunks(rankKnowledgeChunks(query, input.chunks), 4);
+  const ranked = selectDiverseChunks(
+    hybridRankKnowledgeChunks(query, input.chunks, input.semanticScores),
+    4,
+  );
   const pages = pageDirectory(input.chunks);
   const navigation = navigationAnswer(input, pages);
   if (navigation) return { ...navigation, stream: textStream(navigation.answer) };
@@ -246,7 +254,7 @@ export async function streamSoulVoiceAnswer(
 export function selectRequestChunks(
   messages: ChatRequest["messages"],
   chunks: KnowledgeChunk[],
-  limit = 48,
+  limit = 2500,
 ): KnowledgeChunk[] {
   const ranked = rankKnowledgeChunks(retrievalQuery(messages), chunks);
   // Keep a small navigation directory, even when no passage matches the question.
@@ -325,6 +333,35 @@ export function rankKnowledgeChunks(query: string, chunks: KnowledgeChunk[]): Ra
     .sort((a, b) => b.score - a.score);
 }
 
+export function hybridRankKnowledgeChunks(
+  query: string,
+  chunks: KnowledgeChunk[],
+  scores?: Record<string, number>,
+): RankedChunk[] {
+  const lexical = rankKnowledgeChunks(query, chunks);
+  if (!scores || !Object.keys(scores).length) return lexical;
+  const semantic = chunks
+    .filter((c) => Number.isFinite(scores[c.id]) && scores[c.id] >= 0.5)
+    .sort((a, b) => scores[b.id] - scores[a.id])
+    .slice(0, 12);
+  const merged = new Map(lexical.map((chunk, i) => [chunk.id, { ...chunk, score: 1 / (20 + i) }]));
+  semantic.forEach((chunk, i) => {
+    const existing = merged.get(chunk.id);
+    merged.set(chunk.id, {
+      ...chunk,
+      lexicalScore: 0,
+      matchedTerms: [],
+      phraseMatch: false,
+      ...existing,
+      score: (existing?.score ?? 0) + 1 / (20 + i),
+    });
+  });
+  // Exact approved answers and verbatim matches retain their priority.
+  return [...merged.values()].sort(
+    (a, b) => Number(b.phraseMatch) - Number(a.phraseMatch) || b.score - a.score,
+  );
+}
+
 function selectDiverseChunks(chunks: RankedChunk[], limit: number): RankedChunk[] {
   const selected: RankedChunk[] = [];
   const pageCounts = new Map<string, number>();
@@ -385,7 +422,8 @@ function buildEvidence(chunks: RankedChunk[], query: string) {
       title: first.pageTitle,
       url: first.pageUrl,
       text:
-        first.pageUrl.startsWith("manual://") && /Approved answer:/.test(text)
+        (first.pageUrl.startsWith("manual://") && /Approved answer:/.test(text)) ||
+        group.some((chunk) => chunk.lexicalScore === 0)
           ? text.trim()
           : passages.length
             ? passages.join("\n")
@@ -744,7 +782,7 @@ function toCitations(chunks: KnowledgeChunk[]) {
     .filter((chunk) => {
       try {
         const url = new URL(chunk.pageUrl);
-        if (!["https:", "http:"].includes(url.protocol)) return false;
+        if (!["https:", "http:", "document:"].includes(url.protocol)) return false;
         url.hash = "";
         if (seen.has(url.href)) return false;
         seen.add(url.href);

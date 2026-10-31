@@ -1,3 +1,4 @@
+import { prepareSemanticSearch } from "@/lib/server/semantic-search";
 import { personalitySchema } from "@/lib/personality";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
@@ -22,7 +23,7 @@ const chunkSchema = z.object({
 const schema = z.object({
   soulId: z.string().min(1).max(100),
   personality: personalitySchema,
-  chunks: z.array(chunkSchema).max(250),
+  chunks: z.array(chunkSchema).max(2500),
   messages: z.array(messageSchema).min(1).max(20),
 });
 
@@ -32,7 +33,7 @@ export const Route = createFileRoute("/api/chat/stream")({
       POST: async ({ request }) => {
         try {
           const length = Number(request.headers.get("content-length") ?? "0");
-          if (length > 420_000)
+          if (length > 2_000_000)
             return errorResponse("Knowledge payload is too large.", 413, "payload_too_large");
           const parsed = schema.safeParse(await request.json());
           if (!parsed.success)
@@ -45,7 +46,8 @@ export const Route = createFileRoute("/api/chat/stream")({
           const signal = AbortSignal.any([request.signal, abort.signal]);
           let result: Awaited<ReturnType<typeof streamSoulVoiceAnswer>>;
           try {
-            result = await streamSoulVoiceAnswer(access.input, signal);
+            const input = await prepareSemanticSearch(access.input, access.ownerUserId, signal);
+            result = await streamSoulVoiceAnswer(input, signal);
           } catch (error) {
             await finalizeUsage(reservation.reservationId, false);
             throw error;

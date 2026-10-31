@@ -1,3 +1,5 @@
+import { warmKnowledgeIndex } from "@/lib/server/semantic-search";
+import { activeKnowledgeChunks } from "@/lib/knowledge-content";
 import { createFileRoute } from "@tanstack/react-router";
 import { publishSoul } from "@/lib/published-souls";
 import type { Soul } from "@/lib/soul";
@@ -11,7 +13,7 @@ export const Route = createFileRoute("/api/souls/publish")({
       POST: async ({ request }) => {
         try {
           const length = Number(request.headers.get("content-length") ?? "0");
-          if (length > 900_000) return responseError("Soul payload is too large.", 413);
+          if (length > 1_500_000) return responseError("Soul payload is too large.", 413);
           const user = await requireUser(request);
           const value = (await request.json()) as Partial<Soul>;
           const workspace = await readUserWorkspace(user.id);
@@ -45,8 +47,13 @@ export const Route = createFileRoute("/api/souls/publish")({
             widgetToken: value.channels?.widgetToken ?? "",
             ownerUserId: user.id,
           });
+          const searchIndex = await warmKnowledgeIndex(
+            user.id,
+            activeKnowledgeChunks(record.soul.knowledge),
+          );
           return Response.json(
             {
+              searchIndex,
               soulId: record.soul.id,
               status: record.soul.status,
               publishedAt: record.publishedAt,

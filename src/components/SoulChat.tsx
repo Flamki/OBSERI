@@ -726,7 +726,7 @@ export default function SoulChat({
                       {message.citations.map((citation, index) => (
                         <a
                           key={`${citation.chunkId}-${index}`}
-                          href={citation.url}
+                          href={/^https?:\/\//.test(citation.url) ? citation.url : undefined}
                           target="_blank"
                           rel="noreferrer"
                           className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] ${isDark ? "border-white/15 bg-white/5 text-white/80" : "border-black/10 bg-white/70 text-[#64635f]"}`}
@@ -867,7 +867,7 @@ export default function SoulChat({
                     {message.citations.map((citation, index) => (
                       <a
                         key={`${citation.chunkId}-${index}`}
-                        href={citation.url}
+                        href={/^https?:\/\//.test(citation.url) ? citation.url : undefined}
                         target="_blank"
                         rel="noreferrer"
                         className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs ${

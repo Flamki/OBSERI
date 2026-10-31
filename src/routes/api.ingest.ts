@@ -7,6 +7,7 @@ import { readUserWorkspace } from "@/lib/user-workspace-store";
 import { crawlPageAllowance } from "@/lib/billing-store";
 
 const schema = z.object({
+  rendering: z.enum(["auto", "always", "never"]).default("auto"),
   url: z.string().trim().url().max(2_048),
   maxPages: z.number().int().min(1).max(50).default(20),
   maxDepth: z.number().int().min(0).max(4).default(3),

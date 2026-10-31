@@ -9,6 +9,7 @@ export type PreviousSnapshot = {
 
 export type ScanRequest = {
   signal?: AbortSignal;
+  rendering?: "auto" | "always" | "never";
   url: string;
   category?: MonitorCategory;
   previous?: PreviousSnapshot;
@@ -26,6 +27,7 @@ export type PageSnapshot = {
   normalizedText: string;
   excerpt: string;
   truncated?: boolean;
+  rendered?: boolean;
   wordCount: number;
   statusCode: number;
   contentType: string;
@@ -81,8 +83,12 @@ export async function scanPublicPage(input: ScanRequest): Promise<ScanResult> {
         accept: "text/html,application/xhtml+xml,text/plain,application/json;q=0.7,*/*;q=0.2",
         "user-agent":
           "ObseriBot/1.0 (+https://obseri.com; website knowledge crawler; contact flamki@obseri.com)",
-        ...(input.validators?.etag ? { "if-none-match": input.validators.etag } : {}),
-        ...(!input.validators?.etag && input.validators?.lastModified
+        ...(input.rendering !== "always" && input.validators?.etag
+          ? { "if-none-match": input.validators.etag }
+          : {}),
+        ...(input.rendering !== "always" &&
+        !input.validators?.etag &&
+        input.validators?.lastModified
           ? { "if-modified-since": input.validators.lastModified }
           : {}),
       },
@@ -137,9 +143,30 @@ export async function scanPublicPage(input: ScanRequest): Promise<ScanResult> {
   }
 
   const body = await readLimitedBody(response, MAX_RESPONSE_BYTES);
-  const title = extractTitle(body) || new URL(currentUrl).hostname;
+  let title = extractTitle(body) || new URL(currentUrl).hostname;
   const description = extractMetaDescription(body);
-  const fullText = normalizeDocument(body, contentType);
+  let fullText = normalizeDocument(body, contentType);
+  let renderedLinks: string[] | undefined;
+  let rendered = false;
+  if (
+    (input.rendering === "always" ||
+      (input.rendering === "auto" && needsBrowserRendering(body, fullText))) &&
+    /html|unknown/.test(contentType)
+  ) {
+    const { renderPublicPage } = await import("./server/render-page");
+    const page = await renderPublicPage(currentUrl, input.signal);
+    fullText = page.text.trim();
+    title = page.title || title;
+    currentUrl = page.finalUrl;
+    renderedLinks = page.links.filter((link) => {
+      try {
+        return new URL(link).hostname === new URL(currentUrl).hostname;
+      } catch {
+        return false;
+      }
+    });
+    rendered = true;
+  }
   const normalizedText = fullText.slice(0, MAX_NORMALIZED_CHARS);
   if (normalizedText.length < 40) {
     throw new ScanError(
@@ -160,17 +187,18 @@ export async function scanPublicPage(input: ScanRequest): Promise<ScanResult> {
     hash,
     normalizedText,
     excerpt: normalizedText.slice(0, 420),
+    rendered,
     truncated: fullText.length > MAX_NORMALIZED_CHARS,
     wordCount: normalizedText.split(/\s+/).filter(Boolean).length,
     statusCode: response.status,
     contentType,
     sizeBytes: new TextEncoder().encode(body).length,
-    etag: response.headers.get("etag") ?? undefined,
-    lastModified: response.headers.get("last-modified") ?? undefined,
+    etag: rendered ? undefined : (response.headers.get("etag") ?? undefined),
+    lastModified: rendered ? undefined : (response.headers.get("last-modified") ?? undefined),
     canonicalUrl: extractCanonicalUrl(body, currentUrl),
     language: extractDocumentLanguage(body),
     structuredDataTypes: extractStructuredDataTypes(body),
-    discoveredLinks: extractDiscoveredLinks(body, currentUrl),
+    discoveredLinks: renderedLinks ?? extractDiscoveredLinks(body, currentUrl),
   };
 
   const category = input.category ?? "other";
@@ -186,6 +214,16 @@ export async function scanPublicPage(input: ScanRequest): Promise<ScanResult> {
     durationMs: Date.now() - startedAt,
     notModified: false,
   };
+}
+
+export function needsBrowserRendering(html: string, text: string): boolean {
+  return (
+    text.length < 200 ||
+    (text.length < 1200 &&
+      /<(?:div|main)[^>]+id=["'](?:root|app|__next)["']|enable javascript|javascript (?:is )?required/i.test(
+        html,
+      ))
+  );
 }
 
 export async function fetchPublicText(

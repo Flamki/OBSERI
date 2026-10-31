@@ -7,6 +7,7 @@ export async function streamWebsiteCrawl(
     url: string;
     maxPages: number;
     maxDepth: number;
+    rendering?: "auto" | "always" | "never";
     includePatterns?: string[];
     excludePatterns?: string[];
     validators?: Array<{ url: string; etag?: string; lastModified?: string }>;

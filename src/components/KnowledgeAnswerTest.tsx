@@ -64,6 +64,9 @@ export function KnowledgeAnswerTest({ soul, question }: { soul: Soul; question: 
           <p className="mb-2 text-[11px] text-[#817f79]">
             {(result.ms / 1000).toFixed(1)}s ·{" "}
             {result.answer.mode === "model" ? "AI answer" : "Evidence fallback"}
+            {result.answer.searchMode === "hybrid"
+              ? " · Semantic + keyword search"
+              : " · Keyword search"}
             {result.question !== question || result.knowledge !== soul.knowledge
               ? " · Draft changed — test again"
               : ""}
@@ -73,7 +76,7 @@ export function KnowledgeAnswerTest({ soul, question }: { soul: Soul; question: 
             <a
               className="mt-2 block truncate text-xs underline"
               key={citation.chunkId}
-              href={citation.url}
+              href={/^https?:\/\//.test(citation.url) ? citation.url : undefined}
               target="_blank"
               rel="noreferrer"
             >

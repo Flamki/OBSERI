@@ -30,6 +30,7 @@ import { Route as ApiBillingSummaryRouteImport } from './routes/api.billing.summ
 import { Route as ApiBillingWebhookRouteImport } from './routes/api.billing.webhook'
 import { Route as ApiChatStreamRouteImport } from './routes/api.chat.stream'
 import { Route as ApiIngestStreamRouteImport } from './routes/api.ingest.stream'
+import { Route as ApiKnowledgePdfRouteImport } from './routes/api.knowledge.pdf'
 import { Route as ApiSoulsSoulIdRouteImport } from './routes/api.souls.$soulId'
 import { Route as ApiSoulsPublishRouteImport } from './routes/api.souls.publish'
 import { Route as ApiVoiceCloneRouteImport } from './routes/api.voice.clone'
@@ -149,6 +150,11 @@ const ApiIngestStreamRoute = ApiIngestStreamRouteImport.update({
   path: '/stream',
   getParentRoute: () => ApiIngestRoute,
 } as any)
+const ApiKnowledgePdfRoute = ApiKnowledgePdfRouteImport.update({
+  id: '/api/knowledge/pdf',
+  path: '/api/knowledge/pdf',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSoulsSoulIdRoute = ApiSoulsSoulIdRouteImport.update({
   id: '/api/souls/$soulId',
   path: '/api/souls/$soulId',
@@ -234,6 +240,7 @@ export interface FileRoutesByFullPath {
   '/api/billing/webhook': typeof ApiBillingWebhookRoute
   '/api/chat/stream': typeof ApiChatStreamRoute
   '/api/ingest/stream': typeof ApiIngestStreamRoute
+  '/api/knowledge/pdf': typeof ApiKnowledgePdfRoute
   '/api/souls/$soulId': typeof ApiSoulsSoulIdRouteWithChildren
   '/api/souls/publish': typeof ApiSoulsPublishRoute
   '/api/voice/clone': typeof ApiVoiceCloneRoute
@@ -269,6 +276,7 @@ export interface FileRoutesByTo {
   '/api/billing/webhook': typeof ApiBillingWebhookRoute
   '/api/chat/stream': typeof ApiChatStreamRoute
   '/api/ingest/stream': typeof ApiIngestStreamRoute
+  '/api/knowledge/pdf': typeof ApiKnowledgePdfRoute
   '/api/souls/$soulId': typeof ApiSoulsSoulIdRouteWithChildren
   '/api/souls/publish': typeof ApiSoulsPublishRoute
   '/api/voice/clone': typeof ApiVoiceCloneRoute
@@ -305,6 +313,7 @@ export interface FileRoutesById {
   '/api/billing/webhook': typeof ApiBillingWebhookRoute
   '/api/chat/stream': typeof ApiChatStreamRoute
   '/api/ingest/stream': typeof ApiIngestStreamRoute
+  '/api/knowledge/pdf': typeof ApiKnowledgePdfRoute
   '/api/souls/$soulId': typeof ApiSoulsSoulIdRouteWithChildren
   '/api/souls/publish': typeof ApiSoulsPublishRoute
   '/api/voice/clone': typeof ApiVoiceCloneRoute
@@ -342,6 +351,7 @@ export interface FileRouteTypes {
     | '/api/billing/webhook'
     | '/api/chat/stream'
     | '/api/ingest/stream'
+    | '/api/knowledge/pdf'
     | '/api/souls/$soulId'
     | '/api/souls/publish'
     | '/api/voice/clone'
@@ -377,6 +387,7 @@ export interface FileRouteTypes {
     | '/api/billing/webhook'
     | '/api/chat/stream'
     | '/api/ingest/stream'
+    | '/api/knowledge/pdf'
     | '/api/souls/$soulId'
     | '/api/souls/publish'
     | '/api/voice/clone'
@@ -412,6 +423,7 @@ export interface FileRouteTypes {
     | '/api/billing/webhook'
     | '/api/chat/stream'
     | '/api/ingest/stream'
+    | '/api/knowledge/pdf'
     | '/api/souls/$soulId'
     | '/api/souls/publish'
     | '/api/voice/clone'
@@ -446,6 +458,7 @@ export interface RootRouteChildren {
   ApiBillingInvoicesRoute: typeof ApiBillingInvoicesRoute
   ApiBillingSummaryRoute: typeof ApiBillingSummaryRoute
   ApiBillingWebhookRoute: typeof ApiBillingWebhookRoute
+  ApiKnowledgePdfRoute: typeof ApiKnowledgePdfRoute
   ApiSoulsSoulIdRoute: typeof ApiSoulsSoulIdRouteWithChildren
   ApiSoulsPublishRoute: typeof ApiSoulsPublishRoute
   ApiVoiceCloneRoute: typeof ApiVoiceCloneRoute
@@ -605,6 +618,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIngestStreamRouteImport
       parentRoute: typeof ApiIngestRoute
     }
+    '/api/knowledge/pdf': {
+      id: '/api/knowledge/pdf'
+      path: '/api/knowledge/pdf'
+      fullPath: '/api/knowledge/pdf'
+      preLoaderRoute: typeof ApiKnowledgePdfRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/souls/$soulId': {
       id: '/api/souls/$soulId'
       path: '/api/souls/$soulId'
@@ -753,6 +773,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBillingInvoicesRoute: ApiBillingInvoicesRoute,
   ApiBillingSummaryRoute: ApiBillingSummaryRoute,
   ApiBillingWebhookRoute: ApiBillingWebhookRoute,
+  ApiKnowledgePdfRoute: ApiKnowledgePdfRoute,
   ApiSoulsSoulIdRoute: ApiSoulsSoulIdRouteWithChildren,
   ApiSoulsPublishRoute: ApiSoulsPublishRoute,
   ApiVoiceCloneRoute: ApiVoiceCloneRoute,

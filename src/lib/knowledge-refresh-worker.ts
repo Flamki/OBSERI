@@ -30,6 +30,7 @@ export async function refreshDueKnowledge() {
             url: source.rootUrl,
             maxPages: Math.min(source.pageLimit, allowance),
             maxDepth: source.crawlDepth,
+            rendering: source.rendering ?? "auto",
             includePatterns: source.includePatterns,
             excludePatterns: source.excludePatterns,
             timeoutMs: Math.min(45_000, deadline - Date.now() - 5000),

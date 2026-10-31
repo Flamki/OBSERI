@@ -14,6 +14,7 @@ export type IngestOptions = {
   url: string;
   maxPages: number;
   maxDepth: number;
+  rendering?: "auto" | "always" | "never";
   includePatterns?: string[];
   excludePatterns?: string[];
   validators?: Array<{ url: string; etag?: string; lastModified?: string }>;
@@ -256,6 +257,7 @@ export async function ingestWebsite(
           result: await scanPublicPage({
             url: item.url,
             analyze: false,
+            rendering: options.rendering ?? "auto",
             signal,
             validators: validators.get(canonicalizeUrl(item.url)),
           }),
