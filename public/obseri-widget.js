@@ -341,7 +341,12 @@
           sessionId: trackingAllowed() ? visitorSession() : undefined,
           path: safePath(),
         });
-        frame.src = origin + "/widget/" + encodeURIComponent(soulId) + "?mode=chat";
+        frame.src =
+          origin +
+          "/widget/" +
+          encodeURIComponent(soulId) +
+          "?mode=chat&parentOrigin=" +
+          encodeURIComponent(location.origin);
       } catch (error) {
         console.error("Obseri:", error);
         label.textContent = "Unavailable";
@@ -361,6 +366,10 @@
   window.addEventListener("message", function (event) {
     if (event.source !== frame.contentWindow || event.origin !== origin) return;
     if (!event.data) return;
+    if (event.data.type === "obseri:ready") {
+      sendContext();
+      return;
+    }
     if (event.data.type === "obseri:conversation-started") {
       track("conversation_started");
       return;

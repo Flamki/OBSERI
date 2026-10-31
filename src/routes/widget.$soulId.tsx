@@ -41,15 +41,21 @@ function EmbeddedSoul() {
       });
     };
     window.addEventListener("message", update);
+    // Cross-site navigation can clear window.name. Request credentials only
+    // after the listener is ready, from the expected parent window and origin.
+    if (context.parentOrigin && window.parent !== window) {
+      window.parent.postMessage({ type: "obseri:ready" }, context.parentOrigin);
+    }
     return () => window.removeEventListener("message", update);
   }, [context.parentOrigin]);
 
   useEffect(() => {
     const controller = new AbortController();
     if (!context.session) {
-      setError("This widget session is invalid.");
+      if (!context.parentOrigin) setError("This widget session is invalid.");
       return () => controller.abort();
     }
+    setError("");
     void fetch(`/api/souls/${encodeURIComponent(soulId)}`, {
       signal: controller.signal,
       headers: { authorization: `Bearer ${context.session}` },
@@ -64,7 +70,7 @@ function EmbeddedSoul() {
         setError(cause instanceof Error ? cause.message : "The soul is unavailable.");
       });
     return () => controller.abort();
-  }, [context.session, soulId]);
+  }, [context.session, context.parentOrigin, soulId]);
 
   return (
     <main className="obs-app min-h-screen bg-transparent p-2 text-[#0b0b0c]">
@@ -147,6 +153,15 @@ function readWidgetContext(): {
   path: string;
 } {
   if (typeof window === "undefined") return { session: "", parentOrigin: "", path: "/" };
+  let parentOrigin = "";
+  try {
+    const parent =
+      new URLSearchParams(window.location.search).get("parentOrigin") || document.referrer;
+    const url = new URL(parent);
+    if (url.protocol === "https:" || url.protocol === "http:") parentOrigin = url.origin;
+  } catch {
+    // Older embeds can still provide their parent through window.name.
+  }
   try {
     const value = JSON.parse(window.name) as {
       session?: unknown;
@@ -156,11 +171,12 @@ function readWidgetContext(): {
     };
     return {
       session: typeof value.session === "string" ? value.session : "",
-      parentOrigin: typeof value.parentOrigin === "string" ? value.parentOrigin : "",
+      parentOrigin:
+        parentOrigin || (typeof value.parentOrigin === "string" ? value.parentOrigin : ""),
       sessionId: typeof value.sessionId === "string" ? value.sessionId : undefined,
       path: typeof value.path === "string" ? value.path : "/",
     };
   } catch {
-    return { session: "", parentOrigin: "", path: "/" };
+    return { session: "", parentOrigin, path: "/" };
   }
 }
