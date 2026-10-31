@@ -92,6 +92,7 @@ try {
     id,
     workspaceId: id,
     siteUrl: origin,
+    voice: { provider: "supertonic", enabled: false, profileId: "aster", speed: 1, pitch: 1 },
     channels: {
       widgetEnabled: true,
       allowedDomains: ["release-smoke.example"],
