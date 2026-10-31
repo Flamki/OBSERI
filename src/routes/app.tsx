@@ -2555,10 +2555,13 @@ function PlaygroundView({
   }
 
   return (
-    <div className="relative h-full min-h-[560px] overflow-hidden bg-[#e9e8e6]">
-      <section className="absolute inset-0 flex min-w-0 flex-col overflow-hidden bg-[#eae9e7]">
+    <div className="relative h-full min-h-0 overflow-hidden bg-[#e9e8e6]">
+      <section
+        aria-label="Website preview"
+        className={`absolute inset-y-0 left-0 flex min-w-0 flex-col overflow-hidden bg-[#eae9e7] transition-[right] duration-300 motion-reduce:transition-none ${customizeOpen ? "right-0 lg:right-[330px]" : "right-0"}`}
+      >
         <div className="absolute inset-0 flex items-stretch justify-center overflow-hidden p-0">
-          <div className="flex h-full min-h-[560px] w-full flex-col overflow-hidden bg-white">
+          <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-white">
             <div className="hidden h-11 shrink-0 items-center gap-3 border-b border-[#e8e7e5] bg-[#f7f7f7] px-3">
               <div className="hidden gap-1.5 sm:flex">
                 <span className="h-2.5 w-2.5 rounded-full bg-[#ff6b61]" />
@@ -2666,14 +2669,17 @@ function PlaygroundView({
         <button
           aria-label="Close customization drawer"
           onClick={() => setCustomizeOpen(false)}
-          className="absolute inset-0 z-40 bg-black/12 backdrop-blur-[1px]"
+          className="absolute inset-0 z-40 bg-black/12 lg:hidden"
         />
       )}
 
       <aside
-        className={`absolute inset-y-0 right-0 z-50 flex w-[330px] max-w-[calc(100%-28px)] flex-col overflow-hidden border-l border-[#e0dfdd] bg-white shadow-[-20px_0_55px_rgba(20,24,18,.16)] transition-transform duration-300 ${customizeOpen ? "translate-x-0" : "translate-x-full"}`}
+        aria-label="Visitor experience customization"
+        aria-hidden={!customizeOpen}
+        inert={!customizeOpen}
+        className={`absolute inset-y-0 right-0 z-50 flex w-[330px] max-w-[calc(100%-28px)] flex-col overflow-clip border-l border-[#e0dfdd] bg-white shadow-[-20px_0_55px_rgba(20,24,18,.16)] transition-transform duration-300 motion-reduce:transition-none lg:shadow-none ${customizeOpen ? "translate-x-0" : "translate-x-full"}`}
       >
-        <div className="border-b border-[#ececeb] p-5">
+        <div className="shrink-0 border-b border-[#ececeb] p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold">Visitor experience</p>
@@ -2697,14 +2703,23 @@ function PlaygroundView({
           )}
         </div>
 
-        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-5">
+        <div
+          role="region"
+          aria-label="Customization settings"
+          tabIndex={0}
+          className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain p-5"
+        >
           <form onSubmit={openAddress}>
-            <label className="text-xs font-semibold uppercase tracking-[.12em] text-[#928f86]">
+            <label
+              htmlFor="customize-preview-url"
+              className="text-xs font-semibold uppercase tracking-[.12em] text-[#928f86]"
+            >
               Preview URL
             </label>
             <div className="mt-2 flex items-center gap-2 rounded-xl border border-[#dfdedb] px-3">
               <Globe2 className="h-4 w-4 shrink-0 text-[#98968e]" />
               <input
+                id="customize-preview-url"
                 value={address}
                 onChange={(event) => setAddress(event.target.value)}
                 className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none"
@@ -2723,6 +2738,7 @@ function PlaygroundView({
               {themes.map((theme) => (
                 <button
                   key={theme.id}
+                  aria-pressed={soul.appearance.theme === theme.id}
                   onClick={() => updateAppearance({ theme: theme.id })}
                   className={`flex items-center justify-between rounded-xl border p-3 text-left transition ${
                     soul.appearance.theme === theme.id
@@ -2759,6 +2775,7 @@ function PlaygroundView({
                       : "border-transparent"
                   }`}
                   aria-label={`Use accent ${accent}`}
+                  aria-pressed={soul.appearance.accent.toLowerCase() === accent.toLowerCase()}
                 >
                   <span
                     className="h-6 w-6 rounded-full shadow-inner"
@@ -2770,6 +2787,7 @@ function PlaygroundView({
                 +
                 <input
                   type="color"
+                  aria-label="Custom accent color"
                   value={soul.appearance.accent}
                   onChange={(event) => updateAppearance({ accent: event.target.value })}
                   className="sr-only"
@@ -2786,6 +2804,7 @@ function PlaygroundView({
             </Field>
             <Field label="Position">
               <select
+                aria-label="Launcher position"
                 value={soul.appearance.position}
                 onChange={(event) =>
                   updateAppearance({
@@ -2810,21 +2829,22 @@ function PlaygroundView({
             </p>
           </div>
 
-          <button onClick={onIntegrate} className="primary-button w-full justify-center">
-            Looks right — integrate it
-            <ChevronRight className="h-4 w-4" />
-          </button>
-
           <p className="text-center text-[11px] leading-4 text-[#98958d]">
             If a site blocks embedded previews, open it in a new tab. The installed widget is
             unaffected.
           </p>
         </div>
+        <div className="shrink-0 border-t border-[#ececeb] bg-white p-4">
+          <button onClick={onIntegrate} className="primary-button w-full justify-center">
+            Looks right — integrate it
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
       </aside>
 
       <div
         className={`absolute top-1/2 z-[55] flex w-[132px] -translate-y-1/2 flex-col overflow-hidden rounded-l-2xl border border-r-0 border-black/10 bg-white/95 shadow-[0_12px_32px_rgba(20,24,18,.16)] backdrop-blur-xl transition-[right] duration-300 ${
-          customizeOpen ? "right-[330px]" : "right-0"
+          customizeOpen ? "right-[330px] hidden lg:flex" : "right-0"
         }`}
       >
         <button
