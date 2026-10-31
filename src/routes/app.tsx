@@ -2615,38 +2615,12 @@ function PersonalityView({
   );
 }
 
-type VoiceboxProfile = {
-  id: string;
-  name: string;
-  description?: string | null;
-  language?: string;
-  voice_type?: string;
-  preset_engine?: string | null;
-  preset_voice_id?: string | null;
-  default_engine?: string | null;
-  sample_count?: number;
-};
-
-type VoiceboxPreset = {
-  engine: "kokoro" | "qwen_custom_voice";
-  voiceId: string;
-  name: string;
-  gender: string;
-  language: string;
-};
-
 type StudioVoice = {
   id: string;
   name: string;
   detail: string;
   language: string;
-  provider: "browser" | "voicebox" | "supertonic";
-  browserVoiceName?: string;
-  profileId?: string;
-  presetEngine?: "kokoro" | "qwen_custom_voice";
-  presetVoiceId?: string;
-  gender?: string;
-  neuralVoiceId?: SupertonicVoiceId;
+  neuralVoiceId: SupertonicVoiceId;
 };
 
 const VOICE_PALETTES = [
@@ -2689,28 +2663,6 @@ function VoiceOrb({ id, className = "" }: { id: string; className?: string }) {
   );
 }
 
-function cleanVoiceName(name: string) {
-  return (
-    name
-      .replace(/^(Microsoft|Google|Apple)\s+/i, "")
-      .replace(/\s+Online\s*\(Natural\).*$/i, "")
-      .replace(/\s+-\s+.*$/, "")
-      .trim() || "Natural"
-  );
-}
-
-function languageName(code: string) {
-  const normalized = code || "en";
-  try {
-    const language = new Intl.DisplayNames(["en"], { type: "language" }).of(
-      normalized.split("-")[0],
-    );
-    return language ? `${language} · ${normalized}` : normalized;
-  } catch {
-    return normalized;
-  }
-}
-
 function VoiceView({
   soul,
   onUpdate,
@@ -2720,14 +2672,6 @@ function VoiceView({
   onUpdate: (updater: (soul: Soul) => Soul) => void;
   onNotice: (message: string) => void;
 }) {
-  const [browserVoices, setBrowserVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [voicebox, setVoicebox] = useState<{
-    connected: boolean;
-    profiles: VoiceboxProfile[];
-    presets: VoiceboxPreset[];
-    message?: string;
-  }>({ connected: false, profiles: [], presets: [] });
-  const [cloneOpen, setCloneOpen] = useState(false);
   const [libraryTab, setLibraryTab] = useState<"explore" | "mine">("explore");
   const [query, setQuery] = useState("");
   const [languageFilter, setLanguageFilter] = useState("all");
@@ -2736,46 +2680,11 @@ function VoiceView({
   );
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [preparingId, setPreparingId] = useState<string | null>(null);
-  const audioRef = useRef<{ audio: HTMLAudioElement; url: string } | null>(null);
-  const previewRequestRef = useRef<AbortController | null>(null);
   const previewTokenRef = useRef(0);
-
-  useEffect(() => {
-    const load = () => setBrowserVoices(window.speechSynthesis?.getVoices() ?? []);
-    load();
-    window.speechSynthesis?.addEventListener("voiceschanged", load);
-    void authFetch("/api/voice/profiles")
-      .then((response) => response.json())
-      .then(
-        (data: {
-          connected?: boolean;
-          profiles?: VoiceboxProfile[];
-          presets?: VoiceboxPreset[];
-          message?: string;
-        }) =>
-          setVoicebox({
-            connected: Boolean(data.connected),
-            profiles: Array.isArray(data.profiles) ? data.profiles : [],
-            presets: Array.isArray(data.presets) ? data.presets : [],
-            message: data.message,
-          }),
-      )
-      .catch(() => undefined);
-    return () => window.speechSynthesis?.removeEventListener("voiceschanged", load);
-  }, []);
-
   useEffect(
     () => () => {
       previewTokenRef.current += 1;
-      previewRequestRef.current?.abort();
-      previewRequestRef.current = null;
-      window.speechSynthesis?.cancel();
       stopSupertonic();
-      if (audioRef.current) {
-        audioRef.current.audio.pause();
-        URL.revokeObjectURL(audioRef.current.url);
-        audioRef.current = null;
-      }
     },
     [],
   );
@@ -2783,97 +2692,17 @@ function VoiceView({
   const update = (patch: Partial<Soul["voice"]>) =>
     onUpdate((current) => ({ ...current, voice: { ...current.voice, ...patch } }));
 
-  const defaultVoice: StudioVoice = {
-    id: "browser:default",
-    name: "Natural",
-    detail: "Balanced device voice · ready now",
-    language: soul.voice.language || "en",
-    provider: "browser",
-    browserVoiceName: "",
-  };
-  const presetVoices: StudioVoice[] = voicebox.presets.map((preset) => {
-    const profile = voicebox.profiles.find(
-      (candidate) =>
-        candidate.preset_engine === preset.engine && candidate.preset_voice_id === preset.voiceId,
-    );
-    const engineLabel = preset.engine === "kokoro" ? "Kokoro" : "Qwen";
-    const gender = preset.gender
-      ? `${preset.gender.charAt(0).toUpperCase()}${preset.gender.slice(1)}`
-      : "Preset";
-    return {
-      id: `preset:${preset.engine}:${preset.voiceId}`,
-      name: preset.name,
-      detail: `${gender} · ${languageName(preset.language)} · ${engineLabel}`,
-      language: preset.language,
-      provider: "voicebox" as const,
-      profileId: profile?.id,
-      presetEngine: preset.engine,
-      presetVoiceId: preset.voiceId,
-      gender: preset.gender,
-    };
-  });
-  const customVoices: StudioVoice[] = voicebox.profiles.map((profile) => ({
-    id:
-      profile.voice_type === "preset" && profile.preset_engine && profile.preset_voice_id
-        ? `preset:${profile.preset_engine}:${profile.preset_voice_id}`
-        : `voicebox:${profile.id}`,
-    name: profile.name,
-    detail: `${languageName(profile.language || soul.voice.language)} · ${profile.voice_type === "preset" ? `${profile.preset_engine === "kokoro" ? "Kokoro" : "Qwen"} preset` : "Cloned voice"}`,
-    language: profile.language || soul.voice.language,
-    provider: "voicebox" as const,
-    profileId: profile.id,
-    presetEngine:
-      profile.preset_engine === "kokoro" || profile.preset_engine === "qwen_custom_voice"
-        ? profile.preset_engine
-        : undefined,
-    presetVoiceId: profile.preset_voice_id ?? undefined,
-  }));
-  const deviceVoices: StudioVoice[] = [
-    defaultVoice,
-    ...browserVoices.map((voice) => ({
-      id: `browser:${voice.name}:${voice.lang}`,
-      name: cleanVoiceName(voice.name),
-      detail: `${languageName(voice.lang)} · ${voice.localService ? "On-device" : "Streaming"}`,
-      language: voice.lang,
-      provider: "browser" as const,
-      browserVoiceName: voice.name,
-    })),
-  ];
   const neuralVoices: StudioVoice[] = supertonicVoices.map((voice) => ({
     id: `supertonic:${voice.id}`,
     name: voice.name,
-    detail: `${voice.description} · On-device neural`,
-    language: "en",
-    provider: "supertonic" as const,
+    detail: `${voice.description} · Neural`,
+    language: soul.voice.language || "en",
     neuralVoiceId: voice.id,
-    gender: voice.gender,
   }));
-  const exploreVoices: StudioVoice[] = [
-    ...neuralVoices,
-    ...(voicebox.connected ? presetVoices : []),
-    ...deviceVoices,
-  ];
+  const exploreVoices = neuralVoices;
   const activeVoice =
-    soul.voice.provider === "voicebox"
-      ? (customVoices.find((voice) => voice.profileId === soul.voice.profileId) ?? {
-          id: `voicebox:${soul.voice.profileId || "selected"}`,
-          name: soul.voice.profileName || "Custom voice",
-          detail: `${languageName(soul.voice.language)} · Custom profile`,
-          language: soul.voice.language,
-          provider: "voicebox" as const,
-          profileId: soul.voice.profileId,
-        })
-      : soul.voice.provider === "supertonic"
-        ? (neuralVoices.find((voice) => voice.neuralVoiceId === soul.voice.profileId) ??
-          neuralVoices[0])
-        : (deviceVoices.find((voice) => voice.browserVoiceName === soul.voice.browserVoiceName) ??
-          defaultVoice);
-  const mineVoices = Array.from(
-    new Map<string, StudioVoice>([
-      [activeVoice.id, activeVoice] as const,
-      ...customVoices.map((voice) => [voice.id, voice] as const),
-    ]).values(),
-  );
+    neuralVoices.find((voice) => voice.neuralVoiceId === soul.voice.profileId) ?? neuralVoices[0];
+  const mineVoices = [activeVoice];
   const tabVoices = libraryTab === "explore" ? exploreVoices : mineVoices;
   const languageOptions = Array.from(new Set(tabVoices.map((voice) => voice.language))).slice(0, 5);
   const normalizedQuery = query.trim().toLowerCase();
@@ -2885,83 +2714,11 @@ function VoiceView({
         voice.detail.toLowerCase().includes(normalizedQuery)),
   );
 
-  useEffect(() => {
-    if (activeVoice.provider !== "voicebox" || !activeVoice.profileId) return;
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => {
-      void authFetch("/api/voice/speak", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          text: previewText,
-          profileId: activeVoice.profileId,
-          language: activeVoice.language,
-          engine: activeVoice.presetEngine,
-          speed: soul.voice.speed,
-        }),
-        signal: controller.signal,
-      }).catch(() => undefined);
-    }, 700);
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [
-    activeVoice.language,
-    activeVoice.presetEngine,
-    activeVoice.profileId,
-    activeVoice.provider,
-    previewText,
-    soul.voice.speed,
-  ]);
-
   function stopPreview() {
     previewTokenRef.current += 1;
-    previewRequestRef.current?.abort();
-    previewRequestRef.current = null;
-    window.speechSynthesis?.cancel();
     stopSupertonic();
-    if (audioRef.current) {
-      audioRef.current.audio.pause();
-      URL.revokeObjectURL(audioRef.current.url);
-      audioRef.current = null;
-    }
     setPlayingId(null);
-  }
-
-  async function ensureVoiceProfile(voice: StudioVoice) {
-    if (voice.provider !== "voicebox" || voice.profileId) return voice;
-    if (!voice.presetEngine || !voice.presetVoiceId)
-      throw new Error("This Voicebox profile is not ready yet.");
-
-    setPreparingId(voice.id);
-    try {
-      const response = await authFetch("/api/voice/profiles", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          engine: voice.presetEngine,
-          voiceId: voice.presetVoiceId,
-          name: voice.name,
-          language: voice.language,
-        }),
-      });
-      const payload = (await response.json()) as {
-        profile?: VoiceboxProfile;
-        error?: { message?: string };
-      };
-      if (!response.ok || !payload.profile)
-        throw new Error(payload.error?.message || "Voicebox could not prepare this voice.");
-      setVoicebox((current) => ({
-        ...current,
-        profiles: current.profiles.some((profile) => profile.id === payload.profile?.id)
-          ? current.profiles
-          : [...current.profiles, payload.profile as VoiceboxProfile],
-      }));
-      return { ...voice, profileId: payload.profile.id };
-    } finally {
-      setPreparingId(null);
-    }
+    setPreparingId(null);
   }
 
   async function previewVoice(voice: StudioVoice) {
@@ -2972,165 +2729,37 @@ function VoiceView({
     stopPreview();
     const token = previewTokenRef.current;
     setPlayingId(voice.id);
-
-    if (voice.provider === "supertonic" && voice.neuralVoiceId) {
-      setPreparingId(voice.id);
-      try {
-        await speakSupertonic(previewText, {
-          voice: voice.neuralVoiceId,
-          language: voice.language,
-          speed: soul.voice.speed,
-          qualitySteps: 5,
-          onProgress: (stage) => {
-            if (stage.phase === "loading") {
-              onNotice(`${stage.label} · ${Math.round(stage.progress * 100)}%`);
-            }
-          },
-        });
-      } catch {
-        if ("speechSynthesis" in window) {
-          const fallback = new SpeechSynthesisUtterance(previewText);
-          fallback.lang = voice.language;
-          fallback.rate = soul.voice.speed;
-          fallback.pitch = soul.voice.pitch;
-          fallback.voice =
-            browserVoices.find((candidate) =>
-              candidate.lang.toLowerCase().startsWith(voice.language.toLowerCase().split("-")[0]),
-            ) ?? null;
-          window.speechSynthesis.speak(fallback);
-          onNotice("Using an instant device voice while the cloud voice is offline.");
-        } else {
-          onNotice("Cloud neural voice is offline and this browser has no device voice.");
-        }
-      } finally {
+    setPreparingId(voice.id);
+    try {
+      await speakSupertonic(previewText, {
+        voice: voice.neuralVoiceId,
+        language: voice.language,
+        speed: soul.voice.speed,
+        qualitySteps: 5,
+      });
+    } catch (error) {
+      if (previewTokenRef.current === token)
+        onNotice(
+          error instanceof Error ? error.message : "Neural voice is unavailable. Please try again.",
+        );
+    } finally {
+      if (previewTokenRef.current === token) {
         setPreparingId(null);
         setPlayingId(null);
       }
-      return;
     }
-
-    let playableVoice = voice;
-    if (voice.provider === "voicebox" && !voice.profileId) {
-      try {
-        playableVoice = await ensureVoiceProfile(voice);
-      } catch (error) {
-        setPlayingId(null);
-        onNotice(error instanceof Error ? error.message : "Voicebox could not prepare this voice.");
-        return;
-      }
-    }
-
-    if (playableVoice.provider === "voicebox" && playableVoice.profileId) {
-      const previewRequest = new AbortController();
-      previewRequestRef.current = previewRequest;
-      try {
-        const response = await authFetch("/api/voice/speak", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            text: previewText,
-            profileId: playableVoice.profileId,
-            language: playableVoice.language,
-            engine: playableVoice.presetEngine,
-            speed: soul.voice.speed,
-          }),
-          signal: previewRequest.signal,
-        });
-        if (!response.ok) {
-          const payload = (await response.json().catch(() => null)) as {
-            error?: { message?: string };
-          } | null;
-          throw new Error(payload?.error?.message || "Voicebox preview is unavailable.");
-        }
-        if (previewTokenRef.current !== token) return;
-        const blob = await response.blob();
-        if (previewTokenRef.current !== token) return;
-        previewRequestRef.current = null;
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audioRef.current = { audio, url };
-        audio.onended = () => {
-          URL.revokeObjectURL(url);
-          audioRef.current = null;
-          setPlayingId(null);
-        };
-        audio.onerror = () => {
-          URL.revokeObjectURL(url);
-          audioRef.current = null;
-          setPlayingId(null);
-          onNotice("The voice preview could not be played.");
-        };
-        await audio.play();
-      } catch (error) {
-        if (previewRequestRef.current === previewRequest) previewRequestRef.current = null;
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        setPlayingId(null);
-        onNotice(error instanceof Error ? error.message : "Voice preview failed.");
-      }
-      return;
-    }
-
-    if (!("speechSynthesis" in window)) {
-      setPlayingId(null);
-      onNotice("Voice previews are not supported in this browser.");
-      return;
-    }
-    const utterance = new SpeechSynthesisUtterance(previewText);
-    utterance.lang = voice.language;
-    utterance.rate = soul.voice.speed;
-    utterance.pitch = soul.voice.pitch;
-    const selected = browserVoices.find(
-      (candidate) => candidate.name === voice.browserVoiceName && candidate.lang === voice.language,
-    );
-    if (selected) utterance.voice = selected;
-    utterance.onend = () => {
-      if (previewTokenRef.current === token) setPlayingId(null);
-    };
-    utterance.onerror = () => {
-      if (previewTokenRef.current === token) setPlayingId(null);
-    };
-    window.speechSynthesis.speak(utterance);
   }
 
-  async function selectVoice(voice: StudioVoice) {
+  function selectVoice(voice: StudioVoice) {
     stopPreview();
-    let selectedVoice = voice;
-    if (voice.provider === "voicebox" && !voice.profileId) {
-      try {
-        selectedVoice = await ensureVoiceProfile(voice);
-      } catch (error) {
-        onNotice(error instanceof Error ? error.message : "Voicebox could not prepare this voice.");
-        return;
-      }
-    }
-    if (selectedVoice.provider === "voicebox") {
-      update({
-        enabled: true,
-        provider: "voicebox",
-        profileId: selectedVoice.profileId ?? "",
-        profileName: selectedVoice.name,
-        language: selectedVoice.language,
-      });
-    } else if (selectedVoice.provider === "supertonic") {
-      update({
-        enabled: true,
-        provider: "supertonic",
-        profileId: selectedVoice.neuralVoiceId ?? "F1",
-        profileName: selectedVoice.name,
-        browserVoiceName: "",
-        language: selectedVoice.language,
-      });
-    } else {
-      update({
-        enabled: true,
-        provider: "browser",
-        profileId: "",
-        profileName: selectedVoice.name,
-        browserVoiceName: selectedVoice.browserVoiceName ?? "",
-        language: selectedVoice.language,
-      });
-    }
-    onNotice(`${selectedVoice.name} is now your active voice.`);
+    update({
+      enabled: true,
+      provider: "supertonic",
+      profileId: voice.neuralVoiceId,
+      profileName: voice.name,
+      browserVoiceName: "",
+    });
+    onNotice(`${voice.name} is now your active voice.`);
   }
 
   return (
@@ -3212,76 +2841,14 @@ function VoiceView({
                   step={0.05}
                   onChange={(speed) => update({ speed })}
                 />
-                <Range
-                  label="Pitch"
-                  value={soul.voice.pitch}
-                  min={0.7}
-                  max={1.3}
-                  step={0.05}
-                  onChange={(pitch) => update({ pitch })}
-                />
               </div>
 
-              <div className="mt-6 flex flex-col gap-4 border-t border-[#ecebe9] pt-5 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <p className="text-sm font-medium">Voice engine</p>
-                  <p className="mt-1 text-xs text-[#7f7d78]">
-                    Neural voices stay consistent across devices. Browser voices start instantly.
-                  </p>
-                </div>
-                <div className="flex rounded-xl bg-[#f1f1f0] p-1 text-xs font-semibold">
-                  <button
-                    onClick={() => {
-                      if (neuralVoices[0]) void selectVoice(neuralVoices[0]);
-                    }}
-                    className={`rounded-lg px-3 py-2 transition ${soul.voice.provider === "supertonic" ? "bg-white shadow-sm" : "text-[#7b7974]"}`}
-                  >
-                    Neural
-                  </button>
-                  <button
-                    onClick={() => void selectVoice(defaultVoice)}
-                    className={`rounded-lg px-3 py-2 transition ${soul.voice.provider === "browser" ? "bg-white shadow-sm" : "text-[#7b7974]"}`}
-                  >
-                    Browser
-                  </button>
-                  <button
-                    disabled={!voicebox.connected || !customVoices.length}
-                    onClick={() => {
-                      if (customVoices[0]) void selectVoice(customVoices[0]);
-                    }}
-                    className={`rounded-lg px-3 py-2 transition disabled:cursor-not-allowed disabled:opacity-40 ${soul.voice.provider === "voicebox" ? "bg-white shadow-sm" : "text-[#7b7974]"}`}
-                  >
-                    Voicebox
-                  </button>
-                </div>
-              </div>
+              <p className="mt-6 border-t border-[#ecebe9] pt-5 text-xs text-[#7f7d78]">
+                All 10 Neural voices are available here and in your website assistant. Voice
+                generation uses your plan’s voice allowance.
+              </p>
             </div>
           </section>
-
-          <Card className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-4">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#f0ebfa] text-[#7257a0]">
-                <Mic2 className="h-5 w-5" />
-              </span>
-              <div>
-                <h3 className="text-sm font-semibold">Clone an authorized voice</h3>
-                <p className="mt-1 max-w-lg text-sm leading-6 text-[#777671]">
-                  Create a custom profile from a clean sample you own or have permission to use.
-                </p>
-                <p className="mt-2 flex items-center gap-1.5 text-xs text-[#7b7974]">
-                  <ShieldCheck className="h-3.5 w-3.5 text-[#0b0b0c]" /> Consent is recorded with
-                  every clone.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setCloneOpen(true)}
-              disabled={!voicebox.connected}
-              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-[#e0dfdc] px-4 text-xs font-semibold transition hover:bg-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              <Upload className="h-4 w-4" /> Clone voice
-            </button>
-          </Card>
         </div>
 
         <section className="flex h-[calc(100dvh-76px)] min-h-[590px] min-w-0 flex-col overflow-hidden bg-white xl:sticky xl:top-0">
@@ -3373,20 +2940,9 @@ function VoiceView({
                         <span className="min-w-0 flex-1">
                           <span className="flex items-center gap-2">
                             <span className="truncate text-sm font-semibold">{voice.name}</span>
-                            {voice.provider === "voicebox" && (
-                              <span className="shrink-0 rounded-full bg-[#ece8f6] px-1.5 py-0.5 text-[9px] font-semibold text-[#735a9b]">
-                                {voice.presetEngine === "kokoro"
-                                  ? "Kokoro"
-                                  : voice.presetEngine === "qwen_custom_voice"
-                                    ? "Qwen"
-                                    : "Custom"}
-                              </span>
-                            )}
-                            {voice.provider === "supertonic" && (
-                              <span className="shrink-0 rounded-full bg-[#ffe5eb] px-1.5 py-0.5 text-[9px] font-semibold text-[#a43f58]">
-                                Neural
-                              </span>
-                            )}
+                            <span className="shrink-0 rounded-full bg-[#ffe5eb] px-1.5 py-0.5 text-[9px] font-semibold text-[#a43f58]">
+                              Neural
+                            </span>
                           </span>
                           <span className="mt-1 block truncate text-xs text-[#807e79]">
                             {voice.detail}
@@ -3428,43 +2984,11 @@ function VoiceView({
             )}
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t border-[#ecebe9] px-4 py-3 text-[11px] text-[#807e79]">
-            <span className="flex items-center gap-2">
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${voicebox.connected ? "bg-[#22c55e]" : "bg-[#bcbab4]"}`}
-              />
-              {libraryTab === "explore" && soul.voice.provider === "browser"
-                ? `${deviceVoices.length} device voices ready`
-                : voicebox.connected
-                  ? "Voicebox connected"
-                  : "Device voices ready"}
-            </span>
-            <button
-              onClick={() => setCloneOpen(true)}
-              disabled={!voicebox.connected}
-              className="font-semibold text-[#53524e] disabled:opacity-40"
-            >
-              + Clone voice
-            </button>
+          <div className="border-t border-[#ecebe9] px-4 py-3 text-[11px] text-[#807e79]">
+            10 Neural voices · consistent across devices
           </div>
         </section>
       </div>
-      {cloneOpen && (
-        <CloneVoiceDialog
-          onClose={() => setCloneOpen(false)}
-          onCreated={(profile) => {
-            update({
-              provider: "voicebox",
-              profileId: profile.id,
-              profileName: profile.name,
-              cloneConsentRecorded: true,
-            });
-            setVoicebox((current) => ({ ...current, profiles: [...current.profiles, profile] }));
-            setCloneOpen(false);
-            onNotice("Voice profile created.");
-          }}
-        />
-      )}
     </Page>
   );
 }
@@ -5726,127 +5250,6 @@ function CreateSoulDialog({
   );
 }
 
-function CloneVoiceDialog({
-  onClose,
-  onCreated,
-}: {
-  onClose: () => void;
-  onCreated: (profile: VoiceboxProfile) => void;
-}) {
-  const [name, setName] = useState("");
-  const [transcript, setTranscript] = useState("");
-  const [rightsBasis, setRightsBasis] = useState("self");
-  const [consent, setConsent] = useState(false);
-  const [audio, setAudio] = useState<File | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    if (!audio || !consent) return;
-    setBusy(true);
-    setError("");
-    try {
-      const form = new FormData();
-      form.append("name", name);
-      form.append("transcript", transcript);
-      form.append("rightsBasis", rightsBasis);
-      form.append("consent", String(consent));
-      form.append("audio", audio);
-      const response = await authFetch("/api/voice/clone", { method: "POST", body: form });
-      const payload = (await response.json()) as {
-        profile?: VoiceboxProfile;
-        error?: { message?: string };
-      };
-      if (!response.ok || !payload.profile)
-        throw new Error(payload.error?.message || "Voice cloning failed.");
-      onCreated(payload.profile);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Voice cloning failed.");
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm">
-      <button className="absolute inset-0" onClick={onClose} aria-label="Close" />
-      <form
-        onSubmit={submit}
-        className="relative max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-[#dfdedb] bg-white p-6 shadow-2xl sm:p-7"
-      >
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute right-4 top-4 rounded-lg p-2 hover:bg-[#f2f2f1]"
-        >
-          <X className="h-4 w-4" />
-        </button>
-        <h2 className="text-2xl font-semibold">Clone an authorized voice</h2>
-        <p className="mt-2 text-sm leading-6 text-[#777671]">
-          Use a clean sample with an exact transcript.
-        </p>
-        <div className="mt-6 grid gap-5 sm:grid-cols-2">
-          <Field label="Voice name">
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              className="clean-input"
-            />
-          </Field>
-          <Field label="Rights basis">
-            <select
-              value={rightsBasis}
-              onChange={(event) => setRightsBasis(event.target.value)}
-              className="clean-input"
-            >
-              <option value="self">My own voice</option>
-              <option value="permission">Explicit permission</option>
-              <option value="licensed">Commercially licensed</option>
-            </select>
-          </Field>
-        </div>
-        <Field label="Audio sample" className="mt-5">
-          <input
-            type="file"
-            accept="audio/*"
-            onChange={(event) => setAudio(event.target.files?.[0] ?? null)}
-            className="clean-input"
-          />
-        </Field>
-        <Field label="Exact transcript" className="mt-5">
-          <textarea
-            value={transcript}
-            onChange={(event) => setTranscript(event.target.value)}
-            rows={4}
-            className="clean-input resize-none"
-          />
-        </Field>
-        <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl bg-[#f5f5f4] p-4">
-          <input
-            type="checkbox"
-            checked={consent}
-            onChange={(event) => setConsent(event.target.checked)}
-            className="mt-1"
-          />
-          <span className="text-sm leading-6 text-[#5a5854]">
-            I confirm that I own this voice or have explicit permission or a valid license to clone
-            and use it.
-          </span>
-        </label>
-        {error && (
-          <p className="mt-4 rounded-xl bg-[#fff3ef] p-3 text-sm text-[#984c3b]">{error}</p>
-        )}
-        <button
-          disabled={!audio || !name || !transcript || !consent || busy}
-          className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[#1e1e1d] px-4 py-3 text-sm font-semibold text-white disabled:opacity-40"
-        >
-          {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Mic2 className="h-4 w-4" />}
-          Create voice profile
-        </button>
-      </form>
-    </div>
-  );
-}
-
 function Page({
   title,
   description,
@@ -6150,7 +5553,7 @@ const DEMO_SOUL: Soul = {
         url: "https://obseri.com/voice",
         title: "Voice and consent",
         description:
-          "Browser voices work immediately, while Voicebox adds profiles and consent-gated voice cloning.",
+          "Choose from 10 Neural voices, shared across previews and your website assistant.",
         hash: "3333333333333333333333333333333333333333333333333333333333333333",
         wordCount: 320,
         capturedAt: "2026-07-14T05:00:00.000Z",
@@ -6160,7 +5563,7 @@ const DEMO_SOUL: Soul = {
             id: "demo-voice-0",
             pageUrl: "https://obseri.com/voice",
             pageTitle: "Voice and consent",
-            text: "Obseri supports browser speech as a zero-setup fallback and Voicebox for managed profiles, speech generation, and consent-gated voice cloning.",
+            text: "Obseri offers 10 Neural voices that stay consistent across devices.",
             order: 0,
             tokenEstimate: 28,
           },
@@ -6188,9 +5591,9 @@ const DEMO_SOUL: Soul = {
   },
   voice: {
     enabled: true,
-    provider: "browser",
-    profileId: "",
-    profileName: "Browser voice",
+    provider: "supertonic",
+    profileId: "F1",
+    profileName: "Aster",
     browserVoiceName: "",
     language: "en",
     speed: 1,

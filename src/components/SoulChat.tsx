@@ -1,3 +1,4 @@
+import { neuralVoice } from "@/lib/voice-catalog";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowUp,
@@ -24,7 +25,6 @@ import {
   playSupertonicAudio,
   speakSupertonic,
   stopSupertonic,
-  type SupertonicVoiceId,
 } from "@/lib/supertonic";
 import { authFetch } from "@/lib/auth-client";
 
@@ -93,7 +93,6 @@ export default function SoulChat({
   const messagesRef = useRef(messages);
   const sendingRef = useRef(false);
   const voiceRequestRef = useRef<AbortController | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const theme = soul.appearance.theme ?? "light";
   const isDark = theme === "dark";
   const isGlass = theme === "glass";
@@ -139,8 +138,6 @@ export default function SoulChat({
       voiceCallActiveRef.current = false;
       voiceRequestRef.current?.abort();
       recognitionRef.current?.abort();
-      audioRef.current?.pause();
-      window.speechSynthesis?.cancel();
       stopSupertonic();
     },
     [],
@@ -151,15 +148,16 @@ export default function SoulChat({
   }, [messages, sending]);
 
   useEffect(() => {
-    if (!voiceMode || voicePanelView !== "voice" || soul.voice.provider !== "supertonic") return;
+    if (!voiceMode || voicePanelView !== "voice") return;
     // Generate the predictable opening line while the visitor is looking at
     // the call panel. Clicking Call can then begin with human speech instead
     // of a cold HTTP + inference pause.
     void fetchSupertonicAudio(soul.personality.greeting, {
-      voice: (soul.voice.profileId || "F1") as SupertonicVoiceId,
+      voice: neuralVoice(soul.voice.provider === "supertonic" ? soul.voice.profileId : undefined)
+        .id,
       language: callLanguage,
       speed: soul.voice.speed,
-      qualitySteps: 4,
+      qualitySteps: 2,
       soulId: soul.id,
       sessionToken,
     }).catch(() => undefined);
@@ -338,72 +336,50 @@ export default function SoulChat({
   }
 
   async function speak(text: string) {
-    if (soul.voice.provider === "voicebox" && soul.voice.profileId) {
-      await playAudioBlob(await fetchVoiceboxAudio(text));
-      return;
-    }
-
-    if (soul.voice.provider === "supertonic") {
-      await speakSupertonic(text, {
-        voice: (soul.voice.profileId || "F1") as SupertonicVoiceId,
-        language: callLanguage,
-        speed: soul.voice.speed,
-        qualitySteps: 2,
-        soulId: soul.id,
-        sessionToken,
-      });
-      return;
-    }
-
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-      await speakBrowserSegment(text);
-    }
+    await speakSupertonic(text, {
+      voice: neuralVoice(soul.voice.provider === "supertonic" ? soul.voice.profileId : undefined)
+        .id,
+      language: callLanguage,
+      speed: soul.voice.speed,
+      qualitySteps: 2,
+      soulId: soul.id,
+      sessionToken,
+    });
   }
 
   function createStreamingSpeaker() {
     let pendingText = "";
     let synthesis = Promise.resolve();
     let playback = Promise.resolve();
-    window.speechSynthesis?.cancel();
-    audioRef.current?.pause();
 
     const queue = (text: string) => {
       const segment = text.trim();
       if (!segment) return;
-      if (soul.voice.provider === "voicebox" && soul.voice.profileId) {
-        const audio = fetchVoiceboxAudio(segment, voiceRequestRef.current?.signal);
-        playback = playback.then(async () => {
-          if (!voiceCallActiveRef.current) return;
-          await playAudioBlob(await audio);
-        });
-      } else if (soul.voice.provider === "supertonic") {
-        // Keep inference serialized on the small voice host, but start the
-        // next synthesis while the previous phrase is playing. This removes
-        // the dead-air gap between phrases without stampeding the model.
-        const audio = synthesis.then(() =>
-          fetchSupertonicAudio(segment, {
-            voice: (soul.voice.profileId || "F1") as SupertonicVoiceId,
-            language: callLanguage,
-            speed: soul.voice.speed,
-            qualitySteps: 2,
-            soulId: soul.id,
-            sessionToken,
-          }),
-        );
-        synthesis = audio.then(
-          () => undefined,
-          () => undefined,
-        );
-        playback = playback.then(async () => {
-          if (!voiceCallActiveRef.current) return;
-          await playSupertonicAudio(await audio);
-        });
-      } else {
-        playback = playback.then(() =>
-          voiceCallActiveRef.current ? speakBrowserSegment(segment) : Promise.resolve(),
-        );
-      }
+      // Keep inference serialized on the small voice host, but start the
+      // next synthesis while the previous phrase is playing. This removes
+      // the dead-air gap between phrases without stampeding the model.
+      const audio = synthesis.then(() =>
+        fetchSupertonicAudio(segment, {
+          voice: neuralVoice(
+            soul.voice.provider === "supertonic" ? soul.voice.profileId : undefined,
+          ).id,
+          language: callLanguage,
+          speed: soul.voice.speed,
+          qualitySteps: 2,
+          soulId: soul.id,
+          sessionToken,
+        }),
+      );
+      synthesis = audio.then(
+        () => undefined,
+        () => undefined,
+      );
+      playback = playback.then(async () => {
+        if (!voiceCallActiveRef.current) return;
+        const blob = await audio;
+        if (!voiceCallActiveRef.current) return;
+        await playSupertonicAudio(blob);
+      });
     };
 
     return {
@@ -422,67 +398,6 @@ export default function SoulChat({
         await playback;
       },
     };
-  }
-
-  async function fetchVoiceboxAudio(text: string, signal?: AbortSignal) {
-    const response = await authFetch("/api/voice/speak", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        ...(sessionToken ? { authorization: `Bearer ${sessionToken}` } : {}),
-      },
-      body: JSON.stringify({
-        text,
-        soulId: soul.id,
-        profileId: soul.voice.profileId,
-        language: callLanguage,
-      }),
-      signal,
-    });
-    if (!response.ok) throw new Error("Voice generation failed.");
-    return response.blob();
-  }
-
-  async function playAudioBlob(blob: Blob) {
-    const href = URL.createObjectURL(blob);
-    const audio = new Audio(href);
-    audioRef.current = audio;
-    await new Promise<void>((resolve, reject) => {
-      let settled = false;
-      const finish = (playbackError?: Error) => {
-        if (settled) return;
-        settled = true;
-        URL.revokeObjectURL(href);
-        if (audioRef.current === audio) audioRef.current = null;
-        if (playbackError) reject(playbackError);
-        else resolve();
-      };
-      audio.onended = () => finish();
-      audio.onpause = () => finish();
-      audio.onerror = () => finish(new Error("Voice playback failed."));
-      void audio
-        .play()
-        .catch((cause) =>
-          finish(cause instanceof Error ? cause : new Error("Voice playback failed.")),
-        );
-    });
-  }
-
-  async function speakBrowserSegment(text: string) {
-    if (!("speechSynthesis" in window)) return;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = callLanguage;
-    utterance.rate = soul.voice.speed;
-    utterance.pitch = soul.voice.pitch;
-    const voice = window.speechSynthesis
-      .getVoices()
-      .find((candidate) => candidate.name === soul.voice.browserVoiceName);
-    if (voice) utterance.voice = voice;
-    await new Promise<void>((resolve) => {
-      utterance.onend = () => resolve();
-      utterance.onerror = () => resolve();
-      window.speechSynthesis.speak(utterance);
-    });
   }
 
   function startListening(autoSend: boolean) {
@@ -593,17 +508,7 @@ export default function SoulChat({
     setVoiceCallActive(true);
     const greeting = soul.personality.greeting.trim();
     setVoiceStatus("speaking");
-    const opening =
-      soul.voice.provider === "supertonic"
-        ? fetchSupertonicAudio(greeting, {
-            voice: (soul.voice.profileId || "F1") as SupertonicVoiceId,
-            language: callLanguage,
-            speed: soul.voice.speed,
-            qualitySteps: 4,
-            soulId: soul.id,
-            sessionToken,
-          }).then(playSupertonicAudio)
-        : speak(greeting);
+    const opening = speak(greeting);
     void opening
       .then(() => {
         if (voiceCallActiveRef.current) startListening(true);
@@ -620,9 +525,6 @@ export default function SoulChat({
     voiceRequestRef.current = null;
     recognitionRef.current?.abort();
     recognitionRef.current = null;
-    audioRef.current?.pause();
-    audioRef.current = null;
-    window.speechSynthesis?.cancel();
     stopSupertonic();
     setListening(false);
     setVoiceCallActive(false);
@@ -634,7 +536,6 @@ export default function SoulChat({
     messagesRef.current = greeting;
     setMessages(greeting);
     setError("");
-    window.speechSynthesis?.cancel();
     stopSupertonic();
   }
 
@@ -916,7 +817,7 @@ export default function SoulChat({
           <button
             onClick={() => {
               setSoundEnabled((current) => !current);
-              window.speechSynthesis?.cancel();
+              stopSupertonic();
             }}
             className={`rounded-lg p-2 ${quietButtonTone}`}
             aria-label="Toggle spoken answers"

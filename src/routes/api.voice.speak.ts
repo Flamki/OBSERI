@@ -1,27 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
+import { supertonicVoices } from "@/lib/voice-catalog";
 import { getRuntimeEnvironment } from "@/lib/runtime-env";
 import { readBearerToken, verifyWidgetSession } from "@/lib/integration-security";
-import { getPublishedSoul } from "@/lib/integration-store";
+import { consumeRateLimit, getPublishedSoul } from "@/lib/integration-store";
+import { isPublicVoiceDemo } from "@/lib/voice-demo";
 import { requireUser } from "@/lib/user-auth";
 import { BillingStoreError, finalizeUsage, reserveUsage } from "@/lib/billing-store";
 
 const schema = z.object({
   text: z.string().min(1).max(4_000),
-  provider: z.enum(["voicebox", "supertonic"]).optional(),
-  profileId: z.string().min(1).max(120).optional(),
+  provider: z.literal("supertonic").default("supertonic"),
+  profileId: z
+    .string()
+    .refine((id) => supertonicVoices.some((voice) => voice.id === id), "Choose a Neural voice")
+    .default("F1"),
   language: z.string().min(2).max(10).default("en"),
-  engine: z
-    .enum([
-      "qwen",
-      "qwen_custom_voice",
-      "luxtts",
-      "chatterbox",
-      "chatterbox_turbo",
-      "tada",
-      "kokoro",
-    ])
-    .optional(),
   speed: z.number().min(0.5).max(2).optional(),
   qualitySteps: z.number().int().min(2).max(8).optional(),
   soulId: z.string().min(1).max(100).optional(),
@@ -46,45 +40,27 @@ export const Route = createFileRoute("/api/voice/speak")({
         if (!parsed.success)
           return Response.json({ error: { message: "Invalid speech request." } }, { status: 400 });
         const env = getRuntimeEnvironment();
-        const provider = parsed.data.provider ?? "voicebox";
         const supertonicApiKey = env.OBSERI_SUPERTONIC_API_KEY;
-        const baseUrl = (
-          provider === "supertonic" ? env.OBSERI_SUPERTONIC_URL : env.OBSERI_VOICEBOX_URL
-        )?.replace(/\/$/, "");
-        if (!baseUrl)
+        const baseUrl = env.OBSERI_SUPERTONIC_URL?.replace(/\/$/, "");
+        if (!baseUrl || !supertonicApiKey)
           return Response.json(
-            {
-              error: {
-                message:
-                  provider === "supertonic"
-                    ? "Cloud neural voice is not configured."
-                    : "Voicebox is not configured.",
-              },
-            },
+            { error: { message: "Neural voice is not configured." } },
             { status: 503 },
-          );
-        if (provider === "supertonic" && !supertonicApiKey)
-          return Response.json(
-            { error: { message: "Cloud neural voice authentication is not configured." } },
-            { status: 503 },
-          );
-        if (provider === "voicebox" && !parsed.data.profileId)
-          return Response.json(
-            { error: { message: "A Voicebox profile is required." } },
-            { status: 400 },
           );
 
         let reservationId: string | null = null;
         let committed = false;
         try {
-          const ownerUserId = await resolveVoiceOwner(request, parsed.data.soulId);
-          const reservation = await reserveUsage(
-            ownerUserId,
-            "voice_seconds",
-            estimatedVoiceSeconds(parsed.data.text),
-          );
+          const ownerUserId = await resolveVoiceOwner(request, parsed.data);
+          const reservation = ownerUserId
+            ? await reserveUsage(
+                ownerUserId,
+                "voice_seconds",
+                estimatedVoiceSeconds(parsed.data.text),
+              )
+            : { reservationId: null };
           reservationId = reservation.reservationId;
-          if (provider === "supertonic") {
+          {
             const supertonicRequest = {
               text: parsed.data.text,
               voice: parsed.data.profileId ?? "F1",
@@ -108,32 +84,6 @@ export const Route = createFileRoute("/api/voice/speak")({
             committed = true;
             return audioResponse(audio, cached ? "HIT" : "MISS", "supertonic");
           }
-
-          const engine =
-            parsed.data.engine ?? (await resolveProfileEngine(baseUrl, parsed.data.profileId!));
-          const voiceboxRequest = {
-            profile_id: parsed.data.profileId!,
-            text: parsed.data.text,
-            language: parsed.data.language,
-            engine,
-            model_size: engine === "qwen_custom_voice" ? "0.6B" : undefined,
-            normalize: true,
-          };
-          const cacheKey = JSON.stringify(voiceboxRequest);
-          const cacheable = parsed.data.text.length <= 240;
-          const cached = cacheable ? readCachedAudio(cacheKey) : null;
-          const audio =
-            cached ??
-            (cacheable
-              ? await generateCachedAudio(cacheKey, () => generateAudio(baseUrl, voiceboxRequest))
-              : await generateAudio(baseUrl, voiceboxRequest));
-          await finalizeUsage(
-            reservationId,
-            true,
-            audioDurationSeconds(audio, estimatedVoiceSeconds(parsed.data.text)),
-          );
-          committed = true;
-          return audioResponse(audio, cached ? "HIT" : "MISS", "voicebox");
         } catch (error) {
           if (error instanceof VoiceAccessError || error instanceof BillingStoreError)
             return Response.json(
@@ -168,7 +118,8 @@ class VoiceAccessError extends Error {
   }
 }
 
-async function resolveVoiceOwner(request: Request, soulId?: string) {
+async function resolveVoiceOwner(request: Request, input: z.infer<typeof schema>) {
+  const { soulId } = input;
   const authorization = request.headers.get("authorization");
   const bearer = authorization ? readBearerToken(request) : "";
   if (bearer.startsWith("obs_sess.")) {
@@ -190,8 +141,21 @@ async function resolveVoiceOwner(request: Request, soulId?: string) {
       );
     }
   }
-  const demoOwner = process.env.OBSERI_DEMO_OWNER_USER_ID;
-  if (demoOwner) return demoOwner;
+  if (isPublicVoiceDemo(request, input)) {
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    for (const [key, limit, window] of [
+      [`voice-demo:ip:${ip}`, 12, 600],
+      ["voice-demo:global:hour", 120, 3600],
+      ["voice-demo:global:day", 200, 86400],
+    ] as const) {
+      if (!(await consumeRateLimit(key, limit, window)))
+        throw new VoiceAccessError(
+          "The voice demo has reached its limit. Please try again later.",
+          429,
+        );
+    }
+    return null;
+  }
   throw new VoiceAccessError("Sign in to generate voice.", 401);
 }
 
@@ -210,15 +174,6 @@ function audioDurationSeconds(audio: CachedAudio, fallback: number) {
   }
   return fallback;
 }
-
-type VoiceboxGenerationRequest = {
-  profile_id: string;
-  text: string;
-  language: string;
-  engine?: string;
-  model_size?: string;
-  normalize: boolean;
-};
 
 function readCachedAudio(key: string) {
   const cached = previewCache.get(key);
@@ -290,7 +245,7 @@ async function generateSupertonicAudio(
   });
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(readVoiceboxError(detail) || `Supertonic returned ${response.status}.`);
+    throw new Error(readVoiceError(detail) || `Supertonic returned ${response.status}.`);
   }
   return {
     bytes: await response.arrayBuffer(),
@@ -304,78 +259,11 @@ function normalizeLanguage(language: string) {
   return base || "na";
 }
 
-async function generateAudio(baseUrl: string, body: VoiceboxGenerationRequest) {
-  let response = await fetch(`${baseUrl}/generate/stream`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(300_000),
-  });
-  if (!response.ok) {
-    const detail = await response.text();
-    if (response.status === 400 && detail.toLowerCase().includes("not downloaded")) {
-      response = await generateAndFetchAudio(baseUrl, body);
-    } else {
-      throw new Error(readVoiceboxError(detail) || `Voicebox returned ${response.status}.`);
-    }
-  }
-  return {
-    bytes: await response.arrayBuffer(),
-    contentType: response.headers.get("content-type") ?? "audio/wav",
-    createdAt: Date.now(),
-  } satisfies CachedAudio;
-}
-
-function readVoiceboxError(detail: string) {
+function readVoiceError(detail: string) {
   try {
     const payload = JSON.parse(detail) as { detail?: string };
     return payload.detail || detail;
   } catch {
     return detail;
   }
-}
-
-async function resolveProfileEngine(baseUrl: string, profileId: string) {
-  const response = await fetch(`${baseUrl}/profiles/${encodeURIComponent(profileId)}`, {
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!response.ok)
-    throw new Error((await response.text()) || "Voicebox profile could not be loaded.");
-  const profile = (await response.json()) as {
-    preset_engine?: string | null;
-    default_engine?: string | null;
-  };
-  return profile.preset_engine || profile.default_engine || "qwen";
-}
-
-async function generateAndFetchAudio(baseUrl: string, body: VoiceboxGenerationRequest) {
-  const start = await fetch(`${baseUrl}/generate`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (!start.ok) throw new Error((await start.text()) || "Voicebox model download failed.");
-  const generation = (await start.json()) as { id?: string };
-  if (!generation.id) throw new Error("Voicebox did not return a generation id.");
-
-  const deadline = Date.now() + 300_000;
-  while (Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 1_000));
-    const statusResponse = await fetch(`${baseUrl}/history/${generation.id}`, {
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!statusResponse.ok)
-      throw new Error((await statusResponse.text()) || "Voicebox generation status failed.");
-    const status = (await statusResponse.json()) as { status?: string; error?: string | null };
-    if (status.status === "failed") throw new Error(status.error || "Voicebox generation failed.");
-    if (status.status === "completed") {
-      const audio = await fetch(`${baseUrl}/audio/${generation.id}`, {
-        signal: AbortSignal.timeout(30_000),
-      });
-      if (!audio.ok) throw new Error((await audio.text()) || "Voicebox audio is unavailable.");
-      return audio;
-    }
-  }
-  throw new Error("Voicebox model preparation timed out. Please try again.");
 }

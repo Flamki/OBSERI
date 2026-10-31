@@ -11,8 +11,6 @@ export type VoiceAgent = {
   greeting: string;
   colors: [string, string, string];
   rate: number;
-  pitch: number;
-  voiceHints: string[];
   fallback: string;
   neuralVoice: SupertonicVoiceId;
 };
@@ -46,48 +44,15 @@ type LandingVoiceMessage = {
   content: string;
 };
 
-function chooseHumanBrowserVoice(agent: VoiceAgent, voices: SpeechSynthesisVoice[]) {
-  const sharedNaturalVoices = [
-    "aria",
-    "jenny",
-    "guy",
-    "ava",
-    "andrew",
-    "emma",
-    "brian",
-    "roger",
-    "michelle",
-    "sonia",
-    "samantha",
-  ];
-  const preferredNames = [...agent.voiceHints, ...sharedNaturalVoices];
-  const legacyVoices = ["david", "zira", "mark", "hazel", "desktop", "espeak"];
-
-  return voices
-    .map((voice) => {
-      const name = voice.name.toLowerCase();
-      const preferredIndex = preferredNames.findIndex((candidate) => name.includes(candidate));
-      let score = preferredIndex >= 0 ? 180 - preferredIndex * 8 : 0;
-      if (/natural|neural|online|premium|enhanced/.test(name)) score += 90;
-      if (/google|microsoft|apple/.test(name)) score += 12;
-      if (!voice.localService) score += 18;
-      if (legacyVoices.some((legacy) => name.includes(legacy))) score -= 140;
-      return { voice, score };
-    })
-    .sort((a, b) => b.score - a.score)[0]?.voice;
-}
-
 export const VOICE_AGENTS: VoiceAgent[] = [
   {
     id: "ona",
-    name: "Ona",
+    name: "Aster",
     role: "Lead qualification",
     tone: "Warm · persuasive",
-    greeting: "Hi, I’m Ona from Obseri. What are you hoping to improve on your website today?",
+    greeting: "Hi, I’m Aster from Obseri. What are you hoping to improve on your website today?",
     colors: ["#ff6f91", "#b39cff", "#ffd3dc"],
     rate: 0.98,
-    pitch: 1,
-    voiceHints: ["aria", "ava", "emma", "samantha"],
     fallback:
       "I can learn what a visitor needs, recommend the right next step, and capture a qualified lead.",
     neuralVoice: "F1",
@@ -100,29 +65,25 @@ export const VOICE_AGENTS: VoiceAgent[] = [
     greeting: "Hi, I’m Arlo. Tell me what you’re looking for and I’ll help you find it.",
     colors: ["#ff8a62", "#ffc178", "#e98594"],
     rate: 0.96,
-    pitch: 1,
-    voiceHints: ["guy", "andrew", "brian", "roger", "eric"],
     fallback:
       "Tell me what you are trying to accomplish and I will guide you to the most relevant product information.",
     neuralVoice: "M1",
   },
   {
     id: "mira",
-    name: "Mira",
+    name: "Nora",
     role: "Customer support",
     tone: "Calm · helpful",
-    greeting: "Hi, I’m Mira. How can I help you today?",
+    greeting: "Hi, I’m Nora. How can I help you today?",
     colors: ["#8d7bd1", "#d6b4ec", "#ffb7c8"],
     rate: 0.94,
-    pitch: 1,
-    voiceHints: ["jenny", "michelle", "sonia", "aria", "ava"],
     fallback:
       "I can answer common support questions, cite the right documentation, and escalate when human help is needed.",
     neuralVoice: "F3",
   },
 ];
 
-/** Drives a live browser voice call with one of the landing-page agents. */
+/** Drives a live Neural voice call with one of the landing-page agents. */
 export function useVoiceAgent() {
   const [activeAgent, setActiveAgent] = useState<string | null>(null);
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
@@ -130,29 +91,22 @@ export function useVoiceAgent() {
     "Choose a voice and ask about pricing, product, or support.",
   );
   const [reply, setReply] = useState("Every voice answers from the same website knowledge.");
-  const [notice, setNotice] = useState("Live browser voice · nothing is uploaded");
+  const [notice, setNotice] = useState("Neural voice · microphone active only during a call");
   const recognitionRef = useRef<BrowserRecognition | null>(null);
   const conversationActiveRef = useRef(false);
   const speechTurnRef = useRef(0);
   const voiceMessagesRef = useRef<LandingVoiceMessage[]>([]);
   const voiceRequestRef = useRef<AbortController | null>(null);
-  const browserVoicesRef = useRef<SpeechSynthesisVoice[]>([]);
-
-  useEffect(() => {
-    const loadVoices = () => {
-      browserVoicesRef.current = window.speechSynthesis?.getVoices() ?? [];
-    };
-    loadVoices();
-    window.speechSynthesis?.addEventListener("voiceschanged", loadVoices);
-
-    return () => {
+  useEffect(
+    () => () => {
       conversationActiveRef.current = false;
+      speechTurnRef.current += 1;
       voiceRequestRef.current?.abort();
       recognitionRef.current?.abort?.();
-      window.speechSynthesis?.cancel();
-      window.speechSynthesis?.removeEventListener("voiceschanged", loadVoices);
-    };
-  }, []);
+      stopSupertonic();
+    },
+    [],
+  );
 
   const buildAnswer = (agent: VoiceAgent, spoken: string) => {
     const question = spoken.toLowerCase();
@@ -292,53 +246,20 @@ export function useVoiceAgent() {
 
     setVoiceStatus("speaking");
     setNotice(speakingNotice);
-    void speakSupertonic(answer, {
+    void speakSupertonic(answer.slice(0, 400), {
+      soulId: "obseri-landing-voice-demo",
       voice: agent.neuralVoice,
       language: "en",
       speed: agent.rate,
       qualitySteps: 4,
     })
       .then(finishTurn)
-      .catch(() => speakBrowserReply());
-
-    function speakBrowserReply() {
-      if (!("speechSynthesis" in window)) {
-        conversationActiveRef.current = false;
-        setVoiceStatus("error");
-        setNotice("Voice playback is not available in this browser.");
-        return;
-      }
-
-      const utterance = new SpeechSynthesisUtterance(answer);
-      const availableVoices = (
-        browserVoicesRef.current.length
-          ? browserVoicesRef.current
-          : window.speechSynthesis.getVoices()
-      ).filter((voice) => voice.lang.toLowerCase().startsWith("en"));
-      const preferredVoice = chooseHumanBrowserVoice(agent, availableVoices);
-
-      if (preferredVoice) {
-        utterance.voice = preferredVoice;
-        utterance.lang = preferredVoice.lang;
-      }
-      utterance.rate = agent.rate;
-      utterance.pitch = agent.pitch;
-      utterance.onstart = () => {
-        setVoiceStatus("speaking");
-        setNotice(speakingNotice);
-      };
-      utterance.onend = () => {
-        finishTurn();
-      };
-      utterance.onerror = () => {
+      .catch(() => {
         if (speechTurn !== speechTurnRef.current) return;
         conversationActiveRef.current = false;
         setVoiceStatus("error");
-        setNotice("Voice playback stopped. Try again.");
-      };
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utterance);
-    }
+        setNotice("Neural voice is unavailable. Please try again.");
+      });
   };
 
   function beginListening(agent: VoiceAgent) {
@@ -443,7 +364,6 @@ export function useVoiceAgent() {
     voiceRequestRef.current = null;
     recognitionRef.current?.abort?.();
     recognitionRef.current = null;
-    window.speechSynthesis?.cancel();
     stopSupertonic();
     setVoiceStatus("idle");
     setNotice("Conversation stopped");
@@ -457,7 +377,6 @@ export function useVoiceAgent() {
 
     conversationActiveRef.current = false;
     recognitionRef.current?.abort?.();
-    window.speechSynthesis?.cancel();
     stopSupertonic();
     setActiveAgent(agent.id);
     setVoiceStatus("thinking");

@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import postgres from "postgres";
-import type { Soul, SoulConversation } from "@/lib/soul";
+import { normalizeVoice, type Soul, type SoulConversation } from "@/lib/soul";
 import { deliverWebhook, type ObseriWebhookEvent } from "@/lib/webhooks";
 import { normalizeAllowedDomains, sha256 } from "@/lib/integration-security";
 import { billingPlanIncludesFeature } from "@/lib/billing-plans";
@@ -414,7 +414,7 @@ type PublishedRow = {
 function rowToRecord(row: PublishedRow | undefined): PublishedSoulRecord | null {
   if (!row) return null;
   return {
-    soul: row.soul,
+    soul: { ...row.soul, voice: normalizeVoice(row.soul.voice) },
     ownerUserId: row.owner_user_id,
     publishedAt:
       row.published_at instanceof Date ? row.published_at.toISOString() : row.published_at,
@@ -428,6 +428,7 @@ function rowToRecord(row: PublishedRow | undefined): PublishedSoulRecord | null 
 
 function createPublicSoul(source: Soul, allowedDomains: string[], now: string): Soul {
   const soul = structuredClone(source);
+  soul.voice = normalizeVoice(soul.voice);
   soul.status = "live";
   soul.updatedAt = now;
   soul.conversations = [];

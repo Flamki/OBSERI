@@ -697,7 +697,7 @@ function ChatTab() {
         <div className="flex items-center gap-3 border-b border-[#efefec] px-5 py-4">
           <Orb agent={VOICE_AGENTS[0]} size={36} live={agentTyping} />
           <div>
-            <p className="text-[15px] font-medium">Ona</p>
+            <p className="text-[15px] font-medium">Aster</p>
             <p className="text-[12px] text-[#8a8a8f]">Answers from obseri.com</p>
           </div>
         </div>

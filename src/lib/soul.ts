@@ -1,3 +1,4 @@
+import { neuralVoice } from "./voice-catalog";
 export type KnowledgeChunk = {
   id: string;
   pageUrl: string;
@@ -221,9 +222,9 @@ export function createSoul(siteUrl: string, name?: string): Soul {
     },
     voice: {
       enabled: true,
-      provider: "browser",
-      profileId: "",
-      profileName: "Natural",
+      provider: "supertonic",
+      profileId: "F1",
+      profileName: "Aster",
       browserVoiceName: "",
       language: "en",
       speed: 1,
@@ -286,6 +287,18 @@ export function createWebsiteSource(
   };
 }
 
+/** Keep saved and published assistants on the supported Neural catalogue. */
+export function normalizeVoice(voice: Soul["voice"]): Soul["voice"] {
+  const selected = neuralVoice(voice.provider === "supertonic" ? voice.profileId : undefined);
+  return {
+    ...voice,
+    provider: "supertonic",
+    profileId: selected.id,
+    profileName: selected.name,
+    browserVoiceName: "",
+  };
+}
+
 export function normalizeWorkspace(workspace: SoulWorkspace): SoulWorkspace {
   return {
     ...workspace,
@@ -296,12 +309,7 @@ export function normalizeWorkspace(workspace: SoulWorkspace): SoulWorkspace {
         ...soul.appearance,
         theme: soul.appearance.theme ?? "light",
       },
-      voice: {
-        ...soul.voice,
-        provider: soul.voice.provider ?? "browser",
-        profileId: soul.voice.profileId ?? "",
-        profileName: soul.voice.profileName ?? "Natural",
-      },
+      voice: normalizeVoice(soul.voice),
       channels: {
         ...soul.channels,
         allowedDomains:
