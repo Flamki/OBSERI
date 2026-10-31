@@ -462,39 +462,27 @@ export async function finalizeUsage(
 ) {
   if (!reservationId) return;
   const sql = db();
-  await sql.begin(async (transaction) => {
-    const rows = await transaction<
-      {
-        owner_user_id: string;
-        period_start: string;
-        metric: UsageMetric;
-        units: number;
-        status: string;
-      }[]
-    >`
-      select owner_user_id, period_start, metric, units, status
-      from obseri_usage_reservations where reservation_id = ${reservationId} for update
-    `;
-    const reservation = rows[0];
-    if (!reservation || reservation.status !== "reserved") return;
-    const committedUnits = commit
-      ? Math.max(0, Math.min(reservation.units, Math.floor(actualUnits ?? reservation.units)))
-      : 0;
-    await transaction`
-      update obseri_usage_monthly set
-        reserved_units = greatest(0, reserved_units - ${reservation.units}),
-        used_units = used_units + ${committedUnits},
-        updated_at = now()
-      where owner_user_id = ${reservation.owner_user_id}
-        and period_start = ${reservation.period_start}
-        and metric = ${reservation.metric}
-    `;
-    await transaction`
+  // Claim the reservation and move its units in one atomic statement. The
+  // status predicate makes retries idempotent, including simultaneous callers.
+  // Avoid five database round trips on every chat reply and audio segment.
+  await sql`
+    with finalized as (
       update obseri_usage_reservations set
         status = ${commit ? "committed" : "released"}, finalized_at = now()
-      where reservation_id = ${reservationId}
-    `;
-  });
+      where reservation_id = ${reservationId} and status = 'reserved'
+      returning owner_user_id, period_start, metric, units
+    )
+    update obseri_usage_monthly as usage set
+      reserved_units = greatest(0, usage.reserved_units - finalized.units),
+      used_units = usage.used_units + case when ${commit} then
+        greatest(0, least(finalized.units, floor(coalesce(${actualUnits ?? null}::numeric, finalized.units))))::bigint
+        else 0 end,
+      updated_at = now()
+    from finalized
+    where usage.owner_user_id = finalized.owner_user_id
+      and usage.period_start = finalized.period_start
+      and usage.metric = finalized.metric
+  `;
 }
 
 function safeHostname(value: string) {
