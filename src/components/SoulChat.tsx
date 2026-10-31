@@ -74,7 +74,9 @@ export default function SoulChat({
   const [value, setValue] = useState("");
   const [sending, setSending] = useState(false);
   const [listening, setListening] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(soul.voice.enabled);
+  const [soundEnabled, setSoundEnabled] = useState(
+    soul.voice.enabled && initialPanelMode === "voice",
+  );
   const [voiceCallActive, setVoiceCallActive] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState<"idle" | "listening" | "thinking" | "speaking">(
     "idle",
@@ -110,7 +112,7 @@ export default function SoulChat({
     const greeting = [greetingMessage(soul.id, soul.personality.greeting)];
     messagesRef.current = greeting;
     setMessages(greeting);
-    setSoundEnabled(soul.voice.enabled);
+    setSoundEnabled(soul.voice.enabled && initialPanelMode === "voice");
     setCallLanguage(soul.voice.language || "en-US");
     setVoicePanelView(initialPanelMode);
     stopVoiceCall();
@@ -149,7 +151,7 @@ export default function SoulChat({
   }, [messages, sending]);
 
   useEffect(() => {
-    if (!voiceMode || soul.voice.provider !== "supertonic") return;
+    if (!voiceMode || voicePanelView !== "voice" || soul.voice.provider !== "supertonic") return;
     // Generate the predictable opening line while the visitor is looking at
     // the call panel. Clicking Call can then begin with human speech instead
     // of a cold HTTP + inference pause.
@@ -159,9 +161,12 @@ export default function SoulChat({
       speed: soul.voice.speed,
       qualitySteps: 4,
       soulId: soul.id,
+      sessionToken,
     }).catch(() => undefined);
   }, [
     voiceMode,
+    voicePanelView,
+    sessionToken,
     soul.voice.provider,
     soul.voice.profileId,
     soul.voice.speed,
@@ -344,6 +349,8 @@ export default function SoulChat({
         language: callLanguage,
         speed: soul.voice.speed,
         qualitySteps: 2,
+        soulId: soul.id,
+        sessionToken,
       });
       return;
     }
@@ -381,6 +388,7 @@ export default function SoulChat({
             speed: soul.voice.speed,
             qualitySteps: 2,
             soulId: soul.id,
+            sessionToken,
           }),
         );
         synthesis = audio.then(
@@ -419,7 +427,10 @@ export default function SoulChat({
   async function fetchVoiceboxAudio(text: string, signal?: AbortSignal) {
     const response = await authFetch("/api/voice/speak", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(sessionToken ? { authorization: `Bearer ${sessionToken}` } : {}),
+      },
       body: JSON.stringify({
         text,
         soulId: soul.id,
@@ -590,6 +601,7 @@ export default function SoulChat({
             speed: soul.voice.speed,
             qualitySteps: 4,
             soulId: soul.id,
+            sessionToken,
           }).then(playSupertonicAudio)
         : speak(greeting);
     void opening

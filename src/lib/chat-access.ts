@@ -9,7 +9,7 @@ export async function resolveChatRequest(
 ): Promise<{ input: ChatRequest; ownerUserId: string | null }> {
   const authorization = request.headers.get("authorization");
   const bearer = authorization ? readBearerToken(request) : "";
-  if (bearer.startsWith("obss_")) {
+  if (bearer.startsWith("obs_sess.")) {
     const session = verifyWidgetSession(bearer, input.soulId);
     const allowed = await consumeRateLimit(`chat:${input.soulId}:${session.origin}`, 30, 60);
     if (!allowed) throw new ChatAccessError("Too many messages. Try again shortly.", 429);

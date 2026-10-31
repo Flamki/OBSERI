@@ -171,7 +171,7 @@ class VoiceAccessError extends Error {
 async function resolveVoiceOwner(request: Request, soulId?: string) {
   const authorization = request.headers.get("authorization");
   const bearer = authorization ? readBearerToken(request) : "";
-  if (bearer.startsWith("obss_")) {
+  if (bearer.startsWith("obs_sess.")) {
     if (!soulId) throw new VoiceAccessError("A published soul is required for widget voice.", 400);
     verifyWidgetSession(bearer, soulId);
     const record = await getPublishedSoul(soulId);

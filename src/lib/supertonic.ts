@@ -138,6 +138,7 @@ export async function synthesizeSupertonic(
     speed?: number;
     qualitySteps?: number;
     soulId?: string;
+    sessionToken?: string;
     onProgress?: (stage: SupertonicLoadStage) => void;
   } = {},
 ) {
@@ -185,6 +186,7 @@ export function fetchSupertonicAudio(
     speed: options.speed ?? 1.03,
     qualitySteps: Math.min(8, Math.max(2, options.qualitySteps ?? 4)),
     soulId: options.soulId,
+    sessionToken: options.sessionToken,
   };
   const cacheKey = JSON.stringify(request);
   const cached = cloudAudioCache.get(cacheKey);
@@ -194,7 +196,10 @@ export function fetchSupertonicAudio(
     throw error;
   });
   cloudAudioCache.set(cacheKey, audio);
-  void audio.finally(() => cloudAudioCache.delete(cacheKey));
+  void audio.then(
+    () => cloudAudioCache.delete(cacheKey),
+    () => cloudAudioCache.delete(cacheKey),
+  );
   while (cloudAudioCache.size > CLOUD_AUDIO_CACHE_LIMIT) {
     const oldest = cloudAudioCache.keys().next().value;
     if (typeof oldest !== "string") break;
@@ -236,10 +241,14 @@ async function fetchCloudSupertonic(request: {
   speed: number;
   qualitySteps: number;
   soulId?: string;
+  sessionToken?: string;
 }) {
   const response = await authFetch("/api/voice/speak", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...(request.sessionToken ? { authorization: `Bearer ${request.sessionToken}` } : {}),
+    },
     body: JSON.stringify({
       provider: "supertonic",
       text: request.text,

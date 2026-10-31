@@ -4,6 +4,11 @@ import { createSoul } from "../../src/lib/soul";
 // Allow the synthetic merchant to embed the loopback development server.
 test.use({ launchOptions: { args: ["--disable-features=LocalNetworkAccessChecks"] } });
 test("cross-site embed starts chat when the browser clears window.name", async ({ page }) => {
+  let voiceRequests = 0;
+  await page.route("**/api/voice/speak", (route) => {
+    voiceRequests++;
+    return route.fulfill({ status: 401, json: { error: { message: "Unexpected voice request" } } });
+  });
   const embed = await readFile(new URL("../../public/obseri-widget.js", import.meta.url), "utf8");
   await page.route("**/obseri-widget.js", (route) =>
     route.fulfill({ contentType: "application/javascript", body: embed }),
@@ -39,6 +44,7 @@ test("cross-site embed starts chat when the browser clears window.name", async (
   await page.getByRole("button", { name: "Ask a question", exact: true }).click();
   const frame = page.frameLocator('iframe[title="Obseri website assistant"]');
   await expect(frame.getByPlaceholder("Ask this website...")).toBeVisible();
+  expect(voiceRequests).toBe(0);
   await frame.getByRole("button", { name: "Close conversation", exact: true }).click();
   await expect(page.getByRole("button", { name: "Ask a question", exact: true })).toBeVisible();
 });
