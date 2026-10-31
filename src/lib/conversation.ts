@@ -144,7 +144,8 @@ export async function streamSoulVoiceAnswer(input: ChatRequest): Promise<VoiceSt
   const isFireworks = apiUrl?.includes("api.fireworks.ai") ?? false;
   const model =
     env.OBSERI_VOICE_MODEL?.trim() ||
-    (isFireworks ? "accounts/fireworks/models/gpt-oss-20b" : chatModel);
+    chatModel ||
+    (isFireworks ? "accounts/fireworks/models/gpt-oss-20b" : undefined);
   const metadata = {
     citations: fallback.citations.slice(0, 3),
     followUp: fallback.followUp,

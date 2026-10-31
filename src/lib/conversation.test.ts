@@ -201,6 +201,8 @@ it("uses only matching sentences and their source when a provider response is em
 it("also lets voice clarify without keyword matches and does not invent streaming citations", async () => {
   const { streamSoulVoiceAnswer } = await import("./conversation");
   provider("unused");
+  vi.stubEnv("OBSERI_VOICE_MODEL", "");
+  vi.stubEnv("OBSERI_CHAT_MODEL", "accounts/fireworks/models/gpt-oss-120b");
   const mock = vi
     .fn()
     .mockResolvedValue(
@@ -215,6 +217,9 @@ it("also lets voice clarify without keyword matches and does not invent streamin
   expect((await reader.read()).done).toBe(true);
   expect(result.mode).toBe("model");
   expect(result.citations).toEqual([]);
+  expect(JSON.parse(mock.mock.calls[0][1].body).model).toBe(
+    "accounts/fireworks/models/gpt-oss-120b",
+  );
   expect(JSON.parse(mock.mock.calls[0][1].body).max_tokens).toBeGreaterThan(120);
 });
 
