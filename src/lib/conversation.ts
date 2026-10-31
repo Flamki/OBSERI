@@ -36,6 +36,8 @@ export async function answerSoulQuestion(input: ChatRequest): Promise<ChatRespon
   const query = retrievalQuery(input.messages);
   const ranked = selectDiverseChunks(rankKnowledgeChunks(query, input.chunks), 6);
   const pages = pageDirectory(input.chunks);
+  const navigation = navigationAnswer(input, pages);
+  if (navigation) return navigation;
   const fallback = buildRetrievalAnswer(question, query, ranked, input, pages);
   const env = getRuntimeEnvironment();
   const apiUrl = (env.OBSERI_CHAT_API_URL || env.OBSERI_AI_API_URL)?.trim();
@@ -133,6 +135,8 @@ export async function streamSoulVoiceAnswer(input: ChatRequest): Promise<VoiceSt
   const query = retrievalQuery(input.messages);
   const ranked = selectDiverseChunks(rankKnowledgeChunks(query, input.chunks), 4);
   const pages = pageDirectory(input.chunks);
+  const navigation = navigationAnswer(input, pages);
+  if (navigation) return { ...navigation, stream: textStream(navigation.answer) };
   const fallback = buildRetrievalAnswer(question, query, ranked, input, pages);
   const env = getRuntimeEnvironment();
   const apiUrl = (env.OBSERI_CHAT_API_URL || env.OBSERI_AI_API_URL)?.trim();
@@ -337,6 +341,27 @@ function pageDirectory(chunks: KnowledgeChunk[]): KnowledgeChunk[] {
     .map((chunk) => ({ ...chunk, text: "" }));
 }
 
+function navigationAnswer(input: ChatRequest, pages: KnowledgeChunk[]): ChatResponse | null {
+  const question = input.messages.at(-1)?.content ?? "";
+  const previous = input.messages
+    .slice(0, -1)
+    .reverse()
+    .find((message) => message.role === "assistant");
+  const vague = tokenize(question).every((term) =>
+    ["page", "pages", "website", "something"].includes(term),
+  );
+  if (!previous || !pages.length || !vague || !/\b(help|find|navigate)\b/i.test(question))
+    return null;
+  const choices = pages.slice(0, 3);
+  return {
+    answer: `You can open ${choices.map((page) => page.pageTitle).join(" or ")} using the links below. Which page would you like to explore, or what topic should I help you find?`,
+    citations: toCitations(choices),
+    followUp: "Which page would you like to explore?",
+    leadIntent: "none",
+    mode: "retrieval",
+  };
+}
+
 function clarificationAnswer(
   question: string,
   input: ChatRequest,
@@ -438,6 +463,7 @@ const CONVERSATION_RULES = [
   "Only cite evidence actually used to support your answer, or an available page you explicitly recommend. Put IDs only in the JSON citationIds array; never print IDs in the answer text. Use an empty citationIds array for clarification, greetings, and unsupported answers. Never add decorative sources.",
   "Do not promise to find a page or person without either supplying a verified destination or asking the specific question needed to proceed.",
   "Evidence excerpts may cross section boundaries or start mid-sentence. Keep facts attached to the section they describe: a technology list before the next project heading belongs to the preceding project. Never infer an association just from adjacent words. Prefer an explicit sentence linking the fact to the project or service, and describe it without inventing a name if its name is missing.",
+  "Distinguish general work experience and technology summaries from individual projects. Do not turn those summaries into extra projects or invent exact counts.",
 ];
 
 function buildSystemPrompt(personality: PersonalityConfig): string {

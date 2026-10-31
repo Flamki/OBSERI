@@ -235,3 +235,20 @@ it("keeps a project's technology list with its preceding context, not the next h
   expect(evidence).not.toContain("Four-agent AI platform");
   expect(evidence).not.toContain("Four agents run");
 });
+
+it("fulfils a vague follow-up offer with real page choices even if a model would omit the links", async () => {
+  const mock = provider("Here are some pages you might like.");
+  const input = fixture();
+  const result = await answerSoulQuestion({
+    ...input,
+    messages: [
+      { role: "visitor", content: "asking" },
+      { role: "assistant", content: "I can help you find the right page or person." },
+      { role: "visitor", content: "ok help me to find" },
+    ],
+  });
+  expect(result.answer).toContain("Projects");
+  expect(result.citations).toHaveLength(1);
+  expect(result.citations[0].url).toBe("https://merchant.example/projects");
+  expect(mock).not.toHaveBeenCalled();
+});
