@@ -78,7 +78,7 @@ test("owner creates an email-bound invitation link and can revoke it", async ({ 
   });
   await page.goto("/app?view=profile");
   await page.getByRole("textbox", { name: "Teammate email" }).fill("editor@example.com");
-  await page.getByRole("button", { name: "Create invite" }).click();
+  await page.getByRole("button", { name: "Create invite link" }).click();
   await expect(page.getByRole("textbox", { name: "Invitation link" })).toHaveValue(
     /\/app#invite=a{43}$/,
   );
@@ -98,7 +98,7 @@ test("editor uses the selected workspace and cannot see billing or invitation co
   await expect(
     page.getByText("Ask the owner to manage billing and invitations.", { exact: false }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Create invite" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Create invite link" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Cancel subscription" })).toHaveCount(0);
   await page.getByRole("button", { name: "Plans and billing", exact: true }).click();
   await expect(page.getByText("Billing is managed by the workspace owner.")).toBeVisible();
@@ -136,4 +136,24 @@ test("invitation is removed from URL and requires explicit acceptance", async ({
   expect(accepted).toBe(false);
   await page.getByRole("button", { name: "Accept invitation" }).click();
   await expect(page.getByRole("alert")).toContainText("Sign in with the email address");
+});
+
+test("full Free workspace explains the limit before submitting and opens team plans", async ({
+  page,
+}) => {
+  await setup(page);
+  let posts = 0;
+  await page.route("**/api/team", (route) => {
+    if (route.request().method() === "POST") posts++;
+    return route.fulfill({ json: { members: [], invitations: [], seatLimit: 1, plan: "Free" } });
+  });
+  await page.goto("/app?view=profile");
+  await expect(page.getByText("Your plan includes only your seat.")).toBeVisible();
+  await page.getByRole("textbox", { name: "Teammate email" }).fill("editor@example.com");
+  await expect(page.getByRole("button", { name: "Create invite link" })).toBeDisabled();
+  await page.getByRole("textbox", { name: "Teammate email" }).press("Enter");
+  expect(posts).toBe(0);
+  await expect(page.getByText("No email is sent.", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "View team plans" }).click();
+  await expect(page.getByText("Choose the plan that fits your traffic")).toBeVisible();
 });

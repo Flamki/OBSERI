@@ -168,7 +168,7 @@ type Details = {
   seatLimit: number | null;
   plan: string;
 };
-export function TeamSettings() {
+export function TeamSettings({ onViewPlans }: { onViewPlans: () => void }) {
   const team = useTeamWorkspace();
   const [details, setDetails] = useState<Details | null>(null);
   const [email, setEmail] = useState("");
@@ -176,6 +176,12 @@ export function TeamSettings() {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const owner = !team || team.current.role === "owner";
+  const seatsUsed = details ? 1 + details.members.length + details.invitations.length : 0;
+  const seatsFull = details?.seatLimit != null && seatsUsed >= details.seatLimit;
+  const replacesPending = details?.invitations.some(
+    (invitation) => invitation.email.toLowerCase() === email.trim().toLowerCase(),
+  );
+  const canInvite = !!details && (!seatsFull || !!replacesPending);
   async function load() {
     setDetails(await authFetch("/api/team").then(result));
   }
@@ -222,11 +228,28 @@ export function TeamSettings() {
               </span>
             </p>
           )}
+          {seatsFull && (
+            <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm">
+              <p className="font-medium">
+                {details?.seatLimit === 1
+                  ? "Your plan includes only your seat."
+                  : "All team seats are in use."}
+              </p>
+              <p className="mt-1 text-stone-600">
+                {details?.seatLimit === 1
+                  ? "Choose a team plan before inviting a teammate."
+                  : "Upgrade your plan or remove a member or pending invitation to add someone new."}
+              </p>
+              <button type="button" onClick={onViewPlans} className="mt-3 font-medium underline">
+                View team plans
+              </button>
+            </div>
+          )}
           <form
             className="mt-5 flex flex-wrap gap-2"
             onSubmit={(e) => {
               e.preventDefault();
-              void act({ action: "invite", email });
+              if (!busy && canInvite) void act({ action: "invite", email });
             }}
           >
             <input
@@ -240,17 +263,21 @@ export function TeamSettings() {
               className="clean-input min-w-0 flex-1"
             />
             <button
-              disabled={busy || !details}
+              disabled={busy || !canInvite}
               className="rounded-full bg-black px-5 py-3 text-sm text-white disabled:opacity-50"
             >
-              Create invite
+              {busy ? "Working…" : replacesPending ? "Replace invite link" : "Create invite link"}
             </button>
           </form>
           <p className="mt-2 text-xs text-stone-500">
-            Share the link yourself. It expires in 7 days and works only for this email.
+            No email is sent. Copy and share the invitation link with your teammate. It expires in 7
+            days and works only for this email.
           </p>
           {link && (
             <div className="mt-4 rounded-xl bg-stone-100 p-4">
+              <p role="status" className="mb-3 text-sm">
+                Invitation link ready. No email was sent—share the link below with your teammate.
+              </p>
               <label className="text-xs font-medium">
                 Invitation link
                 <input

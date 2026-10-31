@@ -851,6 +851,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
                 workspace={workspace}
                 onWorkspaceNameChange={(name) => setWorkspace((current) => ({ ...current, name }))}
                 billingOnly
+                onViewPlans={() => navigate("billing")}
                 onPlanChange={setActivePlan}
                 onClose={() => navigate("playground")}
               />
@@ -859,6 +860,7 @@ function SoulStudio({ user }: { user: StudioUser }) {
                 workspace={workspace}
                 onWorkspaceNameChange={(name) => setWorkspace((current) => ({ ...current, name }))}
                 onPlanChange={setActivePlan}
+                onViewPlans={() => navigate("billing")}
               />
             ) : view === "settings" ? (
               <SettingsView
@@ -4164,12 +4166,14 @@ function ProfileWorkspaceView({
   workspace,
   onWorkspaceNameChange,
   billingOnly = false,
+  onViewPlans,
   onPlanChange,
   onClose,
 }: {
   workspace: SoulWorkspace;
   onWorkspaceNameChange: (name: string) => void;
   billingOnly?: boolean;
+  onViewPlans: () => void;
   onPlanChange?: (plan: BillingPlan) => void;
   onClose?: () => void;
 }) {
@@ -4512,7 +4516,7 @@ function ProfileWorkspaceView({
                 />
               </Field>
             </Card>
-            <TeamSettings />
+            <TeamSettings onViewPlans={onViewPlans} />
             <OperationHealth />
           </div>
         )}
