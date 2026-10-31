@@ -1,3 +1,4 @@
+import "./check-chat-readiness.mjs";
 // Opt-in read-only checks inside Vercel, where sensitive values remain available.
 // Never print credentials, database URLs, provider response bodies, or user data.
 import prices from "../src/lib/billing-prices.json" with { type: "json" };

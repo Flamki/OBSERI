@@ -59,7 +59,7 @@ export async function answerSoulQuestion(input: ChatRequest): Promise<ChatRespon
       body: JSON.stringify({
         model,
         temperature: 0.35,
-        max_tokens: 500,
+        max_tokens: model.includes("gpt-oss") ? 2048 : 500,
         ...(isFireworks
           ? {
               reasoning_effort: model.includes("gpt-oss") ? "low" : "none",
