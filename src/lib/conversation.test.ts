@@ -107,6 +107,9 @@ it("does not confuse filler words, US or UI with unrelated portfolio content", a
   expect(rankKnowledgeChunks("can you say my current UI", chunks)).toEqual([]);
   expect(rankKnowledgeChunks("asking", chunks)).toEqual([]);
   expect(rankKnowledgeChunks("What PostgreSQL projects do you have?", chunks)[0].id).toBe("cms");
+  expect(
+    rankKnowledgeChunks("Which project uses PostgreSQL?", chunks).map((chunk) => chunk.id),
+  ).toContain("cms");
   const acronyms = [
     { ...chunks[0], text: "Our UI supports keyboard navigation. We work with US businesses." },
   ];
@@ -146,6 +149,15 @@ it("does not attach sources to a model clarification, and deduplicates cited pag
   expect((await answerSoulQuestion(fixture(["projects"]))).citations).toEqual([]);
   provider("The projects include a CMS and a Swift compiler fix.", ["cms", "swift", "unknown-id"]);
   const result = await answerSoulQuestion(fixture(["projects"]));
+  expect(result.citations).toHaveLength(1);
+  expect(result.citations[0].url).toBe("https://merchant.example/projects");
+});
+
+it("turns explicit page recommendations into usable links without exposing internal IDs", async () => {
+  provider("You can explore Projects (ID: cms). Which page would you like?");
+  const result = await answerSoulQuestion(fixture(["help me find a page"]));
+  expect(result.answer).toBe("You can explore Projects. Which page would you like?");
+  expect(result.answer).not.toContain("ID:");
   expect(result.citations).toHaveLength(1);
   expect(result.citations[0].url).toBe("https://merchant.example/projects");
 });

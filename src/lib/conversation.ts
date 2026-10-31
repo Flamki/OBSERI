@@ -117,9 +117,13 @@ export async function answerSoulQuestion(input: ChatRequest): Promise<ChatRespon
       return fallback;
     }
     const cited = [...ranked, ...pages].filter((chunk) => parsed.citationIds.includes(chunk.id));
+    // A named navigation destination is verifiable even if the model omits its citation ID.
+    const namedPages = pages.filter(
+      (page) => page.pageTitle.length >= 4 && parsed.answer.includes(page.pageTitle),
+    );
     return {
-      answer: parsed.answer,
-      citations: toCitations(cited).slice(0, 4),
+      answer: cleanAnswer(parsed.answer, [...ranked, ...pages]),
+      citations: toCitations([...cited, ...namedPages]).slice(0, 4),
       followUp: parsed.followUp,
       leadIntent: parsed.leadIntent,
       mode: "model",
@@ -395,7 +399,7 @@ const CONVERSATION_RULES = [
   "For an ambiguous abbreviation, offer its likely interpretation as a short clarifying question when possible. Avoid generic 'I am not sure' filler.",
   "You cannot see the visitor's screen, screenshots, live DOM, or current interface. Explain that limit when asked to inspect the UI and ask the visitor to describe the relevant part. Saved website text is not a view of their screen.",
   "If evidence is empty or insufficient, you may still greet, clarify intent, and guide navigation using availablePages. Page titles and URLs establish only that a page exists, not additional facts about its contents.",
-  "Only cite evidence actually used to support your answer, or an available page you explicitly recommend. Use an empty citationIds array for clarification, greetings, and unsupported answers. Never add decorative sources.",
+  "Only cite evidence actually used to support your answer, or an available page you explicitly recommend. Put IDs only in the JSON citationIds array; never print IDs in the answer text. Use an empty citationIds array for clarification, greetings, and unsupported answers. Never add decorative sources.",
   "Do not promise to find a page or person without either supplying a verified destination or asking the specific question needed to proceed.",
   "Evidence excerpts may cross section boundaries or start mid-sentence. Keep facts attached to the section they describe: a technology list before the next project heading belongs to the preceding project. Never infer an association just from adjacent words. Prefer an explicit sentence linking the fact to the project or service, and describe it without inventing a name if its name is missing.",
 ];
@@ -528,6 +532,18 @@ function parseModelResponse(content: string): {
   } catch {
     return null;
   }
+}
+
+function cleanAnswer(answer: string, chunks: KnowledgeChunk[]): string {
+  for (const chunk of chunks) {
+    const id = chunk.id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    answer = answer.replace(new RegExp(`\\(\\s*(?:ID|source|chunk):\\s*${id}\\s*\\)`, "gi"), "");
+  }
+  return answer
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+([.,!?;:])/g, "$1")
+    .trim();
 }
 
 function toCitations(chunks: KnowledgeChunk[]) {
