@@ -1,3 +1,6 @@
+import FollowUpSettings from "@/components/FollowUpSettings";
+import FollowUpAction from "@/components/FollowUpAction";
+import { followUpError } from "@/lib/follow-up";
 import { Activity } from "lucide-react";
 import ConversionDashboard from "@/components/ConversionDashboard";
 import { createFileRoute } from "@tanstack/react-router";
@@ -3127,6 +3130,7 @@ function PlaygroundView({
                     initialPanelMode={assistantMode === "chat" ? "chat" : "voice"}
                     onClose={() => setAssistantMode("closed")}
                     onMessagesChange={onMessagesChange}
+                    contactAction={<FollowUpAction soul={soul} preview />}
                   />
                 )}
               </div>
@@ -3385,7 +3389,7 @@ function DeployView({
   onNotice: (message: string) => void;
   onUpgrade: () => void;
 }) {
-  const [tab, setTab] = useState<"widget" | "webhook">("widget");
+  const [tab, setTab] = useState<"widget" | "followup" | "webhook">("widget");
   const [busy, setBusy] = useState(false);
   const [previewMode, setPreviewMode] = useState<"closed" | "chat" | "voice">("closed");
   const webhookAvailable = billingPlanIncludesFeature(plan.id, "webhooks");
@@ -3400,6 +3404,12 @@ function DeployView({
     onNotice(message);
   }
   async function publish() {
+    const followUpIssue = followUpError(soul.personality);
+    if (followUpIssue) {
+      setTab("followup");
+      onNotice(followUpIssue);
+      return;
+    }
     setBusy(true);
     try {
       const publishableSoul = webhookAvailable
@@ -3458,12 +3468,20 @@ function DeployView({
       description="Publish once, then paste one script into your site."
       hideHeader
     >
-      <div className="flex h-12 items-center gap-6 border-b border-[#e5e5e3] bg-[#f9f9f9] px-6 sm:px-8">
+      <div className="flex min-h-12 flex-wrap items-center gap-x-4 gap-y-2 border-b border-[#e5e5e3] bg-[#f9f9f9] px-4 py-2 sm:px-8">
         <button
           onClick={() => setTab("widget")}
           className={`h-full border-b-2 px-1 text-sm font-medium ${tab === "widget" ? "border-[#1f1e1d] text-[#181817]" : "border-transparent text-[#74726d]"}`}
         >
           Website widget
+        </button>
+        <button
+          type="button"
+          aria-pressed={tab === "followup"}
+          onClick={() => setTab("followup")}
+          className={`h-full border-b-2 px-1 py-2 text-sm font-medium ${tab === "followup" ? "border-[#1f1e1d] text-[#181817]" : "border-transparent text-[#74726d]"}`}
+        >
+          Follow-up
         </button>
         <button
           onClick={() => setTab("webhook")}
@@ -3486,7 +3504,9 @@ function DeployView({
           {soul.status === "live" ? "Publish changes" : "Publish soul"}
         </button>
       </div>
-      {tab === "widget" ? (
+      {tab === "followup" ? (
+        <FollowUpSettings soul={soul} onUpdate={onUpdate} />
+      ) : tab === "widget" ? (
         <div className="grid min-h-[calc(100vh-112px)] xl:grid-cols-[minmax(0,1fr)_440px]">
           <div className="min-w-0 xl:border-r xl:border-[#e5e5e3]">
             <Card>
@@ -3627,6 +3647,7 @@ function DeployView({
                       voiceMode
                       initialPanelMode={previewMode === "chat" ? "chat" : "voice"}
                       onClose={() => setPreviewMode("closed")}
+                      contactAction={<FollowUpAction soul={soul} preview />}
                     />
                   )}
                 </div>

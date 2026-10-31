@@ -1,3 +1,4 @@
+import { resolveFollowUp } from "@/lib/follow-up";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { contactRequestSchema } from "@/lib/analytics";
@@ -25,7 +26,7 @@ export const Route = createFileRoute("/api/souls/$soulId/leads")({
           const record = await getPublishedSoul(params.soulId);
           if (
             !record ||
-            !record.soul.personality.leadCapture ||
+            resolveFollowUp(record.soul.personality)?.mode !== "contact" ||
             !originAllowed(session.origin, record.soul.channels.allowedDomains)
           )
             throw new IntegrationStoreError("Contact requests are unavailable.", 403);

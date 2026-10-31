@@ -1,3 +1,4 @@
+import { DEFAULT_FOLLOW_UP, followUpLabel, type FollowUpConfig } from "@/lib/follow-up";
 import { useRef, useState, type FormEvent } from "react";
 import { ArrowUpRight, CheckCircle2, LoaderCircle, X } from "lucide-react";
 import type { ContactRequest } from "@/lib/analytics";
@@ -9,6 +10,8 @@ export default function ContactCapture({
   sessionId,
   path,
   businessName,
+  config = DEFAULT_FOLLOW_UP,
+  preview = false,
 }: {
   soulId: string;
   conversationId: string;
@@ -16,6 +19,8 @@ export default function ContactCapture({
   sessionId?: string;
   path: string;
   businessName: string;
+  config?: FollowUpConfig;
+  preview?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const requestId = useRef(crypto.randomUUID());
@@ -25,7 +30,7 @@ export default function ContactCapture({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (saving) return;
+    if (saving || preview) return;
     const data = new FormData(event.currentTarget);
     if (data.get("consent") !== "on") {
       setError("Please agree to be contacted about your request.");
@@ -75,17 +80,18 @@ export default function ContactCapture({
           </>
         ) : (
           <>
-            Want a personal follow-up? <ArrowUpRight className="h-3.5 w-3.5" />
+            {followUpLabel(config)} <ArrowUpRight className="h-3.5 w-3.5" />
           </>
         )}
       </button>
       <dialog
         ref={dialog}
+        aria-label={config.title || "Contact request"}
         className="m-auto max-h-[90vh] w-[calc(100%-24px)] max-w-sm overflow-y-auto rounded-2xl border border-[#e5e0ed] bg-white p-5 text-[#25212d] shadow-xl backdrop:bg-black/30"
       >
         <div className="mb-5 flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">
-            {saved ? "You’re on their radar." : "Let’s keep the conversation going."}
+            {saved ? "Request received" : config.title || "Let’s keep the conversation going."}
           </h2>
           <button
             type="button"
@@ -114,7 +120,8 @@ export default function ContactCapture({
         ) : (
           <form onSubmit={submit} className="space-y-4">
             <p className="text-sm leading-6 text-[#77717e]">
-              Send your question to {businessName} with a way to reach you.
+              {config.description ||
+                `Send your question to ${businessName} with a way to reach you.`}
             </p>
             <label className="block text-sm font-medium">
               Name
@@ -157,11 +164,15 @@ export default function ContactCapture({
               </p>
             )}
             <button
-              disabled={saving}
+              disabled={saving || preview}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#25212d] px-4 py-3 text-sm font-medium text-white disabled:opacity-60"
             >
               {saving && <LoaderCircle className="h-4 w-4 animate-spin" />}
-              {saving ? "Sending…" : "Send my request"}
+              {preview
+                ? "Preview — no request will be sent"
+                : saving
+                  ? "Sending…"
+                  : "Send my request"}
             </button>
           </form>
         )}

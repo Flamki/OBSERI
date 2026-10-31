@@ -1,3 +1,4 @@
+import { followUpError, followUpSchema } from "@/lib/follow-up";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import postgres from "postgres";
 import { normalizeVoice, type Soul, type SoulConversation } from "@/lib/soul";
@@ -61,6 +62,10 @@ export async function publishSoul(input: {
   assertCredential(input.widgetToken, "obswgt_");
 
   const source = structuredClone(input.value);
+  const followUpIssue = followUpError(source.personality);
+  if (followUpIssue) throw new IntegrationStoreError(followUpIssue, 422, "invalid_follow_up");
+  if (source.personality.leadCapture)
+    source.personality.followUp = followUpSchema.parse(source.personality.followUp ?? {});
   if (
     source.channels.publishKey !== input.ownerKey ||
     source.channels.widgetToken !== input.widgetToken

@@ -175,6 +175,35 @@ try {
   assert.equal(leads[0].email, contact.email);
   const deliveries = await sql`select event_id from obseri_webhook_deliveries where soul_id=${id}`;
   assert.equal(deliveries.length, 0, "no outbound webhook for fixture");
+  soul.personality.leadCapture = false;
+  await sql`update obseri_published_souls set soul=${sql.json(soul)} where soul_id=${id}`;
+  assert.equal(
+    (await request(leadsPath, { method: "POST", headers, body: contact })).status,
+    403,
+    "disabled follow-up rejects stale widget submissions",
+  );
+  soul.personality.leadCapture = true;
+  soul.personality.followUp = {
+    mode: "booking",
+    provider: "cal",
+    label: "Book an intro",
+    title: "",
+    description: "",
+    url: "https://cal.com/obseri-test/intro",
+  };
+  await sql`update obseri_published_souls set soul=${sql.json(soul)} where soul_id=${id}`;
+  const published = await request(`/api/souls/${id}`, { headers });
+  assert.equal(published.status, 200, "published widget config readable");
+  assert.deepEqual(
+    JSON.parse(published.body).soul.personality.followUp,
+    soul.personality.followUp,
+    "booking settings reach the live widget",
+  );
+  assert.equal(
+    (await request(leadsPath, { method: "POST", headers, body: contact })).status,
+    403,
+    "booking mode rejects stale contact form submissions",
+  );
   console.log(
     JSON.stringify({
       target: target.hostname,
@@ -189,6 +218,8 @@ try {
         "contact consent",
         "durable contact and deduplication",
         "owner read/write auth gates",
+        "disabled follow-up blocks stale submissions",
+        "published booking settings and contact gate",
       ],
     }),
   );

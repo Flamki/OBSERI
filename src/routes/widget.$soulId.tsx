@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, Orbit } from "lucide-react";
 import SoulChat from "@/components/SoulChat";
-import ContactCapture from "@/components/ContactCapture";
+import FollowUpAction from "@/components/FollowUpAction";
 import type { Soul } from "@/lib/soul";
 
 export const Route = createFileRoute("/widget/$soulId")({
@@ -95,13 +95,12 @@ function EmbeddedSoul() {
           initialPanelMode={mode}
           contactAction={
             soul.personality.leadCapture ? (
-              <ContactCapture
-                soulId={soul.id}
+              <FollowUpAction
+                soul={soul}
                 conversationId={conversationId.current}
                 sessionToken={context.session}
                 sessionId={context.sessionId}
                 path={context.path}
-                businessName={soul.name}
               />
             ) : undefined
           }

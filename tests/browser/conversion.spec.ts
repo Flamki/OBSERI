@@ -141,7 +141,7 @@ test("contact request stays editable after a failed save and confirms only after
   await page.getByRole("button", { name: "Send my request" }).click();
   await expect(page.getByRole("alert")).toHaveText("Please retry your request.");
   await page.getByRole("button", { name: "Send my request" }).click();
-  await expect(page.getByRole("heading", { name: "You’re on their radar." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Request received" })).toBeVisible();
   expect(attempts).toBe(2);
 });
 

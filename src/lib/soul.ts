@@ -1,3 +1,4 @@
+import type { FollowUpConfig } from "./follow-up";
 import { neuralVoice } from "./voice-catalog";
 export type KnowledgeChunk = {
   id: string;
@@ -111,6 +112,7 @@ export type PersonalityConfig = {
   guardrails: string[];
   unknownResponse: string;
   leadCapture: boolean;
+  followUp?: FollowUpConfig;
   escalationEmail: string;
 };
 
