@@ -37,6 +37,7 @@ it("uses low reasoning for GPT OSS and returns the grounded model answer", async
         pageUrl: "https://merchant.example",
         text: "We build websites for businesses.",
         order: 0,
+        tokenEstimate: 8,
       },
     ],
     messages: [{ role: "visitor", content: "Do you build websites?" }],
