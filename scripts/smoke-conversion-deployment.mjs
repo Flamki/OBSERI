@@ -92,6 +92,8 @@ try {
     id,
     workspaceId: id,
     siteUrl: origin,
+    appearance: { theme: "clean", launcherMode: "chat", launcherLabel: "Ask a question" },
+    knowledge: { pages: [], chunks: [], sources: [] },
     voice: { provider: "supertonic", enabled: false, profileId: "aster", speed: 1, pitch: 1 },
     channels: {
       widgetEnabled: true,
