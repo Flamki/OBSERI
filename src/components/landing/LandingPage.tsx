@@ -320,7 +320,7 @@ function Nav() {
 
 function Hero() {
   return (
-    <section className="relative overflow-hidden px-4 pb-10 pt-32 sm:px-6 sm:pt-40">
+    <section className="relative overflow-hidden px-4 pb-10 pt-24 sm:px-6 sm:pt-28">
       <div className="mx-auto max-w-[1240px] text-center">
         <Reveal>
           <a
@@ -330,26 +330,25 @@ function Hero() {
             <span className="flex items-center gap-1.5 rounded-full bg-[#f5f5f3] px-2.5 py-1 text-[12px] font-medium text-[#0b0b0c]">
               <span className="h-1.5 w-1.5 rounded-full bg-[#ff5c7a]" /> Live
             </span>
-            Website intelligence. A personal next step.
+            Chat, voice & insights.
             <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
           </a>
         </Reveal>
         <Reveal delay={80}>
-          <h1 className="mx-auto mt-7 max-w-[980px] text-balance text-[clamp(2.9rem,7.4vw,6rem)] font-semibold leading-[0.96] tracking-[-0.055em]">
+          <h1 className="mx-auto mt-6 max-w-[900px] text-balance text-[clamp(2.25rem,5vw,4rem)] font-semibold leading-[1.06] tracking-[-0.045em]">
             Your website’s AI chatbot.
             <br />
-            <span className="text-[#9b79bb]">Your next customer’s first answer.</span>
+            <span className="text-[#9b79bb]">Turn visits into leads.</span>
           </h1>
         </Reveal>
         <Reveal delay={160}>
-          <p className="mx-auto mt-6 max-w-[620px] text-[17px] leading-7 text-[#6f6f73] sm:text-[19px] sm:leading-8">
-            Help visitors understand your services with AI chat and voice trained on your website.
-            Capture enquiries, see where they came from, and give your team a clear next step.
+          <p className="mx-auto mt-5 max-w-[520px] text-[16px] leading-7 text-[#6f6f73] sm:text-[18px]">
+            Answer questions with AI chat and voice. Capture leads, ready for your team.
           </p>
         </Reveal>
-        <Reveal delay={240} className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
-          <PrimaryButton to="/app">Build your free assistant</PrimaryButton>
-          <SecondaryButton href="#demo">Explore the experience</SecondaryButton>
+        <Reveal delay={240} className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+          <PrimaryButton to="/app">Start free</PrimaryButton>
+          <SecondaryButton href="#demo">See it work</SecondaryButton>
         </Reveal>
         <p className="mt-5 text-[13px] text-[#929098]">
           Free to start · Analytics + chat + voice · No credit card
