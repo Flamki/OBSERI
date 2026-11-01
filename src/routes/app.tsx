@@ -5033,7 +5033,7 @@ function PlanCard({
                 className={`mt-2 text-[11px] ${isHighlighted ? "text-white/45" : "text-[#8a8a8f]"}`}
               >
                 {cycle === "annual" ? `${formatPrice(total)} billed yearly` : "Billed monthly"} ·
-                INR
+                USD
               </p>
             ) : null}
           </>

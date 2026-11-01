@@ -181,7 +181,7 @@ export function getBillingPlan(value: unknown): BillingPlan {
 }
 
 export function formatPrice(cents: number): string {
-  return new Intl.NumberFormat("en-IN", {
+  return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: BILLING_CURRENCY,
     minimumFractionDigits: cents % 100 === 0 ? 0 : 2,

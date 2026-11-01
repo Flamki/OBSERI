@@ -104,7 +104,7 @@ export const Route = createFileRoute("/")({
               offers: {
                 "@type": "Offer",
                 price: "0",
-                priceCurrency: "INR",
+                priceCurrency: "USD",
                 url: "https://obseri.com/pricing",
                 description: "Start with Obseri's free plan.",
               },

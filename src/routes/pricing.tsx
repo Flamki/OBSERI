@@ -30,7 +30,7 @@ export const Route = createFileRoute("/pricing")({
     publicPageHead(
       "/pricing",
       "AI Website Chatbot Pricing & Team Plans | Obseri",
-      "Compare Obseri plans for website AI chat, neural voice, lead capture, analytics, and team access. Start with one free website. Published prices are in INR.",
+      "Compare Obseri plans for website AI chat, neural voice, lead capture, analytics, and team access. Start with one free website. Published prices are in USD.",
     ),
   component: PricingPage,
 });
@@ -227,7 +227,7 @@ function PricingCard({
 
       <div className="mt-7 min-h-[78px]">
         {price === 0 ? (
-          <p className={`text-[3rem] font-normal tracking-[-.05em] ${serif}`}>₹0</p>
+          <p className={`text-[3rem] font-normal tracking-[-.05em] ${serif}`}>$0</p>
         ) : (
           <>
             <div className="flex items-end gap-1.5">
@@ -246,7 +246,7 @@ function PricingCard({
               className={`mt-2 text-[10px] ${plan.highlighted ? "text-white/38" : "text-black/35"}`}
             >
               {cycle === "annual" ? `${formatPrice(price ?? 0)} billed yearly` : "Billed monthly"} ·
-              INR
+              USD
             </p>
           </>
         )}
@@ -420,7 +420,7 @@ function PricingFooter() {
     <footer className="bg-[#17171a] px-6 pb-10 text-white lg:px-10">
       <div className="mx-auto flex max-w-[1180px] flex-col gap-5 border-t border-white/10 pt-8 text-[10px] text-white/35 sm:flex-row sm:items-center sm:justify-between">
         <img src="/obseri-logo-light.svg" alt="Obseri" className="h-7 w-auto" />
-        <span>All prices in INR. Any applicable taxes are shown at checkout.</span>
+        <span>All prices in USD. Any applicable taxes are shown at checkout.</span>
         <a
           href="mailto:ayush@flamkilabs.com?subject=Obseri%20pricing"
           className="transition hover:text-white"

@@ -16,6 +16,7 @@ describe("Razorpay verification", () => {
     process.env.RAZORPAY_KEY_SECRET = "checkout-secret";
     process.env.RAZORPAY_WEBHOOK_SECRET = "webhook-secret";
     process.env.RAZORPAY_PLAN_GROWTH_MONTHLY = "plan_growth_monthly";
+    process.env.RAZORPAY_PLAN_GROWTH_MONTHLY_USD = "plan_growth_monthly_usd";
   });
 
   afterEach(() => {
@@ -55,13 +56,14 @@ describe("Razorpay verification", () => {
     expect(billingPlanFromRazorpayPlanId("plan_unknown")).toBeNull();
   });
 
-  it("uses the existing INR plan even if a future USD plan is configured", () => {
-    process.env.RAZORPAY_PLAN_GROWTH_MONTHLY_USD = "plan_future_usd";
-    expect(razorpayPlanId("growth", "monthly")).toBe("plan_growth_monthly");
+  it("uses the USD plan for new subscriptions", () => {
+    process.env.RAZORPAY_PLAN_GROWTH_MONTHLY_USD = "plan_growth_monthly_usd";
+    expect(razorpayPlanId("growth", "monthly")).toBe("plan_growth_monthly_usd");
   });
 
   it("rejects a mismatched currency or amount before creating a subscription", async () => {
     process.env.RAZORPAY_PLAN_GROWTH_MONTHLY = "plan_growth_monthly";
+    process.env.RAZORPAY_PLAN_GROWTH_MONTHLY_USD = "plan_growth_monthly_usd";
     for (const item of [
       { currency: "INR", amount: 12900 },
       { currency: "USD", amount: 1099900 },
@@ -77,19 +79,20 @@ describe("Razorpay verification", () => {
     }
   });
 
-  it("creates checkout only after validating the advertised INR plan", async () => {
+  it("creates checkout only after validating the advertised USD plan", async () => {
     process.env.RAZORPAY_PLAN_GROWTH_MONTHLY = "plan_growth_monthly";
+    process.env.RAZORPAY_PLAN_GROWTH_MONTHLY_USD = "plan_growth_monthly_usd";
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(
         Response.json({
           period: "monthly",
           interval: 1,
-          item: { currency: "INR", amount: 1099900 },
+          item: { currency: "USD", amount: 12900 },
         }),
       )
       .mockResolvedValueOnce(
-        Response.json({ id: "sub_new", plan_id: "plan_growth_monthly", status: "created" }),
+        Response.json({ id: "sub_new", plan_id: "plan_growth_monthly_usd", status: "created" }),
       );
     vi.stubGlobal("fetch", fetch);
     const result = await createRazorpaySubscription({
@@ -97,7 +100,7 @@ describe("Razorpay verification", () => {
       cycle: "monthly",
       ownerUserId: "owner",
     });
-    expect(result.providerPlanId).toBe("plan_growth_monthly");
+    expect(result.providerPlanId).toBe("plan_growth_monthly_usd");
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 });

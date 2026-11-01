@@ -1,15 +1,15 @@
 {
-  "currency": "INR",
+  "currency": "USD",
   "launch": {
-    "monthly": 349900,
-    "annual": 3569000
+    "monthly": 3900,
+    "annual": 39780
   },
   "growth": {
-    "monthly": 1099900,
-    "annual": 11219000
+    "monthly": 12900,
+    "annual": 131580
   },
   "scale": {
-    "monthly": 3499900,
-    "annual": 35699000
+    "monthly": 39900,
+    "annual": 406980
   }
 }

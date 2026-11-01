@@ -22,15 +22,15 @@ describe("billing plan catalog", () => {
     expect(getBillingPlan("legacy-plan").id).toBe("free");
   });
 
-  it("formats minor units as Indian rupees", () => {
-    expect(formatPrice(349900)).toBe("₹3,499");
-    expect(formatPrice(297417)).toBe("₹2,974.17");
+  it("formats minor units as US dollars", () => {
+    expect(formatPrice(3900)).toBe("$39");
+    expect(formatPrice(3315)).toBe("$33.15");
   });
 
-  it("preserves the existing provider annual prices (approximately 15 percent savings)", () => {
+  it("uses the USD annual prices (approximately 15 percent savings)", () => {
     for (const id of ["launch", "growth", "scale"] as const) {
       expect(BILLING_PLANS[id].annualPriceMinor).toBe(
-        { launch: 3569000, growth: 11219000, scale: 35699000 }[id],
+        { launch: 39780, growth: 131580, scale: 406980 }[id],
       );
     }
   });

@@ -3,7 +3,7 @@ import prices from "../src/lib/billing-prices.json" with { type: "json" };
 const keyId = process.env.RAZORPAY_KEY_ID?.trim();
 const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim();
 
-if (!keyId || !keySecret || /redacted/i.test(keyId + keySecret)) {
+if (!keyId || !keySecret || /redacted|\[SENSITIVE\]/i.test(keyId + keySecret)) {
   throw new Error("RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are required");
 }
 
