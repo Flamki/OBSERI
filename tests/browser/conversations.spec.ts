@@ -54,9 +54,52 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/api/billing/summary", (route) =>
     route.fulfill({ json: { plan: BILLING_PLANS.launch } }),
   );
-  await page.route("**/api/souls/*/conversations*", (route) =>
-    route.fulfill({ json: { conversations } }),
-  );
+  const states = new Map<
+    string,
+    {
+      status: string;
+      assigneeId: string | null;
+      version: number;
+      notes: { id: string; author: string; body: string; createdAt: string }[];
+    }
+  >();
+  await page.route("**/api/souls/*/conversations*", async (route) => {
+    const url = new URL(route.request().url());
+    const body = route.request().method() === "POST" ? route.request().postDataJSON() : null;
+    const id = body?.conversationId || url.searchParams.get("inbox");
+    if (!id) return route.fulfill({ json: { conversations } });
+    const state = states.get(id) || { status: "open", assigneeId: null, version: 0, notes: [] };
+    if (body?.action === "update") {
+      Object.assign(state, {
+        status: body.status,
+        assigneeId: body.assigneeId,
+        version: state.version + 1,
+      });
+    }
+    if (body?.action === "note")
+      state.notes.push({
+        id: body.noteId,
+        body: body.body,
+        author: "owner@example.com",
+        createdAt: new Date().toISOString(),
+      });
+    states.set(id, state);
+    return route.fulfill({
+      json: body
+        ? { ok: true }
+        : {
+            inbox: {
+              ...state,
+              assignees: [
+                { id: "test-owner", label: "Workspace owner" },
+                { id: "editor", label: "editor@example.com" },
+              ],
+              hasOlderNotes: false,
+              nextCursor: null,
+            },
+          },
+    });
+  });
 });
 
 test("inbox and transcript scroll independently with stable headers", async ({ page }) => {
@@ -217,8 +260,9 @@ test("review queue groups unanswered questions and opens correction with context
   page,
 }) => {
   const question = "Do you support annual billing?";
-  await page.route("**/api/souls/*/conversations*", (route) =>
-    route.fulfill({
+  await page.route("**/api/souls/*/conversations*", (route) => {
+    if (new URL(route.request().url()).searchParams.has("inbox")) return route.fallback();
+    return route.fulfill({
       json: {
         conversations: [
           {
@@ -246,8 +290,8 @@ test("review queue groups unanswered questions and opens correction with context
           },
         ],
       },
-    }),
-  );
+    });
+  });
   await page.goto("/app?view=conversations");
   await page.getByRole("tab", { name: /^Review 1/ }).click();
   const list = page.getByRole("region", { name: "Conversation list", exact: true });
@@ -265,4 +309,64 @@ test("review queue groups unanswered questions and opens correction with context
     path: "test-results/answer-review-correction.png",
     animations: "disabled",
   });
+});
+
+test("team follow-up saves assignment, status and private notes without changing the transcript", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/app?view=conversations");
+  const status = page.getByLabel("Follow-up status", { exact: true });
+  await status.selectOption("waiting");
+  await expect(status).toBeEnabled();
+  await expect(status).toHaveValue("waiting");
+  const assignee = page.getByLabel("Assigned teammate");
+  await assignee.selectOption("editor");
+  await expect(assignee).toBeEnabled();
+  await expect(assignee).toHaveValue("editor");
+  const list = page.getByRole("region", { name: "Conversation list", exact: true });
+  await expect(list.getByText("Waiting for reply · editor@example.com")).toBeVisible();
+  await page.getByRole("button", { name: "Team notes", exact: true }).click();
+  const draft = page.getByLabel("Private note", { exact: true });
+  await expect(draft).toHaveAttribute("maxlength", "2000");
+  await draft.fill("Customer asked for a proposal. Please follow up tomorrow.");
+  await page.getByRole("button", { name: "Add private note" }).click();
+  await expect(draft).toHaveValue("");
+  await expect(page.getByRole("region", { name: "Private team notes" })).toContainText(
+    "Please follow up tomorrow.",
+  );
+  await expect(
+    page.getByRole("region", { name: "Conversation messages", exact: true }),
+  ).not.toContainText("Please follow up tomorrow.");
+  await page.screenshot({ path: "test-results/team-inbox-desktop.png" });
+  await page.getByLabel("Filter follow-up").selectOption("waiting");
+  await expect(list.getByRole("button")).toHaveCount(1);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await list.getByRole("button").first().click();
+  await expect(draft).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add private note" })).toBeInViewport();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: "test-results/team-inbox-mobile.png" });
+});
+
+test("a conflicting team edit refreshes state and explains why it was not saved", async ({
+  page,
+}) => {
+  await page.route("**/api/souls/*/conversations*", (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    return route.fulfill({
+      status: 409,
+      json: {
+        error: {
+          message: "A teammate changed this conversation. Review the latest details and try again.",
+        },
+      },
+    });
+  });
+  await page.goto("/app?view=conversations");
+  const status = page.getByLabel("Follow-up status", { exact: true });
+  await status.selectOption("resolved");
+  await expect(page.getByRole("alert")).toContainText("A teammate changed this conversation");
+  await expect(status).toHaveValue("open");
+  await expect(status).toBeEnabled();
 });

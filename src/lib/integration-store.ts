@@ -307,7 +307,15 @@ export async function persistConversation(input: {
   });
 }
 
-export type OwnerConversation = SoulConversation & { origin: string };
+export type OwnerConversation = SoulConversation & {
+  origin: string;
+  followUp?: {
+    status: "open" | "waiting" | "resolved";
+    assigneeId: string | null;
+    assigneeLabel: string | null;
+    version: number;
+  };
+};
 
 /**
  * Visitor conversations recorded by a published widget, readable only by the account that
@@ -329,12 +337,21 @@ export async function listOwnerConversations(input: {
       messages: SoulConversation["messages"];
       started_at: Date;
       updated_at: Date;
+      follow_up_status: "open" | "waiting" | "resolved";
+      assignee_id: string | null;
+      assignee_label: string | null;
+      inbox_version: number;
     }[]
   >`
     select c.conversation_id, c.origin, c.channel, c.visitor_label, c.lead_intent,
-           c.messages, c.started_at, c.updated_at
+           c.messages, c.started_at, c.updated_at, coalesce(i.status, 'open') as follow_up_status,
+           i.assignee_id, coalesce(i.version, 0) as inbox_version,
+           case when i.assignee_id = p.owner_user_id then 'Workspace owner'
+             when i.assignee_id is not null then coalesce(m.email, 'Unavailable teammate') end as assignee_label
     from obseri_conversations c
     join obseri_published_souls p on p.soul_id = c.soul_id
+    left join obseri_conversation_inbox i on i.conversation_id = c.conversation_id
+    left join obseri_workspace_members m on m.owner_user_id = p.owner_user_id and m.user_id = i.assignee_id
     where c.soul_id = ${input.soulId}
       and p.owner_user_id = ${input.ownerUserId}
     order by c.updated_at desc
@@ -344,6 +361,12 @@ export async function listOwnerConversations(input: {
     id: row.conversation_id,
     origin: row.origin,
     channel: row.channel,
+    followUp: {
+      status: row.follow_up_status,
+      assigneeId: row.assignee_id,
+      assigneeLabel: row.assignee_label,
+      version: Number(row.inbox_version),
+    },
     visitorLabel: row.visitor_label,
     leadIntent: row.lead_intent,
     messages: Array.isArray(row.messages) ? row.messages : [],

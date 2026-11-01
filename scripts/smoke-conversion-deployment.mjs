@@ -159,6 +159,23 @@ try {
       "contact accepted",
     );
   assert.equal((await request(analyticsPath)).status, 401, "owner data requires login");
+  const inboxPath = `/api/souls/${id}/conversations`;
+  for (const privateHeaders of [{}, headers]) {
+    assert.equal(
+      (await request(`${inboxPath}?inbox=${contact.conversationId}`, { headers: privateHeaders })).status,
+      401,
+      "private inbox rejects anonymous and visitor widget credentials",
+    );
+    assert.equal(
+      (await request(inboxPath, {
+        method: "POST",
+        headers: privateHeaders,
+        body: { action: "note", conversationId: contact.conversationId, noteId: randomUUID(), body: "Must not be saved" },
+      })).status,
+      401,
+      "private notes require workspace login",
+    );
+  }
   assert.equal(
     (await request(leadsPath, { method: "PATCH", body: { id: contact.id, status: "won" } })).status,
     401,
@@ -220,6 +237,7 @@ try {
         "contact consent",
         "durable contact and deduplication",
         "owner read/write auth gates",
+        "private inbox and notes reject visitor widget credentials",
         "disabled follow-up blocks stale submissions",
         "published booking settings and contact gate",
       ],

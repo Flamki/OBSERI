@@ -44,6 +44,8 @@ try {
     "obseri_operation_events",
     "obseri_embedding_budgets",
     "obseri_import_leases",
+    "obseri_conversation_inbox",
+    "obseri_conversation_notes",
   ];
   const rows = await sql`
     select table_name

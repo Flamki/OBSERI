@@ -845,6 +845,8 @@ function TeamActivity() {
     "invitation.revoked": "Revoked invitation",
     "member.joined": "Joined workspace",
     "lead.status": "Changed lead status",
+    "conversation.updated": "Updated conversation follow-up",
+    "conversation.note": "Added private conversation note",
   };
   return (
     <div className="mt-5">

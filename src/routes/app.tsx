@@ -1,3 +1,4 @@
+import { ConversationWorkflow } from "@/components/ConversationWorkflow";
 import {
   canAccess,
   normalizePermissions,
@@ -193,7 +194,7 @@ const PAGE_META: Record<StudioView, { title: string; description: string }> = {
 };
 
 /** Visitor conversations from the live widget plus Studio test sessions. */
-type StudioConversation = SoulConversation & { origin: string };
+type StudioConversation = OwnerConversation;
 
 type StudioUser = {
   id: string;
@@ -4095,6 +4096,14 @@ function ConversationsView({
     conversationTeam.current.role === "owner" ||
     canAccess(conversationTeam.current.permissions, "knowledge", true);
   const [filter, setFilter] = useState<ConversationFilter>("all");
+  const [followUpFilter, setFollowUpFilter] = useState("any");
+  const [inboxUpdates, setInboxUpdates] = useState<
+    Record<string, NonNullable<OwnerConversation["followUp"]>>
+  >({});
+  const followUpFor = (item: StudioConversation) => {
+    const local = inboxUpdates[`${soul.id}:${item.id}`];
+    return local && local.version >= (item.followUp?.version ?? 0) ? local : item.followUp;
+  };
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(focusId ?? conversations[0]?.id ?? "");
   const [mobileDetail, setMobileDetail] = useState(Boolean(focusId));
@@ -4118,6 +4127,16 @@ function ConversationsView({
   const needle = query.trim().toLowerCase();
   const visibleReviews = reviews.filter((item) => item.question.toLowerCase().includes(needle));
   const visible = conversations.filter((item) => {
+    if (followUpFilter !== "any") {
+      if (item.channel === "playground") return false;
+      const state = followUpFor(item);
+      if (
+        followUpFilter === "unassigned"
+          ? !!state?.assigneeId
+          : (state?.status ?? "open") !== followUpFilter
+      )
+        return false;
+    }
     if (filter === "review")
       return visibleReviews.some((review) => review.conversationId === item.id);
     if (filter === "leads" && !isLead(item)) return false;
@@ -4219,7 +4238,10 @@ function ConversationsView({
                 type="button"
                 role="tab"
                 aria-selected={filter === id}
-                onClick={() => setFilter(id)}
+                onClick={() => {
+                  setFilter(id);
+                  setFollowUpFilter("any");
+                }}
                 className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition ${filter === id ? "bg-[#0b0b0c] text-white" : "text-[#5f5e5a] hover:bg-[#f3f3f1]"}`}
               >
                 {label}
@@ -4229,6 +4251,23 @@ function ConversationsView({
               </button>
             ))}
           </div>
+          {filter !== "tests" && filter !== "review" && (
+            <label className="flex items-center justify-between text-xs text-stone-600">
+              Follow-up
+              <select
+                aria-label="Filter follow-up"
+                value={followUpFilter}
+                onChange={(e) => setFollowUpFilter(e.target.value)}
+                className="h-8 rounded-lg border border-stone-200 bg-white px-2 text-stone-900"
+              >
+                <option value="any">All conversations</option>
+                <option value="open">Open</option>
+                <option value="waiting">Waiting for reply</option>
+                <option value="resolved">Resolved</option>
+                <option value="unassigned">Unassigned</option>
+              </select>
+            </label>
+          )}
         </div>
         <div
           role="region"
@@ -4315,6 +4354,16 @@ function ConversationsView({
                     {item.messages.length} messages
                   </span>
                 </div>
+                {item.channel !== "playground" && (
+                  <p className="mt-2 truncate text-[11px] text-stone-600">
+                    {
+                      { open: "Open", waiting: "Waiting for reply", resolved: "Resolved" }[
+                        followUpFor(item)?.status ?? "open"
+                      ]
+                    }{" "}
+                    · {followUpFor(item)?.assigneeLabel || "Unassigned"}
+                  </p>
+                )}
               </button>
             ))
           ) : (
@@ -4371,6 +4420,26 @@ function ConversationsView({
               </div>
             )}
           </header>
+          {conversation.channel !== "playground" && (
+            <ConversationWorkflow
+              key={`${soul.id}:${conversation.id}`}
+              soulId={soul.id}
+              conversationId={conversation.id}
+              onChange={(inbox) =>
+                setInboxUpdates((previous) => ({
+                  ...previous,
+                  [`${soul.id}:${conversation.id}`]: {
+                    status: inbox.status,
+                    assigneeId: inbox.assigneeId,
+                    version: inbox.version,
+                    assigneeLabel:
+                      inbox.assignees.find((person) => person.id === inbox.assigneeId)?.label ||
+                      (inbox.assigneeId ? "Unavailable teammate" : null),
+                  },
+                }))
+              }
+            />
+          )}
           <div
             key={conversation.id}
             role="region"
