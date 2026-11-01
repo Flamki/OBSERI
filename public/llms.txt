@@ -9,6 +9,8 @@
 - [Pricing](https://obseri.com/pricing): Self-serve plans, included capacity, and enterprise options.
 - [AI voice agent for websites](https://obseri.com/ai-voice-agent-for-website): Voice and text agent capabilities, setup, use cases, and buyer questions.
 - [AI chatbot trained on your website](https://obseri.com/ai-chatbot-trained-on-your-website): Crawling, source-grounded knowledge, refresh, retrieval testing, and deployment.
+- [Lead generation chatbot](https://obseri.com/ai-chatbot-for-lead-generation): Contact capture, booking links, shared inbox, and honest conversion measurement.
+- [Website chatbot setup guide](https://obseri.com/website-chatbot-setup-guide): Prepare knowledge, test answers, install the widget, and verify enquiries.
 - [Soul Studio](https://obseri.com/app): Build and test website knowledge, personality, voice, integrations, and conversations.
 
 ## Core capabilities
@@ -20,9 +22,13 @@
 - Advanced website crawling with robots.txt, sitemap, canonical URL, deduplication, and incremental refresh support.
 - Source-grounded retrieval with citations and pre-launch retrieval testing.
 - Custom personality, greeting, boundaries, escalation behavior, and lead intent.
-- Real-time voice and text website assistant experiences.
+- On-device neural voice and text chat, with configurable chat-only, voice-only, or combined launchers.
+- Text-based PDF imports and supported JavaScript-rendered page crawling.
+- Semantic retrieval with keyword fallback.
+- Shared conversations, assignments, private notes, team permissions, and activity history.
+- Country, device, source, and page analytics subject to consent and privacy settings.
 - Embeddable website widget, signed events, and webhook integrations.
 
 ## Contact
 
-- Email: flamki@obseri.com
+- Email: ayush@flamkilabs.com

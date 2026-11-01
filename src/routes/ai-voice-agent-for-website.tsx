@@ -61,7 +61,7 @@ function VoiceAgentPage() {
         },
         {
           title: "Works beyond voice",
-          body: "Every voice experience includes text chat, citations, lead intent, conversation review, and webhook delivery to the systems your team already uses.",
+          body: "Choose chat, voice, or both. Review conversations, offer a contact request or booking link, and connect signed webhooks to an endpoint you configure.",
         },
       ]}
       steps={[
@@ -78,7 +78,7 @@ function VoiceAgentPage() {
           body: "Preview the assistant over your real website, test retrieval quality, then publish one isolated widget script to your domain.",
         },
       ]}
-      useCaseTitle="Useful anywhere visitors need a quick, human answer."
+      useCaseTitle="Useful when visitors need a clear answer."
       useCases={[
         {
           title: "Product discovery",
@@ -106,12 +106,12 @@ function VoiceAgentPage() {
         {
           question: "Can visitors type instead of talking?",
           answer:
-            "Yes. The same embedded experience supports voice and text, so visitors can switch based on their device, environment, or accessibility preference.",
+            "Yes, when you enable chat and voice together. You can also choose a chat-only or voice-only launcher in customization.",
         },
         {
           question: "Will it slow down my website?",
           answer:
-            "The widget loads asynchronously and remains isolated from the host page. Production voice uses streaming providers and browser speech remains available as a lightweight fallback.",
+            "The widget script loads asynchronously. Neural speech runs on the visitor’s device and downloads model assets when needed, so first-use loading and response time vary by device and connection. Test the widget on your own pages and target devices.",
         },
         {
           question: "Can I hear and test it before publishing?",

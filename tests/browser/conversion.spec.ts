@@ -13,7 +13,7 @@ test("landing explains the conversion flow and displays INR on desktop and mobil
   );
   await page.route(/neonauth.*\/auth\//, (route) => route.fulfill({ json: null }));
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("See the interest.");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Your website’s AI chatbot.");
   await page.getByRole("button", { name: "Convert", exact: true }).click();
   await expect(page.getByText("Give the conversation somewhere to go.")).toBeVisible();
   await expect(page.getByText("Illustrative journey.", { exact: false })).toBeVisible();

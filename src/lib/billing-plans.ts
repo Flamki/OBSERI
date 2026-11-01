@@ -126,7 +126,7 @@ export const BILLING_PLANS = {
   enterprise: {
     id: "enterprise",
     name: "Enterprise",
-    description: "Custom capacity, security, and deployment controls.",
+    description: "Discuss capacity, team workflows, and setup needs.",
     monthlyPriceMinor: null,
     annualPriceMinor: null,
     limits: {
@@ -139,11 +139,11 @@ export const BILLING_PLANS = {
       refreshIntervalHours: null,
     },
     features: [
-      "Committed usage pricing",
-      "Custom retention and regions",
-      "SSO and audit controls",
-      "Private voice or model deployment",
-      "SLA and dedicated support",
+      "Discuss usage and capacity",
+      "Multiple website workflows",
+      "Team permissions and activity log",
+      "Neural website voice",
+      "Setup assistance",
     ],
     contactSales: true,
   },

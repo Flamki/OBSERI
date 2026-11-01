@@ -1,71 +1,42 @@
-# Obseri founder launch plan
+# Obseri first-customer launch plan
 
-## The wedge
+Updated 1 November 2026. Public business name: obseri.com. Contact: ayush@flamkilabs.com.
 
-Sell a finished website presence, not “another chatbot.”
+## Initial offer
 
-> We turn your existing website into a source-grounded, voiced guide in 48 hours—designed in your brand and connected to your lead flow.
+Help an agency or service business answer website questions and route enquiries to its team. Start with three founder-assisted pilots on the existing published plans. Do not promise a specific number of leads, an installation deadline, or an unapproved managed-service price.
 
-- Initial buyer: design-led SaaS founders, agencies, high-consideration services, and product-marketing teams
-- Founder package: one Soul, up to 250 public pages, custom personality, voice setup, embed installation, lead webhook, and two weeks of tuning
-- Suggested first price: $750 setup plus $149/month managed operation
-- Proof: live before/after website demo, citation accuracy, visitor questions discovered, qualified lead events, and owner time saved
+The pilot covers source review, an assistant configuration, the website embed, a real test enquiry and a review of unanswered questions. Test text first, then neural voice on the customer's target devices. Use the actual plan's page, website, team and usage allowances.
 
-## Demo flow
+## Demonstration
 
-1. Paste the prospect’s URL in Soul Studio and let Obseri learn a bounded set of pages.
-2. Show the page and chunk evidence rather than hiding ingestion behind a spinner.
-3. Shape a personality from their actual brand language.
-4. Ask a hard product question and open the cited source.
-5. Speak a question and audition browser/Voicebox output.
-6. Publish the widget and trigger a signed test webhook.
-7. Explain which parts are already local and which production adapters are enabled for the pilot.
+1. Import the prospect's public website, a supported PDF or manual source content. Check failed, empty and stale sources before continuing.
+2. Configure tone, answer boundaries and a meaningful fallback/contact route.
+3. Test ten real customer questions, follow-up questions and an unsupported request. Check the returned citations.
+4. Choose text, voice or both; verify the device voice experience and startup time without promising instant playback.
+5. Configure consent-based contact capture or a valid booking link. A scheduler link does not mean bookings are created by Obseri.
+6. Publish, install and test as an external visitor. Confirm the enquiry reaches the shared inbox and any configured webhook.
+7. Assign the enquiry and verify teammate permissions, revocation and activity history using real customer roles.
 
-## Before the first external pilot
+## Launch gates still requiring operational evidence
 
-- Deploy a private staging environment with authentication and the production schema.
-- Store published Soul revisions durably and require ownership to publish.
-- Add allowed-domain verification and public widget rate limits.
-- Put browser crawling in an isolated worker with robots/terms handling and per-domain budgets.
-- Configure one model provider with token/cost limits and keep deterministic fallback.
-- Configure Voicebox only for customers who need it; document and retain voice consent.
-- Queue webhook deliveries with retries and expose delivery logs.
-- Add privacy, acceptable-use, voice-use, crawler identification, removal, export, and deletion policies.
-- Instrument citation use, failed answers, latency, crawl failure, and lead delivery.
+Code and browser tests are necessary but do not prove every production service is ready. Before advertising unattended paid onboarding:
 
-## Before self-serve billing
+- Run a fresh signup → import → publish → install → enquiry journey on production.
+- Verify the deployed Razorpay credentials and actual checkout, entitlement activation, webhook reconciliation, cancellation and failure handling. Keep displayed currency consistent with what checkout charges. This SEO release does not change billing currency.
+- Confirm the public privacy and terms content with the operator. Refund-policy work is explicitly deferred by the owner; no policy or legal entity has been invented here.
+- Verify contact delivery to ayush@flamkilabs.com and a way to respond to customer support requests.
+- Exercise backup/restore, account isolation, team revocation and usage-limit behavior with documented results.
+- Monitor model errors, retrieval fallback, crawl/import failures, webhook delivery and response/voice latency. Do not label the whole service production-ready based only on a successful build.
 
-- Stripe checkout, plan enforcement, metering, cancellation, and failed-payment recovery
-- Account verification, workspace invitations, audit log, export, and deletion
-- Scheduled recrawls with freshness controls and content-change reindexing
-- Hybrid retrieval evaluation set and grounded-answer regression checks
-- Abuse detection, prompt-injection regression tests, secret rotation, backups, and restore drills
-- Multi-region/runtime cost review for crawler, model, voice, and storage workloads
+The latest available account-level payment checks did not establish a complete successful paid journey. Recheck against the deployed environment rather than assuming an old local environment pull represents current production configuration.
 
-## Deferred voice-provider backlog
+## Pilot evidence
 
-The pilot continues on the currently configured Obseri voice path. Managed-provider expansion is
-deliberately deferred until production keys and measured traffic are available; it is not a reason
-to buy GPU capacity now.
+For each pilot record: activation date, source/test coverage, actual visitor sessions, conversations, consented enquiries, qualified outcomes marked by the team, latency and failures. Separate test traffic. Country/source attribution describes association; it does not establish incremental revenue lift.
 
-- [ ] Add restricted, server-only `SARVAM_API_KEY` and `ELEVENLABS_API_KEY` values to the production environment.
-- [ ] Implement Sarvam streaming STT/TTS behind the Obseri voice interfaces for Indian and code-switched conversations.
-- [ ] Implement ElevenLabs streaming premium voices and consent-backed voice cloning behind the same interfaces.
-- [ ] Pin a provider and speaker for the lifetime of each call; do not use cross-provider or cross-voice fallback.
-- [ ] Add automatic greeting, VAD, barge-in, cancellation, and incremental audio playback to the managed route.
-- [ ] Meter actual audio seconds, TTS characters, provider failures, and p50/p95 first-audio latency by region.
-- [ ] Run quality, interruption, concurrency, consent, and spend-limit tests before enabling the routes for customers.
-- [ ] Recalculate plan prices and allowances from measured unit economics rather than advertised provider rates.
-- [ ] Reconsider self-hosted GPU serving only after sustained provider spend exceeds the fully loaded hosting cost or an enterprise customer requires private deployment.
+Review after one week. Fix unsupported answers and handoff failures before adding features. Ask permission before using customer names, screenshots or outcomes publicly.
 
-This backlog does not change the current customer plans or runtime behavior.
+## Acquisition
 
-## First 30-day scorecard
-
-- 20 tailored demos built from real prospect websites
-- 8 founder calls with the widget installed during the call
-- 5 paid founder packages
-- 80%+ answers judged supported by a visible source in the curated test set
-- Under 4 seconds median text response on the configured production model
-- At least 10 useful visitor questions or knowledge gaps surfaced per customer
-- Zero voice profiles without recorded rights basis and consent
+Follow [the organic acquisition plan](./seo-organic-growth.md). Prioritize useful setup guidance and real case studies. Search rankings and first-customer revenue remain outcomes to measure, not promises that can be delivered by a code change.

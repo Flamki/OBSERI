@@ -40,12 +40,12 @@ export const LANDING_FAQ: ReadonlyArray<{ question: string; answer: string }> = 
   {
     question: "What does Obseri learn from?",
     answer:
-      "Your public website. Paste a URL and Obseri discovers pages on the same domain, respects robots.txt and your sitemap, removes duplicates, and turns the content into searchable knowledge. You can add manual content, exclude pages, and refresh whenever your site changes.",
+      "Your public website. Paste a URL and Obseri discovers pages on the same domain, respects robots.txt and your sitemap, removes duplicates, and turns the content into searchable knowledge. You can also import text-based PDFs, add manual content, crawl supported JavaScript-rendered pages, exclude pages, and refresh when your site changes.",
   },
   {
     question: "Will it make things up?",
     answer:
-      "Obseri answers from the sources in your workspace and shows citations back to the original page. When the answer is not in your content, it says so using the fallback response you choose instead of guessing, and you can test retrieval before you publish.",
+      "Obseri answers from the sources in your workspace and shows citations back to the original page. You can configure how it handles missing information and test retrieval before publishing. AI can still make mistakes: test your important questions and keep your sources current.",
   },
   {
     question: "How do I put it on my website?",
@@ -55,12 +55,17 @@ export const LANDING_FAQ: ReadonlyArray<{ question: string; answer: string }> = 
   {
     question: "Can visitors really talk to it?",
     answer:
-      "Yes. Visitors can speak through their browser microphone or type. Your agent replies with a consistent neural voice you pick in Studio, so it never switches speakers mid-conversation.",
+      "Yes. Visitors can speak through their browser microphone or type. Your agent replies with a consistent neural voice you pick in Studio, with availability and response time depending on the visitor’s device and browser.",
   },
   {
     question: "What happens when someone is ready to buy?",
     answer:
-      "Visitors can submit a contact request with explicit permission to follow up. Your Conversions dashboard connects tracked visits to conversations and requests, and your team can mark qualified or won outcomes. On Launch and above, signed webhooks deliver requests to your workflow.",
+      "Visitors can submit a contact request with explicit permission to follow up. Your Analytics dashboard connects tracked visits to conversations and requests, and your team can mark qualified or won outcomes. You can also offer a booking link or turn follow-up off. On Launch and above, signed webhooks deliver requests to your workflow.",
+  },
+  {
+    question: "Can my team work together?",
+    answer:
+      "Yes. Growth and Scale include multiple seats. Owners choose which sections teammates can view or edit. The shared inbox supports conversation assignment, private notes, and status updates, and the activity log records workspace changes.",
   },
   {
     question: "Is there a free plan?",
@@ -69,7 +74,7 @@ export const LANDING_FAQ: ReadonlyArray<{ question: string; answer: string }> = 
   },
 ];
 
-const salesEmail = "mailto:flamki@obseri.com?subject=Obseri%20sales";
+const salesEmail = "mailto:ayush@flamkilabs.com?subject=Obseri%20sales";
 
 export default function LandingPage() {
   return (
@@ -331,19 +336,19 @@ function Hero() {
         </Reveal>
         <Reveal delay={80}>
           <h1 className="mx-auto mt-7 max-w-[980px] text-balance text-[clamp(2.9rem,7.4vw,6rem)] font-semibold leading-[0.96] tracking-[-0.055em]">
-            See the interest.
+            Your website’s AI chatbot.
             <br />
-            <span className="text-[#9b79bb]">Start the conversation.</span>
+            <span className="text-[#9b79bb]">Your next customer’s first answer.</span>
           </h1>
         </Reveal>
         <Reveal delay={160}>
           <p className="mx-auto mt-6 max-w-[620px] text-[17px] leading-7 text-[#6f6f73] sm:text-[19px] sm:leading-8">
-            Understand where visitors come from. Help them with answers from your own website. Turn
-            their questions into contact requests you can act on—all through one embed.
+            Help visitors understand your services with AI chat and voice trained on your website.
+            Capture enquiries, see where they came from, and give your team a clear next step.
           </p>
         </Reveal>
         <Reveal delay={240} className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
-          <PrimaryButton to="/app">Start understanding your visitors</PrimaryButton>
+          <PrimaryButton to="/app">Build your free assistant</PrimaryButton>
           <SecondaryButton href="#demo">Explore the experience</SecondaryButton>
         </Reveal>
         <p className="mt-5 text-[13px] text-[#929098]">
@@ -1214,22 +1219,22 @@ const useCases = [
     id: "saas",
     label: "SaaS",
     title: "Turn pricing-page visitors into demos",
-    body: "Answer plan, integration and security questions instantly, then book the call while interest is high.",
+    body: "Answer questions from your published plans and help visitors reach your demo booking page.",
     outcomes: [
-      "Plan comparisons in seconds",
+      "Answers from your plan details",
       "Demo requests routed to sales",
-      "Fewer repeat support tickets",
+      "A shared history for follow-up",
     ],
     agent: VOICE_AGENTS[0],
-    question: "Can I use this with our SSO?",
+    question: "Can my team manage the assistant?",
     answer:
-      "SSO is available on the Enterprise plan. Want me to connect you with the team to scope it?",
+      "Growth and Scale include team seats. The owner can choose which sections each teammate can view or edit.",
   },
   {
     id: "commerce",
     label: "E-commerce",
     title: "Help shoppers choose and check out",
-    body: "Recommend products, explain shipping and returns, and recover buyers who would have bounced.",
+    body: "Explain product details, shipping and returns from your published content, and offer a way to follow up.",
     outcomes: [
       "Product guidance by voice",
       "Shipping and returns answered",
@@ -1253,13 +1258,13 @@ const useCases = [
     agent: VOICE_AGENTS[2],
     question: "Do you take walk-ins on Saturday?",
     answer:
-      "We’re open 9 to 1 on Saturdays for appointments only. I can take your details to book a slot.",
+      "We’re open 9 to 1 on Saturdays for appointments only. I can share our booking page so you can check available slots.",
   },
   {
     id: "agencies",
     label: "Agencies",
     title: "Ship a voice agent for every client",
-    body: "Build a branded agent from each client’s site in minutes and deliver leads straight into their tools.",
+    body: "Build a branded agent from each client’s site and send contact requests to configured webhook endpoints.",
     outcomes: [
       "Up to 10 websites on Scale",
       "Per-site keys and domains",
@@ -1268,7 +1273,7 @@ const useCases = [
     agent: VOICE_AGENTS[0],
     question: "Can you build one for our client’s site?",
     answer:
-      "Yes. Paste their URL in Soul Studio and you’ll have a working agent to show them today.",
+      "Yes. Import their website in Soul Studio, review the content, and test the assistant before publishing.",
   },
 ];
 
@@ -1342,7 +1347,7 @@ function UseCases() {
                 <Orb agent={current.agent} size={36} live />
                 <div>
                   <p className="text-[14px] font-medium">{current.agent.name}</p>
-                  <p className="text-[12px] text-[#8a8a8f]">{current.agent.role}</p>
+                  <p className="text-[12px] text-[#6f6f73]">Illustrative conversation</p>
                 </div>
               </div>
               <div className="space-y-2.5 pt-4">
@@ -1530,7 +1535,7 @@ function PricingTeaser() {
                     <h3 className="text-[17px] font-semibold">{plan.name}</h3>
                     {highlighted && (
                       <span className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-medium">
-                        Popular
+                        For teams
                       </span>
                     )}
                   </div>
@@ -1586,7 +1591,7 @@ function PricingTeaser() {
           })}
         </div>
         <p className="mt-6 text-center text-[14px] text-[#8a8a8f]">
-          Need SSO, custom retention or private deployment?{" "}
+          Need help with a larger rollout?{" "}
           <a href={salesEmail} className="font-medium text-[#0b0b0c] underline underline-offset-4">
             Talk to us about Enterprise
           </a>
@@ -1682,6 +1687,8 @@ function Footer() {
       links: [
         { label: "AI voice agent for websites", href: "/ai-voice-agent-for-website" },
         { label: "Chatbot trained on your site", href: "/ai-chatbot-trained-on-your-website" },
+        { label: "Lead generation chatbot", href: "/ai-chatbot-for-lead-generation" },
+        { label: "Website chatbot setup guide", href: "/website-chatbot-setup-guide" },
       ],
     },
     {

@@ -17,6 +17,8 @@ import {
   type BillingPlanId,
 } from "@/lib/billing-plans";
 
+import { publicPageHead } from "@/lib/public-page-head";
+
 type BillingCycle = "monthly" | "annual";
 
 const serif =
@@ -24,24 +26,12 @@ const serif =
 const selfServePlanIds = ["free", "launch", "growth", "scale"] as const;
 
 export const Route = createFileRoute("/pricing")({
-  head: () => ({
-    meta: [
-      { title: "Pricing | Obseri Voice and Chat Agent" },
-      {
-        name: "description",
-        content:
-          "Simple Obseri pricing for website voice and chat agents. Start free, then scale conversations, voice minutes, knowledge, and websites without surprise overages.",
-      },
-      { property: "og:title", content: "Obseri pricing" },
-      {
-        property: "og:description",
-        content: "Plans for turning website visits into useful voice and chat conversations.",
-      },
-      { property: "og:url", content: "https://obseri.com/pricing" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-    links: [{ rel: "canonical", href: "https://obseri.com/pricing" }],
-  }),
+  head: () =>
+    publicPageHead(
+      "/pricing",
+      "AI Website Chatbot Pricing & Team Plans | Obseri",
+      "Compare Obseri plans for website AI chat, neural voice, lead capture, analytics, and team access. Start with one free website. Published prices are in INR.",
+    ),
   component: PricingPage,
 });
 
@@ -129,7 +119,7 @@ function SiteHeader() {
         </Link>
         <span className="text-white">Pricing</span>
         <a
-          href="mailto:flamki@obseri.com?subject=Obseri%20pricing"
+          href="mailto:ayush@flamkilabs.com?subject=Obseri%20pricing"
           className="transition hover:text-white"
         >
           Contact
@@ -224,7 +214,7 @@ function PricingCard({
         </div>
         {plan.highlighted ? (
           <span className="rounded-full bg-[#ff5c7a] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[.14em] text-white">
-            Most popular
+            For teams
           </span>
         ) : null}
       </div>
@@ -237,7 +227,7 @@ function PricingCard({
 
       <div className="mt-7 min-h-[78px]">
         {price === 0 ? (
-          <p className={`text-[3rem] font-normal tracking-[-.05em] ${serif}`}>$0</p>
+          <p className={`text-[3rem] font-normal tracking-[-.05em] ${serif}`}>₹0</p>
         ) : (
           <>
             <div className="flex items-end gap-1.5">
@@ -335,7 +325,7 @@ function EnterpriseCard() {
         </h2>
         <p className="mt-5 max-w-[540px] text-[14px] leading-7 text-black/52">{plan.description}</p>
         <a
-          href="mailto:flamki@obseri.com?subject=Obseri%20Enterprise"
+          href="mailto:ayush@flamkilabs.com?subject=Obseri%20Enterprise"
           className="mt-7 inline-flex h-12 items-center gap-2 rounded-full bg-[#17171a] px-6 text-[11px] font-bold text-white transition hover:bg-[#a4314a]"
         >
           Talk to us <ArrowRight className="h-3.5 w-3.5" />
@@ -343,12 +333,12 @@ function EnterpriseCard() {
       </div>
       <div className="relative grid grid-cols-2 gap-px bg-black/[0.07] sm:grid-cols-3">
         {[
-          [ShieldCheck, "SSO + audit controls"],
-          [Globe2, "Custom regions"],
-          [Mic2, "Private voice deployment"],
-          [MessageCircle, "Committed usage"],
-          [CircleGauge, "SLA + priority"],
-          [Check, "Dedicated support"],
+          [ShieldCheck, "Team permissions"],
+          [Globe2, "Multiple websites"],
+          [Mic2, "Neural website voice"],
+          [MessageCircle, "Discuss usage needs"],
+          [CircleGauge, "Discuss service needs"],
+          [Check, "Setup assistance"],
         ].map(([Icon, label]) => (
           <div
             key={label as string}
@@ -432,10 +422,10 @@ function PricingFooter() {
         <img src="/obseri-logo-light.svg" alt="Obseri" className="h-7 w-auto" />
         <span>All prices in INR. Any applicable taxes are shown at checkout.</span>
         <a
-          href="mailto:flamki@obseri.com?subject=Obseri%20pricing"
+          href="mailto:ayush@flamkilabs.com?subject=Obseri%20pricing"
           className="transition hover:text-white"
         >
-          flamki@obseri.com
+          ayush@flamkilabs.com
         </a>
       </div>
     </footer>

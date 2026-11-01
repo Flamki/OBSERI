@@ -23,7 +23,11 @@ type SeoProductPageProps = {
   useCaseTitle: string;
   useCases: CopyBlock[];
   questions: Question[];
-  relatedHref: "/ai-voice-agent-for-website" | "/ai-chatbot-trained-on-your-website";
+  relatedHref:
+    | "/ai-voice-agent-for-website"
+    | "/ai-chatbot-trained-on-your-website"
+    | "/ai-chatbot-for-lead-generation"
+    | "/website-chatbot-setup-guide";
   relatedLabel: string;
 };
 
@@ -52,7 +56,7 @@ export default function SeoProductPage({
           <div className="flex items-center gap-5">
             <Link
               to="/"
-              className="hidden text-xs text-white/55 transition hover:text-white sm:block"
+              className="hidden text-xs text-white/70 transition hover:text-white sm:block"
             >
               Product
             </Link>
@@ -76,7 +80,7 @@ export default function SeoProductPage({
             <h1 className="mt-8 max-w-5xl text-[clamp(3rem,7vw,6.8rem)] font-semibold leading-[0.91] tracking-[-0.07em]">
               {title}
             </h1>
-            <p className="mt-8 max-w-2xl text-[16px] leading-8 text-white/55 sm:text-lg">
+            <p className="mt-8 max-w-2xl text-[16px] leading-8 text-white/70 sm:text-lg">
               {introduction}
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
@@ -95,7 +99,7 @@ export default function SeoProductPage({
             </div>
             <div className="mt-14 grid gap-3 border-t border-white/10 pt-7 sm:grid-cols-3">
               {proofPoints.map((point) => (
-                <p key={point} className="flex items-center gap-2 text-xs text-white/48">
+                <p key={point} className="flex items-center gap-2 text-xs text-white/70">
                   <Check className="h-3.5 w-3.5 text-[#ff758f]" /> {point}
                 </p>
               ))}
@@ -109,7 +113,7 @@ export default function SeoProductPage({
               <h2 className="max-w-3xl text-4xl font-semibold leading-[.98] tracking-[-0.055em] sm:text-6xl">
                 {sectionTitle}
               </h2>
-              <p className="max-w-xl text-sm leading-7 text-black/48">{sectionIntroduction}</p>
+              <p className="max-w-xl text-sm leading-7 text-black/65">{sectionIntroduction}</p>
             </div>
             <div className="mt-16 grid gap-3 md:grid-cols-3">
               {benefits.map((benefit, index) => (
@@ -121,7 +125,7 @@ export default function SeoProductPage({
                   <h3 className="mt-12 text-xl font-semibold tracking-[-0.03em]">
                     {benefit.title}
                   </h3>
-                  <p className="mt-4 text-[13px] leading-6 text-black/46">{benefit.body}</p>
+                  <p className="mt-4 text-[13px] leading-6 text-black/65">{benefit.body}</p>
                 </article>
               ))}
             </div>
@@ -130,7 +134,7 @@ export default function SeoProductPage({
 
         <section className="bg-[#e9eae4] px-6 py-24 sm:py-32 lg:px-10">
           <div className="mx-auto max-w-[1320px]">
-            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-black/38">
+            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-black/65">
               How it works
             </p>
             <div className="mt-8 grid gap-4 lg:grid-cols-3">
@@ -143,7 +147,7 @@ export default function SeoProductPage({
                     {index + 1}
                   </span>
                   <h2 className="mt-16 text-2xl font-semibold tracking-[-0.04em]">{step.title}</h2>
-                  <p className="mt-4 text-[13px] leading-6 text-white/45">{step.body}</p>
+                  <p className="mt-4 text-[13px] leading-6 text-white/70">{step.body}</p>
                 </article>
               ))}
             </div>
@@ -163,7 +167,7 @@ export default function SeoProductPage({
               {useCases.map((useCase) => (
                 <article key={useCase.title} className="border-t border-black/10 pt-6">
                   <h3 className="text-lg font-semibold tracking-[-0.025em]">{useCase.title}</h3>
-                  <p className="mt-3 max-w-xl text-[13px] leading-6 text-black/46">
+                  <p className="mt-3 max-w-xl text-[13px] leading-6 text-black/65">
                     {useCase.body}
                   </p>
                 </article>
@@ -184,7 +188,7 @@ export default function SeoProductPage({
               {questions.map((item) => (
                 <article key={item.question} className="border-b border-black/9 py-7 first:pt-0">
                   <h3 className="text-lg font-semibold tracking-[-0.025em]">{item.question}</h3>
-                  <p className="mt-3 text-[13px] leading-6 text-black/48">{item.answer}</p>
+                  <p className="mt-3 text-[13px] leading-6 text-black/65">{item.answer}</p>
                 </article>
               ))}
             </div>
@@ -197,7 +201,7 @@ export default function SeoProductPage({
               <h2 className="text-5xl font-semibold leading-[.92] tracking-[-0.06em] sm:text-7xl">
                 Let visitors talk to your website.
               </h2>
-              <p className="mx-auto mt-6 max-w-xl text-sm leading-7 text-white/45">
+              <p className="mx-auto mt-6 max-w-xl text-sm leading-7 text-white/70">
                 Give Obseri one public URL. Review what it learns, shape the agent, and test the
                 real visitor experience before you publish.
               </p>
@@ -213,7 +217,7 @@ export default function SeoProductPage({
       </main>
 
       <footer className="px-6 py-10 lg:px-10">
-        <div className="mx-auto flex max-w-[1320px] flex-col gap-5 border-t border-black/8 pt-8 text-xs text-black/42 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mx-auto flex max-w-[1320px] flex-col gap-5 border-t border-black/8 pt-8 text-xs text-black/65 sm:flex-row sm:items-center sm:justify-between">
           <img src="/obseri-logo-dark.svg" alt="Obseri" className="h-7 w-auto" />
           <nav className="flex flex-wrap gap-x-5 gap-y-2">
             <Link to="/ai-voice-agent-for-website" className="transition hover:text-black">
@@ -222,7 +226,11 @@ export default function SeoProductPage({
             <Link to="/ai-chatbot-trained-on-your-website" className="transition hover:text-black">
               Website-trained chatbot
             </Link>
-            <a href="mailto:flamki@obseri.com" className="transition hover:text-black">
+            <Link to="/ai-chatbot-for-lead-generation">Lead generation</Link>
+            <Link to="/website-chatbot-setup-guide">Setup guide</Link>
+            <Link to="/pricing">Pricing</Link>
+            <Link to="/about">About</Link>
+            <a href="mailto:ayush@flamkilabs.com" className="transition hover:text-black">
               Contact
             </a>
           </nav>

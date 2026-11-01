@@ -4537,10 +4537,10 @@ function HelpView() {
               happen. Screenshots and exact error text help us resolve issues faster.
             </p>
             <a
-              href="mailto:flamki@obseri.com?subject=Obseri%20support"
+              href="mailto:ayush@flamkilabs.com?subject=Obseri%20support"
               className="primary-button mt-7 inline-flex"
             >
-              Email flamki@obseri.com
+              Email ayush@flamkilabs.com
               <ExternalLink className="h-4 w-4" />
             </a>
           </div>
@@ -4869,9 +4869,9 @@ function BillingView({
         </div>
 
         <footer className="mt-8 flex shrink-0 flex-col items-center justify-center gap-2 text-center text-sm text-[#6f6e69] sm:flex-row">
-          <span>Need custom capacity, SSO, or a private deployment?</span>
+          <span>Need help with a larger rollout?</span>
           <a
-            href="mailto:flamki@obseri.com?subject=Obseri%20Enterprise"
+            href="mailto:ayush@flamkilabs.com?subject=Obseri%20Enterprise"
             className="font-semibold text-[#0b0b0c] underline decoration-black/25 underline-offset-4 transition hover:decoration-black"
           >
             Talk to enterprise sales
@@ -5584,7 +5584,7 @@ const DEMO_SOUL: Soul = {
     unknownResponse:
       "I don’t have that in my knowledge yet, but I can point you to the closest source.",
     leadCapture: true,
-    escalationEmail: "flamki@obseri.com",
+    escalationEmail: "ayush@flamkilabs.com",
   },
   voice: {
     enabled: true,

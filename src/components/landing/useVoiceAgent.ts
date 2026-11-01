@@ -165,7 +165,7 @@ export function useVoiceAgent() {
             unknownResponse:
               "I don’t have that detail in this demo, but I can help you understand how Obseri works.",
             leadCapture: true,
-            escalationEmail: "flamki@obseri.com",
+            escalationEmail: "ayush@flamkilabs.com",
           },
           chunks: [
             {
@@ -196,7 +196,7 @@ export function useVoiceAgent() {
               id: "landing-integrations",
               pageUrl: "https://obseri.com/#trust",
               pageTitle: "Integration and trust",
-              text: "Each website has a scoped workspace and publish key. Obseri supports signed webhook events for approved integrations. It does not promise a specific price in this demo; plan details should be confirmed with the Obseri team at flamki@obseri.com.",
+              text: "Each website has a scoped workspace and publish key. Obseri supports signed webhook events for approved integrations. It does not promise a specific price in this demo; plan details should be confirmed with the Obseri team at ayush@flamkilabs.com.",
               order: 3,
               tokenEstimate: 47,
             },

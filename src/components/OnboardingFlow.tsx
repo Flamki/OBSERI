@@ -179,7 +179,7 @@ export default function OnboardingFlow({
         <div className="mb-7 flex items-center justify-between">
           <img src="/obseri-logo-dark.svg" alt="Obseri" className="h-7 w-auto" />
           <a
-            href="mailto:flamki@obseri.com?subject=Obseri%20setup%20help"
+            href="mailto:ayush@flamkilabs.com?subject=Obseri%20setup%20help"
             className="text-sm text-[#6f6e69] transition hover:text-[#0b0b0c]"
           >
             Need help?

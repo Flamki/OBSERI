@@ -35,8 +35,8 @@ function AuthPage() {
         </div>
       </section>
 
-      <a className="obseri-auth-help" href="mailto:flamki@obseri.com">
-        Need help? flamki@obseri.com
+      <a className="obseri-auth-help" href="mailto:ayush@flamkilabs.com">
+        Need help? ayush@flamkilabs.com
       </a>
     </main>
   );

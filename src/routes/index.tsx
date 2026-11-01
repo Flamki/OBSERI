@@ -6,13 +6,13 @@ import { authClient } from "@/lib/auth-client";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Obseri: Website Analytics, AI Chat & Lead Capture" },
+      { title: "AI Website Chatbot, Voice & Lead Capture | Obseri" },
       {
         name: "description",
         content:
           "Connect visitor analytics, source-grounded AI chat and voice, and contact capture in one website embed. See the journey from first visit to enquiry.",
       },
-      { property: "og:title", content: "Obseri — Understand Visitors. Start Conversations." },
+      { property: "og:title", content: "Obseri — AI Website Chatbot, Voice & Lead Capture" },
       {
         property: "og:description",
         content:
@@ -23,7 +23,7 @@ export const Route = createFileRoute("/")({
       { property: "og:image:width", content: "1200" },
       { property: "og:image:height", content: "630" },
       { property: "og:image:alt", content: "Obseri AI voice agent and website chatbot" },
-      { name: "twitter:title", content: "Obseri — Understand Visitors. Start Conversations." },
+      { name: "twitter:title", content: "Obseri — AI Website Chatbot, Voice & Lead Capture" },
       {
         name: "twitter:description",
         content: "A voice and text AI assistant trained on your website content.",
@@ -37,9 +37,9 @@ export const Route = createFileRoute("/")({
               "@type": "Organization",
               "@id": "https://obseri.com/#organization",
               name: "Obseri",
-              alternateName: "Obseri AI",
+              alternateName: ["Obseri AI", "obseri.com"],
               url: "https://obseri.com/",
-              email: "flamki@obseri.com",
+              email: "ayush@flamkilabs.com",
               slogan: "See the interest. Start the conversation.",
               disambiguatingDescription:
                 "Obseri is the website intelligence software platform at obseri.com for building source-grounded AI voice agents and chatbots.",
@@ -55,7 +55,7 @@ export const Route = createFileRoute("/")({
               contactPoint: {
                 "@type": "ContactPoint",
                 contactType: "sales and customer support",
-                email: "flamki@obseri.com",
+                email: "ayush@flamkilabs.com",
                 availableLanguage: ["English"],
               },
             },
@@ -64,7 +64,7 @@ export const Route = createFileRoute("/")({
               "@id": "https://obseri.com/#website",
               url: "https://obseri.com/",
               name: "Obseri",
-              alternateName: "Obseri AI",
+              alternateName: ["Obseri AI", "obseri.com"],
               description: "AI voice agents and website chatbots trained on your content.",
               publisher: { "@id": "https://obseri.com/#organization" },
               inLanguage: "en",
@@ -89,7 +89,9 @@ export const Route = createFileRoute("/")({
               description:
                 "Create a source-grounded AI voice agent and website chatbot from your website URL, then customize its personality, test retrieval, and embed it on your site.",
               featureList: [
-                "Advanced website crawling and content refresh",
+                "Website crawling, PDF imports and content refresh",
+                "Semantic knowledge search with keyword fallback",
+                "Team permissions, shared inbox and activity log",
                 "Source-grounded AI answers with citations",
                 "Voice and text conversations",
                 "Custom assistant personality",

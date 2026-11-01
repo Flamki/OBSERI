@@ -82,7 +82,7 @@ export async function scanPublicPage(input: ScanRequest): Promise<ScanResult> {
       headers: {
         accept: "text/html,application/xhtml+xml,text/plain,application/json;q=0.7,*/*;q=0.2",
         "user-agent":
-          "ObseriBot/1.0 (+https://obseri.com; website knowledge crawler; contact flamki@obseri.com)",
+          "ObseriBot/1.0 (+https://obseri.com; website knowledge crawler; contact ayush@flamkilabs.com)",
         ...(input.rendering !== "always" && input.validators?.etag
           ? { "if-none-match": input.validators.etag }
           : {}),
@@ -241,7 +241,7 @@ export async function fetchPublicText(
       headers: {
         accept: options.accept ?? "text/plain,application/xml,text/xml;q=0.9,*/*;q=0.2",
         "user-agent":
-          "ObseriBot/1.0 (+https://obseri.com; website knowledge crawler; contact flamki@obseri.com)",
+          "ObseriBot/1.0 (+https://obseri.com; website knowledge crawler; contact ayush@flamkilabs.com)",
       },
       signal: options.signal
         ? AbortSignal.any([options.signal, AbortSignal.timeout(timeoutMs)])

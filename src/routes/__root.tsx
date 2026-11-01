@@ -74,21 +74,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Obseri - Agentic web intelligence" },
+      { title: "Obseri — AI Website Chatbot, Voice & Lead Capture" },
       {
         name: "description",
         content:
-          "Turn volatile web signals into monitored sources, verifiable data, searchable memory, and repeatable workflows.",
+          "Answer website visitors with AI chat and voice trained on your content. Capture enquiries, understand traffic, and follow up with your team.",
       },
       { name: "author", content: "Obseri" },
       { name: "application-name", content: "Obseri" },
       { name: "theme-color", content: "#0b0b0d" },
       { name: "robots", content: "index, follow, max-image-preview:large" },
-      { property: "og:title", content: "Obseri - Agentic web intelligence" },
+      { property: "og:title", content: "Obseri — AI Website Chatbot, Voice & Lead Capture" },
       {
         property: "og:description",
         content:
-          "Turn volatile web signals into monitored sources, verifiable data, searchable memory, and repeatable workflows.",
+          "Answer website visitors with AI chat and voice trained on your content. Capture enquiries, understand traffic, and follow up with your team.",
       },
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: "Obseri" },

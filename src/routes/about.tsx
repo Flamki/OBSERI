@@ -101,12 +101,12 @@ function AboutPage() {
 
       <footer className="border-t border-black/[0.08] px-6 py-10 lg:px-10">
         <div className="mx-auto flex max-w-[1180px] flex-col gap-5 text-[11px] text-black/45 sm:flex-row sm:items-center sm:justify-between">
-          <span>Obseri · AI voice and chat agents for websites</span>
+          <span>obseri.com · AI chat, voice, and website enquiries</span>
           <a
-            href="mailto:flamki@obseri.com?subject=Obseri%20inquiry"
+            href="mailto:ayush@flamkilabs.com?subject=Obseri%20inquiry"
             className="inline-flex items-center gap-1.5 font-medium text-black/65 transition hover:text-black"
           >
-            flamki@obseri.com <ExternalLink className="h-3 w-3" />
+            ayush@flamkilabs.com <ExternalLink className="h-3 w-3" />
           </a>
         </div>
       </footer>

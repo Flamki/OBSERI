@@ -49,15 +49,15 @@ function WebsiteChatbotPage() {
         "Retrieval testing before launch",
       ]}
       sectionTitle="Know exactly what the chatbot learned—and what it did not."
-      sectionIntroduction="Most website chatbot tools collapse ingestion into a progress spinner. Obseri exposes discovered pages, extracted content, revisions, crawl activity, errors, and the knowledge blocks used during retrieval."
+      sectionIntroduction="Obseri exposes discovered pages, extracted content, revisions, crawl activity, errors, and the knowledge blocks used during retrieval."
       benefits={[
         {
-          title: "Advanced website discovery",
-          body: "The crawler respects robots.txt, finds sitemaps and canonical URLs, prioritizes useful pages, blocks private-network targets, and records page-level failures.",
+          title: "Website pages and PDFs",
+          body: "Import public website pages and text-based PDFs. Supported JavaScript-rendered pages can be crawled too. Inspect the extracted text and import failures before relying on a source.",
         },
         {
           title: "Clean, traceable knowledge",
-          body: "Navigation noise and duplicate content are reduced before chunking. Every searchable block remains connected to its page and source URL.",
+          body: "Semantic search retrieves related content even when visitors use different wording, with keyword fallback when needed. Inspect the supporting sources and test important answers before publishing.",
         },
         {
           title: "Fresh without relearning",
@@ -116,7 +116,7 @@ function WebsiteChatbotPage() {
         {
           question: "Can the chatbot invent answers outside my content?",
           answer:
-            "You can require grounded behavior and define exactly how the agent responds when retrieval does not contain enough evidence. The test lab lets you evaluate this before publishing.",
+            "You can require grounded behavior and set instructions for how the agent responds when retrieval does not contain enough evidence. The test lab lets you evaluate this before publishing.",
         },
       ]}
       relatedHref="/ai-voice-agent-for-website"
