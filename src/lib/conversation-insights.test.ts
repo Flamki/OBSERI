@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SoulConversation } from "@/lib/soul";
+import { createSoul } from "@/lib/soul";
+import { addApprovedAnswer } from "@/lib/knowledge-corrections";
 import {
   countSince,
   extractContact,
@@ -8,6 +10,7 @@ import {
   leadsToCsv,
   relativeTime,
   topQuestions,
+  answersToReview,
 } from "@/lib/conversation-insights";
 
 function conversation(
@@ -48,6 +51,50 @@ describe("extractContact", () => {
     expect(extractContact(conversation(["Is it $80 for 2 items?"])).phone).toBeUndefined();
     expect(extractContact(conversation(["Can I book for 2026-09-20?"])).phone).toBeUndefined();
     expect(extractContact(conversation(["Delivered 20/09/2026?"])).phone).toBeUndefined();
+  });
+});
+
+describe("answersToReview", () => {
+  const unknown =
+    "I don’t have that in my knowledge yet, but I can help you find the right page or person.";
+  it("groups unanswered later questions and opens their most recent conversation", () => {
+    const soul = createSoul("https://example.com");
+    const older = conversation(["Hello", "Do you ship to Canada?"]);
+    older.messages[3].content = unknown;
+    const newer = conversation(["do you ship to canada"], "none", "2026-09-21T10:00:00.000Z");
+    newer.messages[1].content = unknown;
+    const result = answersToReview([older, newer], soul);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ count: 2, conversationId: newer.id, hasDraftAnswer: false });
+  });
+  it("excludes successful uncited answers, greetings and Studio tests", () => {
+    const soul = createSoul("https://example.com");
+    const greeting = conversation(["Hello"]);
+    greeting.messages[1].content = unknown;
+    const preview = conversation(["Refund policy?"]);
+    preview.channel = "playground";
+    preview.messages[1].content = unknown;
+    expect(answersToReview([conversation(["What do you sell?"]), greeting, preview], soul)).toEqual(
+      [],
+    );
+  });
+  it("recognizes custom fallback and only marks enabled, active approved answers", () => {
+    const soul = createSoul("https://example.com");
+    soul.personality.unknownResponse = "Please ask our team about that.";
+    const value = conversation(["Refund policy?"]);
+    value.messages[1].content = soul.personality.unknownResponse;
+    soul.knowledge = addApprovedAnswer(
+      soul.knowledge,
+      "Refund policy?",
+      "Refunds are available within thirty days.",
+    );
+    expect(answersToReview([value], soul)[0].hasDraftAnswer).toBe(true);
+    const page = soul.knowledge.pages.find((p) => p.sourceId?.startsWith("answer-"))!;
+    page.enabled = false;
+    expect(answersToReview([value], soul)[0].hasDraftAnswer).toBe(false);
+    page.enabled = true;
+    soul.knowledge.sources!.find((s) => s.id === page.sourceId)!.status = "paused";
+    expect(answersToReview([value], soul)[0].hasDraftAnswer).toBe(false);
   });
 });
 

@@ -1,4 +1,5 @@
 import { refreshDueKnowledge } from "@/lib/knowledge-refresh-worker";
+import { maintainKnowledgeIndexes } from "@/lib/server/knowledge-index-worker";
 import { createFileRoute } from "@tanstack/react-router";
 import { integrationDatabase, drainWebhookQueue } from "@/lib/integration-store";
 import { pruneConversionData } from "@/lib/analytics-store";
@@ -14,8 +15,9 @@ async function drain({ request }: { request: Request }) {
   await integrationDatabase()`delete from obseri_workspace_invitations where expires_at < now() - interval '30 days'`;
   const results = await drainWebhookQueue(25);
   const knowledge = await refreshDueKnowledge();
+  const indexes = await maintainKnowledgeIndexes();
   return Response.json(
-    { processed: results.length, results, knowledge },
+    { processed: results.length, results, knowledge, indexes },
     {
       headers: { "cache-control": "no-store" },
     },

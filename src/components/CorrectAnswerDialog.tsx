@@ -30,7 +30,7 @@ export function CorrectAnswerDialog({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="obs-app obs-dialog max-h-[85dvh] w-[calc(100%-2rem)] overflow-y-auto rounded-2xl bg-white sm:max-w-xl">
         <DialogTitle>Correct this answer</DialogTitle>
         <DialogDescription>
           Add the facts your assistant should use. Test them before saving.

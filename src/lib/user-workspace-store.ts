@@ -127,7 +127,7 @@ export async function refreshPublishedKnowledge(
 ) {
   // Refresh only the exact published knowledge that was crawled. Never publish draft settings.
   await db()`update obseri_published_souls
-    set soul = jsonb_set(soul, '{knowledge}', ${db().json(after.knowledge)}), updated_at = now()
+    set soul = jsonb_set(soul, '{knowledge}', ${db().json(after.knowledge)}), updated_at = now(), semantic_index_due_at = now()
     where owner_user_id = ${userId} and soul_id = ${before.id}
       and soul->'knowledge' = ${db().json(before.knowledge)}`;
 }

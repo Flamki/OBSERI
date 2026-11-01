@@ -24,7 +24,7 @@ beforeAll(async () => {
   vi.stubEnv("DATABASE_URL", "postgres://test");
   await pg.exec(`create table obseri_user_workspaces (user_id text primary key, workspace_id text, workspace jsonb, created_at timestamptz, updated_at timestamptz);
     create table obseri_team_activity (id bigserial primary key, owner_user_id text references obseri_user_workspaces(user_id) on delete cascade, actor_user_id text, actor_email text, action text, changes jsonb, revision bigint);
-    create table obseri_published_souls (soul_id text primary key, owner_user_id text, soul jsonb, updated_at timestamptz);`);
+    create table obseri_published_souls (soul_id text primary key, owner_user_id text, soul jsonb, updated_at timestamptz, semantic_index_due_at timestamptz default now());`);
 });
 beforeEach(async () => {
   await pg.exec("truncate obseri_user_workspaces, obseri_published_souls cascade");

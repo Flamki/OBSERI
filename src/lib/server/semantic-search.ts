@@ -79,6 +79,24 @@ export async function embedTexts(
   return rows.map((row) => row.embedding);
 }
 
+/** Read only active content hashes for this tenant and embedding model. Never index on a chat request. */
+async function readKnowledgeVectors(owner: string, chunks: KnowledgeChunk[], signal: AbortSignal) {
+  const config = configuration();
+  if (!config || !chunks.length) return new Map<string, number[]>();
+  signal.throwIfAborted();
+  const sql = integrationDatabase();
+  const model = `${config.api}/${config.model}`;
+  const hashes = [...new Set(chunks.map((chunk) => hash(documentText(chunk))))];
+  const rows = await withinDeadline(
+    sql<Array<{ content_hash: string; vector: number[] }>>`
+    select content_hash, vector from obseri_knowledge_vectors
+    where owner_user_id = ${owner} and model = ${model} and content_hash = any(${hashes}) and expires_at > now()
+  `,
+    signal,
+  );
+  return new Map(rows.map((row) => [row.content_hash, row.vector]));
+}
+
 /** Cache only vectors and content hashes, scoped to the owner; source text stays in the workspace. */
 export async function indexKnowledge(owner: string, chunks: KnowledgeChunk[], signal: AbortSignal) {
   const config = configuration();
@@ -88,11 +106,16 @@ export async function indexKnowledge(owner: string, chunks: KnowledgeChunk[], si
   const documents = new Map(
     chunks.map((chunk) => [hash(documentText(chunk)), documentText(chunk)]),
   );
-  const rows = await sql<Array<{ content_hash: string; vector: number[] }>>`
-    select content_hash, vector from obseri_knowledge_vectors
-    where owner_user_id = ${owner} and model = ${model} and content_hash = any(${[...documents.keys()]}) and expires_at > now()
-  `;
-  const vectors = new Map(rows.map((row) => [row.content_hash, row.vector]));
+  const vectors = await readKnowledgeVectors(owner, chunks, signal);
+  // Scheduled maintenance renews vectors still used by published knowledge.
+  if (vectors.size)
+    await withinDeadline(
+      sql`
+    update obseri_knowledge_vectors set expires_at = now() + interval '30 days'
+    where owner_user_id = ${owner} and model = ${model} and content_hash = any(${[...vectors.keys()]})
+  `,
+      signal,
+    );
   const missing = [...documents].filter(([key]) => !vectors.has(key));
   for (let start = 0; start < missing.length; start += 32) {
     if (signal.aborted) break;
@@ -104,7 +127,9 @@ export async function indexKnowledge(owner: string, chunks: KnowledgeChunk[], si
         signal,
         owner,
       );
-      await sql`
+      signal.throwIfAborted();
+      await withinDeadline(
+        sql`
         insert into obseri_knowledge_vectors ${sql(
           batch.map(([key], i) => ({
             owner_user_id: owner,
@@ -120,7 +145,9 @@ export async function indexKnowledge(owner: string, chunks: KnowledgeChunk[], si
           "expires_at",
         )}
         on conflict (owner_user_id, model, content_hash) do update set vector = excluded.vector, expires_at = excluded.expires_at
-      `;
+      `,
+        signal,
+      );
       batch.forEach(([key], i) => vectors.set(key, result[i]));
     } catch (error) {
       if (!signal.aborted)
@@ -140,6 +167,7 @@ export async function prepareSemanticSearch(
   owner: string | null,
   parentSignal?: AbortSignal,
 ): Promise<ChatRequest> {
+  parentSignal?.throwIfAborted();
   if (!owner || !configuration() || !input.chunks.length) return input;
   const query = retrievalQuery(input.messages);
   if (query.trim().split(/\s+/).length < 2) return input;
@@ -150,17 +178,19 @@ export async function prepareSemanticSearch(
   try {
     const config = configuration()!;
     const cacheKey = hash(`${owner}|${config.api}|${config.model}|${query}`);
-    const [vectors, queryVector] = await withinDeadline(
-      Promise.all([
-        indexKnowledge(owner, input.chunks, signal),
-        queryCache.has(cacheKey)
-          ? queryCache.get(cacheKey)!
-          : embedTexts([query], "query", signal, owner).then((v) => {
-              if (queryCache.size >= 256) queryCache.delete(queryCache.keys().next().value!);
-              queryCache.set(cacheKey, v[0]);
-              return v[0];
-            }),
-      ]),
+    const vectors = await readKnowledgeVectors(owner, input.chunks, signal);
+    parentSignal?.throwIfAborted();
+    // An unindexed draft or new publication uses keywords immediately. Do not spend
+    // time or provider budget embedding a query that cannot be compared to anything.
+    if (!vectors.size) return input;
+    const queryVector = await withinDeadline(
+      queryCache.has(cacheKey)
+        ? Promise.resolve(queryCache.get(cacheKey)!)
+        : embedTexts([query], "query", signal, owner).then((v) => {
+            if (queryCache.size >= 256) queryCache.delete(queryCache.keys().next().value!);
+            queryCache.set(cacheKey, v[0]);
+            return v[0];
+          }),
       signal,
     );
     parentSignal?.throwIfAborted();
@@ -181,10 +211,18 @@ export async function prepareSemanticSearch(
   }
 }
 
-export async function warmKnowledgeIndex(owner: string, chunks: KnowledgeChunk[]) {
+export async function warmKnowledgeIndex(
+  owner: string,
+  chunks: KnowledgeChunk[],
+  timeoutMs = 45_000,
+) {
   try {
-    const vectors = await indexKnowledge(owner, chunks, AbortSignal.timeout(45_000));
-    await integrationDatabase()`delete from obseri_knowledge_vectors where owner_user_id = ${owner} and expires_at < now()`;
+    const signal = AbortSignal.timeout(timeoutMs);
+    const vectors = await indexKnowledge(owner, chunks, signal);
+    await withinDeadline(
+      integrationDatabase()`delete from obseri_knowledge_vectors where owner_user_id = ${owner} and expires_at < now()`,
+      signal,
+    );
     return { indexed: vectors.size, total: new Set(chunks.map((c) => hash(documentText(c)))).size };
   } catch {
     return { indexed: 0, total: chunks.length };

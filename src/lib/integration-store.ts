@@ -136,7 +136,8 @@ export async function publishSoul(input: {
         webhook_enabled = excluded.webhook_enabled,
         webhook_url = excluded.webhook_url,
         webhook_secret = excluded.webhook_secret,
-        updated_at = excluded.updated_at
+        updated_at = excluded.updated_at,
+        semantic_index_due_at = now()
     `;
     if (input.audit)
       await transaction`insert into obseri_team_activity (owner_user_id, actor_user_id, actor_email, action, changes)

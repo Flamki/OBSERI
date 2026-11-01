@@ -165,16 +165,26 @@ test("owner can test and save an approved answer from a conversation", async ({ 
   let saved = false;
   await page.route("**/api/chat", async (route) => {
     const body = route.request().postDataJSON();
-    tested = body.chunks.some((chunk: { text: string }) =>
-      chunk.text.includes("Our service costs $29 per month."),
-    );
+    tested =
+      body.stream === true &&
+      body.chunks.some((chunk: { text: string }) =>
+        chunk.text.includes("Our service costs $29 per month."),
+      );
     await route.fulfill({
-      json: {
-        answer: "Our service costs $29 per month.",
-        citations: [],
-        mode: "model",
-        leadIntent: "none",
-      },
+      contentType: "application/x-ndjson",
+      body:
+        JSON.stringify({ type: "answer", text: "Our service costs" }) +
+        "\n" +
+        JSON.stringify({
+          type: "result",
+          result: {
+            answer: "Our service costs $29 per month.",
+            citations: [],
+            mode: "model",
+            leadIntent: "none",
+          },
+        }) +
+        "\n",
     });
   });
   await page.route("**/api/workspace", async (route) => {
@@ -197,7 +207,62 @@ test("owner can test and save an approved answer from a conversation", async ({ 
   ).toBeVisible();
   await expect.poll(() => tested).toBe(true);
   await expect(dialog.getByText(/AI answer/)).toBeVisible();
+  await expect(dialog.getByText(/First text.*Complete/)).toBeVisible();
   await dialog.getByRole("button", { name: "Save to knowledge" }).click();
   await expect(dialog).toBeHidden();
   await expect.poll(() => saved).toBe(true);
+});
+
+test("review queue groups unanswered questions and opens correction with context", async ({
+  page,
+}) => {
+  const question = "Do you support annual billing?";
+  await page.route("**/api/souls/*/conversations*", (route) =>
+    route.fulfill({
+      json: {
+        conversations: [
+          {
+            id: "unanswered",
+            visitorLabel: "Visitor needing help",
+            channel: "widget",
+            leadIntent: "none",
+            startedAt: "2026-11-01T00:00:00.000Z",
+            updatedAt: "2026-11-01T00:00:00.000Z",
+            messages: [
+              {
+                id: "v",
+                role: "visitor",
+                content: question,
+                createdAt: "2026-11-01T00:00:00.000Z",
+              },
+              {
+                id: "a",
+                role: "assistant",
+                content:
+                  "I don’t have that in my knowledge yet, but I can help you find the right page or person.",
+                createdAt: "2026-11-01T00:00:01.000Z",
+              },
+            ],
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto("/app?view=conversations");
+  await page.getByRole("tab", { name: /^Review 1/ }).click();
+  const list = page.getByRole("region", { name: "Conversation list", exact: true });
+  await expect(list.getByText("Answers to review", { exact: true })).toBeVisible();
+  await expect(list.getByText(question, { exact: true })).toBeVisible();
+  await list.getByRole("button", { name: "View conversation" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Visitor needing help", exact: true }),
+  ).toBeVisible();
+  await list.getByRole("button", { name: "Correct answer" }).click();
+  await expect(page.getByRole("dialog").getByText(question, { exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCSS("color", "rgb(23, 23, 23)");
+  await expect(page.getByRole("dialog")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await page.screenshot({
+    path: "test-results/answer-review-correction.png",
+    animations: "disabled",
+  });
 });

@@ -2,10 +2,22 @@ import { afterEach, expect, it, vi } from "vitest";
 import { cosineSimilarity, embedTexts, prepareSemanticSearch } from "./server/semantic-search";
 import { hybridRankKnowledgeChunks } from "./conversation";
 import { createSoul } from "./soul";
+import { createHash } from "node:crypto";
+
+const database = vi.hoisted(() => vi.fn());
+const reserve = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+vi.mock("./integration-store", () => ({ integrationDatabase: () => database }));
+vi.mock("./server/operation-guards", async (original) => ({
+  ...(await original<typeof import("./server/operation-guards")>()),
+  reserveEmbeddingCharacters: reserve,
+  recordOperation: vi.fn().mockResolvedValue(undefined),
+}));
 
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+  database.mockReset();
+  reserve.mockClear();
 });
 const chunks = [
   {
@@ -84,4 +96,63 @@ it("retains keyword retrieval when embeddings are not configured", async () => {
   };
   expect(await prepareSemanticSearch(input, "owner")).toBe(input);
   expect(hybridRankKnowledgeChunks("refunds", chunks)[0].id).toBe("refunds");
+});
+
+function searchInput() {
+  const soul = createSoul("https://example.com");
+  return {
+    soulId: soul.id,
+    personality: soul.personality,
+    chunks,
+    messages: [{ role: "visitor" as const, content: "What is the refund policy?" }],
+  };
+}
+function configure() {
+  vi.stubEnv("OBSERI_EMBEDDING_API_URL", "https://embedding.example/v1");
+  vi.stubEnv("OBSERI_EMBEDDING_API_KEY", "test-only");
+}
+it("does not index documents or spend query budget when no active vectors exist", async () => {
+  configure();
+  database.mockResolvedValue([]);
+  const fetch = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  const input = searchInput();
+  expect(await prepareSemanticSearch(input, "unindexed-owner")).toBe(input);
+  expect(database).toHaveBeenCalledTimes(1);
+  expect(fetch).not.toHaveBeenCalled();
+  expect(reserve).not.toHaveBeenCalled();
+});
+it("reads tenant-scoped active hashes and only embeds the query on a reply", async () => {
+  configure();
+  const contentHash = createHash("sha256")
+    .update(`${chunks[0].pageTitle}\n${chunks[0].text}`)
+    .digest("hex");
+  database.mockResolvedValue([{ content_hash: contentHash, vector: Array(32).fill(1) }]);
+  const fetch = vi
+    .fn()
+    .mockResolvedValue(Response.json({ data: [{ index: 0, embedding: Array(32).fill(1) }] }));
+  vi.stubGlobal("fetch", fetch);
+  const result = await prepareSemanticSearch(searchInput(), "indexed-owner");
+  expect(result.semanticScores?.refunds).toBeCloseTo(1);
+  expect(result.semanticScores?.hours).toBeUndefined();
+  expect(database).toHaveBeenCalledTimes(1);
+  const [sql, owner, model, hashes] = database.mock.calls[0];
+  expect(sql.join("?")).toContain("expires_at > now()");
+  expect(sql.join("?")).toContain("owner_user_id =");
+  expect(owner).toBe("indexed-owner");
+  expect(model).toContain("embedding.example");
+  expect(hashes).toContain(contentHash);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  const body = JSON.parse(fetch.mock.calls[0][1].body);
+  expect(body.input).toHaveLength(1);
+  expect(body.input[0]).toMatch(/^search_query:/);
+});
+it("does not start database or provider work for cancelled replies", async () => {
+  configure();
+  const controller = new AbortController();
+  controller.abort(new Error("Visitor left"));
+  await expect(prepareSemanticSearch(searchInput(), "owner", controller.signal)).rejects.toThrow(
+    "Visitor left",
+  );
+  expect(database).not.toHaveBeenCalled();
 });

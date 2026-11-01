@@ -1,4 +1,85 @@
-import type { SoulConversation } from "@/lib/soul";
+import type { Soul, SoulConversation } from "@/lib/soul";
+
+export type AnswerReview = {
+  key: string;
+  question: string;
+  count: number;
+  conversationId: string;
+  updatedAt: string;
+  hasDraftAnswer: boolean;
+};
+
+function questionKey(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Conservative review hints, not a claim that every flagged answer is wrong. */
+export function answersToReview(conversations: SoulConversation[], soul: Soul): AnswerReview[] {
+  const paused = new Set(
+    (soul.knowledge.sources ?? [])
+      .filter((source) => source.status === "paused")
+      .map((source) => source.id),
+  );
+  const approved = new Set(
+    soul.knowledge.pages
+      .filter(
+        (page) =>
+          page.enabled !== false &&
+          page.sourceId?.startsWith("answer-") &&
+          !paused.has(page.sourceId),
+      )
+      .map((page) =>
+        questionKey(
+          (page.content ?? "").split("\nApproved answer: ")[0].replace(/^Question: /, ""),
+        ),
+      ),
+  );
+  const customUnknown = soul.personality.unknownResponse.trim().toLowerCase();
+  const groups = new Map<string, AnswerReview>();
+  for (const conversation of conversations) {
+    if (conversation.channel === "playground") continue;
+    for (let i = 1; i < conversation.messages.length; i++) {
+      const message = conversation.messages[i];
+      const previous = conversation.messages[i - 1];
+      if (message.role !== "assistant" || previous.role !== "visitor") continue;
+      const answer = message.content.trim().toLowerCase();
+      const uncertain =
+        (customUnknown.length > 0 && answer === customUnknown) ||
+        /\bi (?:don['’]t|do not) have (?:that in my knowledge|enough (?:relevant )?information)\b/.test(
+          answer,
+        );
+      if (!uncertain) continue;
+      const question = previous.content.trim();
+      const key = questionKey(question);
+      if (!key || /^(hi|hello|hey|thanks|thank you|ok|okay)$/.test(key)) continue;
+      const existing = groups.get(key);
+      const updatedAt = message.createdAt;
+      if (existing) {
+        existing.count++;
+        if (Date.parse(updatedAt) > Date.parse(existing.updatedAt)) {
+          existing.updatedAt = updatedAt;
+          existing.conversationId = conversation.id;
+          existing.question = question;
+        }
+      } else
+        groups.set(key, {
+          key,
+          question,
+          count: 1,
+          conversationId: conversation.id,
+          updatedAt,
+          hasDraftAnswer: approved.has(key),
+        });
+    }
+  }
+  return [...groups.values()].sort(
+    (a, b) => b.count - a.count || Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
+  );
+}
 
 export type ConversationContact = { email?: string; phone?: string };
 

@@ -93,6 +93,7 @@ import {
 } from "@/lib/soul";
 import { rankKnowledgeChunks, type ChatResponse } from "@/lib/conversation";
 import {
+  answersToReview,
   countSince,
   extractContact,
   firstQuestion,
@@ -4071,7 +4072,7 @@ function OverviewView({
   );
 }
 
-type ConversationFilter = "all" | "leads" | "visitors" | "tests";
+type ConversationFilter = "all" | "leads" | "visitors" | "tests" | "review";
 
 function ConversationsView({
   soul,
@@ -4106,14 +4107,19 @@ function ConversationsView({
     }
   }, [focusId]);
 
+  const reviews = answersToReview(conversations, soul);
   const counts: Record<ConversationFilter, number> = {
+    review: reviews.length,
     all: conversations.length,
     leads: conversations.filter(isLead).length,
     visitors: conversations.filter((item) => item.channel !== "playground").length,
     tests: conversations.filter((item) => item.channel === "playground").length,
   };
   const needle = query.trim().toLowerCase();
+  const visibleReviews = reviews.filter((item) => item.question.toLowerCase().includes(needle));
   const visible = conversations.filter((item) => {
+    if (filter === "review")
+      return visibleReviews.some((review) => review.conversationId === item.id);
     if (filter === "leads" && !isLead(item)) return false;
     if (filter === "visitors" && item.channel === "playground") return false;
     if (filter === "tests" && item.channel !== "playground") return false;
@@ -4203,6 +4209,7 @@ function ConversationsView({
               [
                 ["all", "All"],
                 ["leads", "Leads"],
+                ["review", "Review"],
                 ["visitors", "Visitors"],
                 ["tests", "Tests"],
               ] as Array<[ConversationFilter, string]>
@@ -4229,7 +4236,58 @@ function ConversationsView({
           tabIndex={0}
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
         >
-          {visible.length ? (
+          {filter === "review" ? (
+            <div>
+              <div className="border-b border-[#ececea] p-4">
+                <h2 className="text-sm font-semibold">Answers to review</h2>
+                <p className="mt-1 text-xs leading-5 text-[#65625b]">
+                  Questions the assistant explicitly could not answer in the loaded visitor
+                  conversations. Check the context before adding a correction.
+                </p>
+              </div>
+              {visibleReviews.map((item) => (
+                <article key={item.key} className="space-y-3 border-b border-[#ececea] p-4">
+                  <p className="break-words text-sm font-medium">{item.question}</p>
+                  <p className="text-xs text-[#65625b]">
+                    {item.count} {item.count === 1 ? "occurrence" : "occurrences"} ·{" "}
+                    {relativeTime(item.updatedAt)}
+                  </p>
+                  {item.hasDraftAnswer && (
+                    <p className="text-xs text-[#42644e]">
+                      Approved answer available · retest before publishing changes.
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="rounded-full border border-[#deded9] px-3 py-2 text-xs font-medium hover:bg-[#f5f5f3]"
+                      onClick={() => {
+                        setSelected(item.conversationId);
+                        setMobileDetail(true);
+                      }}
+                    >
+                      View conversation
+                    </button>
+                    {canCorrect && (
+                      <button
+                        type="button"
+                        className="rounded-full bg-[#171717] px-3 py-2 text-xs font-medium text-white hover:bg-[#333]"
+                        onClick={() => setCorrectionQuestion(item.question)}
+                      >
+                        Correct answer
+                      </button>
+                    )}
+                  </div>
+                </article>
+              ))}
+              {!visibleReviews.length && (
+                <p className="p-6 text-center text-sm text-[#65625b]">
+                  No unanswered questions match. This queue flags explicit uncertainty, so other
+                  answers may still need review.
+                </p>
+              )}
+            </div>
+          ) : visible.length ? (
             visible.map((item) => (
               <button
                 key={item.id}
